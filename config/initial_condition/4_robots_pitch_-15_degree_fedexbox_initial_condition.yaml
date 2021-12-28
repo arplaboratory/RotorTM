@@ -1,0 +1,12 @@
+# Robot Start Position
+robot_start: 
+  - {x: 0.2352, y: -0.3048, z: 1.5997}
+  - {x: 0.2352, y: 0.3048,  z: 1.4997}
+  - {x: -0.3536, y: 0.3048,  z: 1.6419}
+  - {x: -0.3536, y: -0.3048,  z: 1.6419}
+
+# Payload Initial State
+payload_start: {x: 0.0, y: 0.0, z: 1.0, qw: 0.991444861373810, qx: 0.0, qy: 0.130526192220052, qz: 0.0}
+
+# Payload Terminal State (Optional)
+payload_stop: {x: 0.0, y: 0.0, z: 0.0, qw: 1.0, qx: 0.0, qy: 0.0, qz: 0.0}

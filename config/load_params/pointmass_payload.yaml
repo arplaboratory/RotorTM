@@ -1,0 +1,5 @@
+# payload inertia parameters
+mass: 0.07
+
+# path to payload mesh
+mesh_path: ""
