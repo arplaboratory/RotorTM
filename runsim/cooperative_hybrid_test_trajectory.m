@@ -31,7 +31,7 @@ end
 
 pl_odom_pub = rospublisher("/payload/marker","visualization_msgs/Marker","DataFormat","struct");
 payload_marker_scale = ones(3);
-payload_marker_color = [1.0,0.745,0.812,0.941]
+payload_marker_color = [1.0,0.745,0.812,0.941];
 
 system_pub = rospublisher("/system/marker","visualization_msgs/MarkerArray","DataFormat","struct");
 system_marker = rosmessage(system_pub);

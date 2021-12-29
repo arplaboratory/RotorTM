@@ -55,12 +55,12 @@ Visualization Manager:
       Reference Frame: <Fixed Frame>
       Value: true
     - Class: rviz/Axes
-      Enabled: true
+      Enabled: false
       Length: 1
       Name: Axes
       Radius: 0.029999999329447746
       Reference Frame: <Fixed Frame>
-      Value: true
+      Value: false
     - Class: rviz/Marker
       Enabled: true
       Marker Topic: /quadrotor/mesh_visualization/robot
@@ -84,9 +84,17 @@ Visualization Manager:
       Topic: /quadrotor/so3_control/cmd_viz
       Unreliable: false
       Value: true
+    - Class: rviz/MarkerArray
+      Enabled: true
+      Marker Topic: /system/marker
+      Name: MarkerArray
+      Namespaces:
+        "": true
+      Queue Size: 100
+      Value: true
     - Class: rviz/Marker
       Enabled: true
-      Marker Topic: /payload/marker
+      Marker Topic: /payload/path
       Name: Marker
       Namespaces:
         "": true
@@ -94,39 +102,15 @@ Visualization Manager:
       Value: true
     - Class: rviz/Marker
       Enabled: true
-      Marker Topic: /quadrotor1/marker
+      Marker Topic: /payload/des_path
       Name: Marker
       Namespaces:
-        "": true
-      Queue Size: 100
-      Value: true
-    - Class: rviz/Marker
-      Enabled: true
-      Marker Topic: /quadrotor2/marker
-      Name: Marker
-      Namespaces:
-        "": true
-      Queue Size: 100
-      Value: true
-    - Class: rviz/Marker
-      Enabled: true
-      Marker Topic: /quadrotor3/marker
-      Name: Marker
-      Namespaces:
-        "": true
-      Queue Size: 100
-      Value: true
-    - Class: rviz/Marker
-      Enabled: true
-      Marker Topic: /cable/marker
-      Name: Marker
-      Namespaces:
-        "": true
+        {}
       Queue Size: 100
       Value: true
   Enabled: true
   Global Options:
-    Background Color: 48; 48; 48
+    Background Color: 238; 238; 236
     Default Light: true
     Fixed Frame: simulator
     Frame Rate: 30
@@ -152,25 +136,25 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 7.0206756591796875
+      Distance: 6.11641263961792
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: -0.47130370140075684
-        Y: 1.3428865671157837
-        Z: -0.16268019378185272
+        X: 0.9169607758522034
+        Y: 0.1874275505542755
+        Z: -0.15682128071784973
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.4197983145713806
+      Pitch: 0.2997984290122986
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 3.923889398574829
+      Yaw: 4.0038909912109375
     Saved: ~
 Window Geometry:
   Displays:
