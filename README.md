@@ -56,12 +56,12 @@ The users can use the interface to choose different parameter files by clicking 
 By default, the following parameter files are chosen: 
 |Name|Chosen Files|
 |---|---|
-|`config/uav_params/snapdragonfly.yaml`|phd or jpdaf specify in the demo.launch file|
-|`config/control_params/dragonfly_control_gains.yaml`|output of py_imag_proc or /hummingbird0/track/bounding_box specify in the demo.launch file|
-|`config/load_params/triangular_payload.yaml`|/hires/image_raw or hummingbird0/camera/rgb specify in the demo.launch file|
-|`config/control_params/triangular_payload_cooperative_cable_gains.yaml`|output of dragonfly imu or hummingbird0/imu specify in the demo.launch file|
-|`config/attach_mechanism/3_robots_cable_mechanism.yaml`|how many drones in FOV specify in the demo.launch file|
-|`config/initial_condition/3_robots_triangular_payload_initial_condition.yaml`|how many drones in FOV specify in the demo.launch file|
+|`UAV Params`|`config/uav_params/snapdragonfly.yaml`|
+|`Payload Params`|`config/control_params/dragonfly_control_gains.yaml`|
+|`UAV Controller Params`|`config/load_params/triangular_payload.yaml`|
+|`Payload Controller Params`|`config/control_params/triangular_payload_cooperative_cable_gains.yaml`|
+|`Attach Mechanism Params`|`config/attach_mechanism/3_robots_cable_mechanism.yaml`|
+|`Initial Condition`|`config/initial_condition/3_robots_triangular_payload_initial_condition.yaml`|
 
 ```
 $ roslaunch RotorTM rviz.launch
