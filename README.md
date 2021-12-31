@@ -71,7 +71,7 @@ After you choose the trajectory generator type, you can click the `Setup Paramet
 It will pop out one of the two following windows depending on the trajectory generator type you choose: 
 1. <img src="https://github.com/arplaboratory/RotorTM/blob/main/doc/circle.png" width="500" height="125"> 
 2. <img src="https://github.com/arplaboratory/RotorTM/blob/main/doc/min_derivative.png" width="500" height="225">
-You can choose your own trajectory parameters, which you can see [here](https://) for further explanation of the parameters. 
+You can choose your own trajectory parameters, which you can see [here](https://github.com/arplaboratory/RotorTM/blob/main/doc/trajectory_generator.md) for further explanation of the parameters. 
 
 After you finish choosing the parameters for trajectory generator, you can click the `Set` button. Then you can hit the `Run` button in the main GUI and the simulation should be running. You should be able to see the visualization by running the following command in the terminal window: 
 ```
