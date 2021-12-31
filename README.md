@@ -63,7 +63,7 @@ By default, the following parameter files are chosen to simulate 3 quadrotors tr
 |`Attach Mechanism Params`|`config/attach_mechanism/3_robots_cable_mechanism.yaml`|
 |`Initial Condition`|`config/initial_condition/3_robots_triangular_payload_initial_condition.yaml`|
 
-You can check in [here](https://) to see different kinds of combinatioins of parameters to simulate different situations. Then you can choose the type of trajectory generator to generate trajectory for the payload. We provide 
+You can check in [here](https://github.com/arplaboratory/RotorTM/blob/main/doc/Simulator_Params.md) to see different kinds of combinatioins of parameters to simulate different situations. Then you can choose the type of trajectory generator to generate trajectory for the payload. We provide 
 1. circular trajectory generator
 2. minimum derivative trajectory generator
 
