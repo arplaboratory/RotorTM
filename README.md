@@ -57,8 +57,8 @@ By default, the following parameter files are chosen to simulate 3 quadrotors tr
 |Name|Chosen Files|
 |---|---|
 |`UAV Params`|`config/uav_params/snapdragonfly.yaml`|
-|`Payload Params`|`config/control_params/dragonfly_control_gains.yaml`|
-|`UAV Controller Params`|`config/load_params/triangular_payload.yaml`|
+|`Payload Params`|`config/load_params/triangular_payload.yaml`|
+|`UAV Controller Params`|`config/control_params/dragonfly_control_gains.yaml`|
 |`Payload Controller Params`|`config/control_params/triangular_payload_cooperative_cable_gains.yaml`|
 |`Attach Mechanism Params`|`config/attach_mechanism/3_robots_cable_mechanism.yaml`|
 |`Initial Condition`|`config/initial_condition/3_robots_triangular_payload_initial_condition.yaml`|
