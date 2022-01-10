@@ -1,8 +1,9 @@
- ## Circular Trajectory	
- The circular trajectory generator will generate a circular trajectory such that it will  
+## Circular Trajectory	
+The circular trajectory generator will generate a circular trajectory such that it will  
  1. ramp up to a constant speed
  2. run several cycles of circles ( depending on the period and duration)
  3. ramp down to zero speed. 
+
 Here are the parameters to set for generating the circular trajectory:
 |Name|Chosen Files|
 |---|---|
