@@ -13,18 +13,19 @@ nquad = length(start);
 %% ************************ ROS Initialization **************************
 worldframe = 'simulator';
 payloadframe = 'payload';
+
 cable_pub = rospublisher("/cable/marker","visualization_msgs/Marker","DataFormat","struct");
 cable_marker_scale = 0.01*ones(3);
 cable_marker_color = [1.0,0.5,0.5,0.5];
-
 cable_marker_msg = init_marker_msg(cable_pub,5,0,worldframe,cable_marker_scale,cable_marker_color);
 
 for i = 1:nquad
     robot_marker_pub{i} = rospublisher("/quadrotor"+num2str(i)+"/marker","visualization_msgs/Marker","DataFormat","struct");
     quadrotor_marker_scale = 0.5*ones(3);
     quadrotor_marker_color = [1.0,0.0,0.0,1.0];
-    quadrotor_mesh = 'package://RotorTM/mesh/hummingbird.mesh'; %TODO: move this to quadrotor params.
-    quadrotor_marker_msg{i} = init_marker_msg(robot_marker_pub{i} ,10,0,worldframe,quadrotor_marker_scale,quadrotor_marker_color,quadrotor_mesh);
+    % quadrotor_mesh = 'package://mesh_visualization/mesh/hummingbird.mesh'; %TODO: move this to quadrotor params.
+    % quadrotor_marker_msg{i} = init_marker_msg(robot_marker_pub{i} ,10,0,worldframe,quadrotor_marker_scale,quadrotor_marker_color,quadrotor_mesh);
+    quadrotor_marker_msg{i} = init_marker_msg(robot_marker_pub{i} ,10,0,worldframe,quadrotor_marker_scale,quadrotor_marker_color);
 end
 
 pl_odom_pub = rospublisher("/payload/marker","visualization_msgs/Marker","DataFormat","struct");
@@ -45,16 +46,17 @@ des_path_color = [1.0,0.341,0.0235,0.549];
 des_path_msg = init_marker_msg(des_path_pub,4,0,worldframe,des_path_scale,des_path_color);
 
 %Controller and trajectory generator handles
-payload_mesh = 'package://RotorTM/mesh/triangular_payload.STL'; %TODO move this to pl_params
+
 if nquad == 1
     controlhandle = @single_payload_geometric_controller;
     payload_marker_scale = ones(3)*0.1;
     dynamicshandle = @(t,s,pl_params) hybrid_ptmass_pl_transportationEOM(t, s, controlhandle, trajhandle, quad_params, pl_params);
-    payload_marker_msg = init_marker_msg(pl_odom_pub,2,0,worldframe,payload_marker_scale,payload_marker_color, payload_mesh);
+    payload_marker_msg = init_marker_msg(pl_odom_pub,2,0,worldframe,payload_marker_scale,payload_marker_color);
 else
     quadattcontrolhandle = @cooperative_attitude_controller;
     plcontrolhandle = @cooperative_payload_controller;
     dynamicshandle = @(t,s) cooperative_suspended_pl_transportationEOM(t, s, nquad, plcontrolhandle, quadattcontrolhandle, trajhandle, quad_params, pl_params);
+    payload_mesh = 'package://mesh_visualization/mesh/triangular_payload.STL'; %TODO move this to pl_params
     payload_marker_msg = init_marker_msg(pl_odom_pub,10,0,worldframe,payload_marker_scale,payload_marker_color,payload_mesh);
 end
 
@@ -162,31 +164,31 @@ for iter = 1:max_iter
     quad_state{1} = x(pl_dim_num+1:end);
     
     % Update payload path
-    path_msg.Points(iter).X = payload_state(1);
-    path_msg.Points(iter).Y = payload_state(2);
-    path_msg.Points(iter).Z = payload_state(3);
+    path_msg.points(iter).x = payload_state(1);
+    path_msg.points(iter).y = payload_state(2);
+    path_msg.points(iter).z = payload_state(3);
     path_time = rostime('now');
-    path_msg.Header.Stamp.Sec = uint32(path_time.Sec);
-    path_msg.Header.Stamp.Nsec = uint32(path_time.Nsec);
+    path_msg.header.stamp.sec = uint32(path_time.Sec);
+    path_msg.header.stamp.nsec = uint32(path_time.Nsec);
     send(path_pub, path_msg);
     
     % Update payload desired path
-    des_path_msg.Points(iter).X = desired_state.pos_des(1);
-    des_path_msg.Points(iter).Y = desired_state.pos_des(2);
-    des_path_msg.Points(iter).Z = desired_state.pos_des(3);
-    des_path_msg.Header.Stamp.Sec = uint32(path_time.Sec);
-    des_path_msg.Header.Stamp.Nsec = uint32(path_time.Nsec);
+    des_path_msg.points(iter).x = desired_state.pos_des(1);
+    des_path_msg.points(iter).y = desired_state.pos_des(2);
+    des_path_msg.points(iter).z = desired_state.pos_des(3);
+    des_path_msg.header.stamp.sec = uint32(path_time.Sec);
+    des_path_msg.header.stamp.nsec = uint32(path_time.Nsec);
     send(des_path_pub, des_path_msg);
     
     % Update quadrotor visualization
-    system_marker.Markers(qn) = update_marker_msg(quadrotor_marker_msg{qn},quad_state{qn}(1:3),RotToQuat(QuatToRot(quad_state{qn}(7:10))'),qn);
+    system_marker.markers(qn) = update_marker_msg(quadrotor_marker_msg{qn},quad_state{qn}(1:3),RotToQuat(QuatToRot(quad_state{qn}(7:10))'),qn);
     
     % Update cable visualization
     cable_point_list =  [payload_state(1:3),quad_state{1}(1:3)];
-    system_marker.Markers(2) = update_line_list_msg(cable_marker_msg,cable_point_list,2);
+    system_marker.markers(2) = update_line_list_msg(cable_marker_msg,cable_point_list,2);
     
     % Update payload visualization
-    system_marker.Markers(3) = update_marker_msg(payload_marker_msg,payload_state(1:3),[1;0;0;0],0);
+    system_marker.markers(3) = update_marker_msg(payload_marker_msg,payload_state(1:3),[1;0;0;0],0);
     
     % Publish the marker message
     send(system_pub, system_marker);  
