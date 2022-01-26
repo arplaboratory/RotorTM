@@ -23,7 +23,7 @@ for i = 1:nquad
     robot_marker_pub{i} = rospublisher("/quadrotor"+num2str(i)+"/marker","visualization_msgs/Marker","DataFormat","struct");
     quadrotor_marker_scale = 0.5*ones(3);
     quadrotor_marker_color = [1.0,0.0,0.0,1.0];
-    quadrotor_mesh = 'package://RotorTM/mesh/hummingbird.mesh'; %TODO: move this to quadrotor params.
+    quadrotor_mesh = quad_params.mesh_path; %TODO: move this to quadrotor params.
     quadrotor_marker_msg{i} = init_marker_msg(robot_marker_pub{i} ,10,0,worldframe,quadrotor_marker_scale,quadrotor_marker_color,quadrotor_mesh);
 end
 
