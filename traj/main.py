@@ -41,7 +41,7 @@ def main():
 		translation2 = (desired_state["pos"][0], desired_state["pos"][1], desired_state["pos"][2])
 		b.sendTransform(translation1, rotation, Time.now(), 'test_robot_circle', '/map')
 		b.sendTransform(translation2, rotation, Time.now(), 'test_robot_line', '/map')
-		# publish circule and line traj to tf, use run rviz rviz to visualize (add tf to displays)
+		# publish circle and line traj to tf, use run rviz rviz to visualize (add tf to displays)
 		print(translation1)
 		print(translation2)
 		print()
