@@ -1,0 +1,9 @@
+max_derivative_order: 6
+max_exponent: 11
+max_velocity: 3
+max_acceleration: 10
+dimension: 3
+corridor_width: 0.5
+number_of_points_to_check_in_corridor: 10
+corridor_constraint_flag: false
+max_iteration: 300
