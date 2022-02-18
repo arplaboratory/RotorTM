@@ -53,16 +53,27 @@ Then you should be able to see the following GUI interface:
 <img src="https://github.com/arplaboratory/RotorTM/blob/main/doc/gui.png" width="450" height="300">
 
 The users can use the interface to choose different parameter files by clicking the corresponding buttion. 
-By default, the following parameter files are chosen: 
+By default, the following parameter files are chosen to simulate 3 quadrotors transporting a triangular payload: 
 |Name|Chosen Files|
 |---|---|
 |`UAV Params`|`config/uav_params/snapdragonfly.yaml`|
-|`Payload Params`|`config/control_params/dragonfly_control_gains.yaml`|
-|`UAV Controller Params`|`config/load_params/triangular_payload.yaml`|
+|`Payload Params`|`config/load_params/triangular_payload.yaml`|
+|`UAV Controller Params`|`config/control_params/dragonfly_control_gains.yaml`|
 |`Payload Controller Params`|`config/control_params/triangular_payload_cooperative_cable_gains.yaml`|
 |`Attach Mechanism Params`|`config/attach_mechanism/3_robots_cable_mechanism.yaml`|
 |`Initial Condition`|`config/initial_condition/3_robots_triangular_payload_initial_condition.yaml`|
 
+You can check in [here](https://github.com/arplaboratory/RotorTM/blob/main/doc/Simulator_Params.md) to see different kinds of combinatioins of parameters to simulate different situations. Then you can choose the type of trajectory generator to generate trajectory for the payload. We provide 
+1. circular trajectory generator
+2. minimum derivative trajectory generator
+
+After you choose the trajectory generator type, you can click the `Setup Parameters` button. 
+It will pop out one of the two following windows depending on the trajectory generator type you choose: 
+1. <img src="https://github.com/arplaboratory/RotorTM/blob/main/doc/circle.png" width="500" height="125"> 
+2. <img src="https://github.com/arplaboratory/RotorTM/blob/main/doc/min_derivative.png" width="500" height="225">
+You can choose your own trajectory parameters, which you can see [here](https://github.com/arplaboratory/RotorTM/blob/main/doc/trajectory_generator.md) for further explanation of the parameters. 
+
+After you finish choosing the parameters for trajectory generator, you can click the `Set` button. Then you can hit the `Run` button in the main GUI and the simulation should be running. You should be able to see the visualization by running the following command in the terminal window: 
 ```
 $ roslaunch RotorTM rviz.launch
 ```
