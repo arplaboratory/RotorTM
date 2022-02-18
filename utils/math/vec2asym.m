@@ -1,7 +1,7 @@
 function mat = vec2asym(vec)
-% function vec = vee(skewsymmetric)
-%   The vee function maps a skew-symmetric 
-%   matrix to a vector
+% function mat = vec2asym(vec)
+%   The vee function maps a 3-d vector to 
+%   a 3x3 skew-symmetric matrix
 
 [row,col] = size(vec); 
 
