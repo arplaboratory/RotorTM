@@ -1,5 +1,7 @@
+#! /usr/bin/env python
 from math import factorial
 import numpy as np
+# test passed
 def generate_poly(max_exponent,max_diff,symbol):
 	
 	f=np.zeros((max_diff+1, max_exponent+1), dtype=float)
