@@ -1,0 +1,17 @@
+<launch>
+<include file="$(find system_launch)/launch/pl_station_state_control_new_pl_manager.launch"/>
+
+<include file="$(find system_launch)/launch/pl_robot_state_control.launch">
+  <arg name="mav_name" value="dragonfly1" />
+ </include>
+
+<include file="$(find system_launch)/launch/pl_robot_state_control.launch">
+  <arg name="mav_name" value="dragonfly2" />
+ </include>
+
+<include file="$(find system_launch)/launch/pl_robot_state_control.launch">
+  <arg name="mav_name" value="dragonfly3" />
+ </include>
+
+
+ </launch>

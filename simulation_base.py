@@ -1,12 +1,13 @@
 import numpy as np
 import numpy.linalg as linalg
+from yaml.error import Mark
 import rospy
 import scipy.integrate
 from scipy.spatial.transform import Rotation as rot_math
-from visualization_msgs.msg import MarkerArray
+from visualization_msgs.msg import MarkerArray, Marker
 from nav_msgs.msg import Odometry 
 from quadrotor_msgs.msg import RPMCommand, FMCommand 
-from utils import utilslib
+from utils import utilslib, rosutilslib
 import time
 
 
@@ -15,6 +16,8 @@ class simulation_base():
       rospy.init_node('simulation')
       self.rate = 100
       rate = rospy.Rate(self.rate) # 1000hz
+      t_span = (0,1/self.rate)
+      self.worldframe = "simulator"
 
       # init parameters
       self.pl_params = pl_params
@@ -22,52 +25,61 @@ class simulation_base():
       self.nquad = self.pl_params.nquad
       self.pl_dim_num = 13
       self.uav_dim_num = 13
-      self.mav_name = 'uav'
+      self.mav_name = 'dragonfly'
       self.sim_start = False
-      self.uav_F = np.ones(self.nquad) * (self.pl_params.mass/self.nquad + self.uav_params.mass) * self.pl_params.grav
+      self.uav_F = np.matmul(self.pl_params.pseudo_inv_P, np.array([0,0,self.pl_params.mass * self.pl_params.grav,0,0,0])) + np.kron([1]*self.nquad, [0,0,self.uav_params.mass * self.pl_params.grav]) 
+      self.uav_F = self.uav_F.reshape(3,self.nquad)[:,2]
       self.uav_M = np.zeros((3,self.nquad))
       self.cable_is_slack = np.zeros(self.nquad)
 
       self.rho_vec_list = self.pl_params.rho_vec_list
       self.cable_len_list = np.array(self.pl_params.cable_length)
-      print("The rho_vec_list is", self.rho_vec_list)
-      print("The cable_len_list is", self.cable_len_list)
-      print("The number of vehicles is", self.nquad)
-      print(scipy.__version__)
 
-      # ROS Publisher 
-      self.system_publisher = rospy.Publisher('system/marker',MarkerArray,queue_size=10)
-      self.payload_odom_publisher = rospy.Publisher('payload/odom',Odometry,queue_size=10)
-      self.robot_odom_publisher = []
-      for i in range(self.nquad):
-          self.robot_odom_publisher.append(rospy.Publisher(self.mav_name + str(i) + '/odom',Odometry,queue_size=10))
-
-      # ROS Subscriber 
-      self.robot_command_subscriber = []
-      for uav_id in range(self.nquad):
-          mav_name = self.mav_name + str(uav_id+1)
-          self.robot_command_subscriber.append(rospy.Subscriber(mav_name + '/rpm_cmd',RPMCommand,self.rpm_command_callback,uav_id))
-          self.robot_command_subscriber.append(rospy.Subscriber(mav_name + '/fm_cmd',FMCommand,self.force_moment_callback,uav_id))
-
-      t_span = (0,1/self.rate)
-      # TODO: init the x here:
       x = np.zeros(self.pl_dim_num + self.uav_dim_num * self.nquad)
       for i in range(self.nquad+1): 
         if i > 0:
             print("initalizing robot ", i)
             x[i*13:i*13+3] = x[0:3] + self.rho_vec_list[:,i-1] + np.array([0,0,self.cable_len_list[i-1]])
         x[i*13 + 6] = 1
-      print("The initial state of the system is with shape,", x.shape)
-      
+
+      # ROS Publisher 
+      self.system_publisher = rospy.Publisher('system/marker',MarkerArray,queue_size=10)
+      self.payload_odom_publisher = rospy.Publisher('payload/odom',Odometry,queue_size=10)
+      self.robot_odom_publisher = []
+      self.attach_publisher = []
+      for i in range(self.nquad):
+          self.robot_odom_publisher.append(rospy.Publisher(self.mav_name + str(i+1) + '/odom',Odometry,queue_size=10))
+          self.attach_publisher.append(rospy.Publisher(self.mav_name + str(i+1) + '/attach',Odometry,queue_size=10))
+
+      # ROS Subscriber 
+      self.robot_command_subscriber = []
+      for uav_id in range(self.nquad):
+          mav_name = self.mav_name + str(uav_id+1)
+          self.robot_command_subscriber.append(rospy.Subscriber(mav_name + '/rpm_cmd',RPMCommand,self.rpm_command_callback,uav_id))
+          self.robot_command_subscriber.append(rospy.Subscriber(mav_name + '/fm_cmd',FMCommand,self.fm_command_callback,uav_id))
+    
+      # Visualization Init
+      self.cable_marker_scale = 0.01 * np.ones(3)
+      self.cable_marker_color = np.array([1.0,0.5,0.5,0.5])
+      self.cable_marker_msg = rosutilslib.init_marker_msg(Marker(),5,0,self.worldframe,self.cable_marker_scale,self.cable_marker_color)
+      self.uav_marker_scale = 0.5 * np.ones(3)
+      self.uav_marker_color = np.array([1.0,0.0,0.0,1.0])
+      self.uav_mesh = self.uav_params.mesh_path
+      self.uav_marker_msg = rosutilslib.init_marker_msg(Marker(),10,0,self.worldframe,self.uav_marker_scale,self.uav_marker_color,self.uav_mesh)
+      self.payload_marker_scale = np.ones(3)
+      self.payload_marker_color = np.array([1.0,0.745,0.812,0.941])
+      self.payload_mesh = self.pl_params.mesh_path
+      self.payload_marker_msg = rosutilslib.init_marker_msg(Marker(),10,0,self.worldframe,self.payload_marker_scale,self.payload_marker_color,self.payload_mesh)
+
       while not rospy.is_shutdown():
         # Without event
         #tsave, xsave = scipy.integrate.solve_ivp(rotortm_simulation_base.run(), t_span, x, method='RK45', event = simulation_base.guard())
         # With event
         start = time.time()
-        sol = scipy.integrate.solve_ivp(self.hybrid_cooperative_rigidbody_pl_transportationEOM, t_span, x, method='RK23')
+        sol = scipy.integrate.solve_ivp(self.hybrid_cooperative_rigidbody_pl_transportationEOM, t_span, x, method='RK45', t_eval=t_span)
         end = time.time()
-        print(end -start)
-        #print(sol)
+        x = sol.y[:,1]
+
         # The simulation must first run on the quadrotors
         # Then the simulation simulates the dynamics of the payload
         # If this is the first iteration in the simulation,
@@ -97,16 +109,76 @@ class simulation_base():
         # Check if the cable is slack
         cable_is_slack = not istaut(x(np.arange(1,3+1)) + np.transpose(QuatToRot(x(np.arange(7,10+1)))) * pl_params.rho_vec_list,x(13 * np.array([np.arange(1,nquad+1)]) + np.array([[1],[2],[3]])),pl_params.cable_length) 
         '''
+        
+        # Publish payload odometry
+        current_time = rospy.get_rostime()
         payload_odom = Odometry()
-        payload_odom.header.stamp = rospy.get_rostime()
-        payload_odom.pose.pose.position.x = sol.y[:,0][0]
-        payload_odom.pose.pose.position.y = sol.y[:,0][1]
-        payload_odom.pose.pose.position.z = sol.y[:,0][2]
-        payload_odom.pose.pose.orientation.w = sol.y[:,0][6]
-        payload_odom.pose.pose.orientation.x = sol.y[:,0][7]
-        payload_odom.pose.pose.orientation.y = sol.y[:,0][8]
-        payload_odom.pose.pose.orientation.z = sol.y[:,0][9]
+        payload_odom.header.stamp = current_time
+        payload_odom.header.frame_id = self.worldframe 
+        payload_odom.pose.pose.position.x    = sol.y[:,1][0]
+        payload_odom.pose.pose.position.y    = sol.y[:,1][1]
+        payload_odom.pose.pose.position.z    = sol.y[:,1][2]
+        payload_odom.twist.twist.linear.x    = sol.y[:,1][3]
+        payload_odom.twist.twist.linear.y    = sol.y[:,1][4]
+        payload_odom.twist.twist.linear.z    = sol.y[:,1][5]
+        payload_odom.pose.pose.orientation.w = sol.y[:,1][6]
+        payload_odom.pose.pose.orientation.x = sol.y[:,1][7]
+        payload_odom.pose.pose.orientation.y = sol.y[:,1][8]
+        payload_odom.pose.pose.orientation.z = sol.y[:,1][9]
+        payload_odom.twist.twist.angular.x   = sol.y[:,1][10]
+        payload_odom.twist.twist.angular.y   = sol.y[:,1][11]
+        payload_odom.twist.twist.angular.z   = sol.y[:,1][12]
         self.payload_odom_publisher.publish(payload_odom)
+
+        payload_rotmat = utilslib.QuatToRot(sol.y[:,0][6:10])
+
+        system_marker = MarkerArray()
+        for uav_id in range(self.nquad):
+            # Publish UAV odometry
+            uav_odom = Odometry()
+            uav_odom.header.stamp = current_time
+            uav_odom.header.frame_id = self.worldframe 
+            uav_state = sol.y[:,1][self.pl_dim_num+self.uav_dim_num*uav_id:self.pl_dim_num+self.uav_dim_num*(uav_id+1)]
+            #print("The uav", uav_id + 1, "_state is",uav_state)
+            #print("The full state is",x)
+            uav_odom.pose.pose.position.x = uav_state[0]
+            uav_odom.pose.pose.position.y = uav_state[1]
+            uav_odom.pose.pose.position.z = uav_state[2]
+            uav_odom.twist.twist.linear.x = uav_state[3]
+            uav_odom.twist.twist.linear.y = uav_state[4]
+            uav_odom.twist.twist.linear.z = uav_state[5]
+            uav_odom.pose.pose.orientation.w = uav_state[6]
+            uav_odom.pose.pose.orientation.x = uav_state[7]
+            uav_odom.pose.pose.orientation.y = uav_state[8]
+            uav_odom.pose.pose.orientation.z = uav_state[9]
+            uav_odom.twist.twist.angular.x = uav_state[10]
+            uav_odom.twist.twist.angular.y = uav_state[11]
+            uav_odom.twist.twist.angular.z = uav_state[12]
+            self.robot_odom_publisher[uav_id].publish(uav_odom)
+
+            # Publish UAV odometry
+            attach_odom = Odometry()
+            attach_odom.header.stamp = current_time
+            attach_odom.header.frame_id = self.worldframe 
+            #TODO: continue here publish the attach odom. 
+            attach_pos = sol.y[:,1][0:3] + np.matmul(payload_rotmat, self.rho_vec_list[:,uav_id])
+            attach_vel = sol.y[:,1][3:6] + np.matmul(payload_rotmat, np.cross(sol.y[:,0][10:13], self.rho_vec_list[:,uav_id]))
+            attach_odom.pose.pose.position.x = attach_pos[0]
+            attach_odom.pose.pose.position.y = attach_pos[1]
+            attach_odom.pose.pose.position.z = attach_pos[2]
+            attach_odom.twist.twist.linear.x = attach_vel[0]
+            attach_odom.twist.twist.linear.y = attach_vel[1]
+            attach_odom.twist.twist.linear.z = attach_vel[2]
+            self.attach_publisher[uav_id].publish(attach_odom)
+
+            system_marker.markers.append(rosutilslib.update_marker_msg(self.uav_marker_msg,uav_state[0:3],uav_state[6:10]))
+
+        # Update cable visualization
+        # system_marker.markers.append(update_line_list_msg(self.cable_marker_msg,cable_point_list,nquad + 1))
+        # Update payload visualization
+        system_marker.markers.append(rosutilslib.update_marker_msg(self.payload_marker_msg,x[0:3],x[6:10]))
+        self.system_publisher.publish(system_marker)
+
         rate.sleep()    
 
   def hybrid_cooperative_rigidbody_pl_transportationEOM(self, t, s): 
@@ -227,7 +299,9 @@ class simulation_base():
              sdotQuad = self.taut_quadEOM_readonly(uav_s,F,M,T)
          sdot = np.concatenate((sdot,sdotQuad))
 
+      #print("The sdot for load is", sdotLoad)
       return sdot
+      
       #return np.zeros(91)
     
   def rigidbody_payloadEOM_readonly(self, s, F, M, invML, C, D, E): 
@@ -359,36 +433,17 @@ class simulation_base():
       sdot[10] = pqrdot[0]
       sdot[11] = pqrdot[1]
       sdot[12] = pqrdot[2]
-
       return sdot
 
-  def init_marker_msg(self, marker_msg, type, action, frame_id, scale = [1,1,1], color = [1,0,0,0], mesh_resource=''):
-
-      time = rospy.time("now")
-      marker_msg.header.stamp.sec = time.Sec
-      marker_msg.header.stamp.nsec = time.Nsec
-      print("The scale is", scale)
-      print("The color is", color)
-      print("The mesh_resource is", mesh_resource)
-
-      marker_msg.header.frame_id = frame_id
-      marker_msg.type = int32(type)
-      marker_msg.action = int32(action)
-      marker_msg.scale.x = scale[0]
-      marker_msg.scale.y = scale[1]
-      marker_msg.scale.z = scale[2]
-      marker_msg.color.a = color[0]
-      marker_msg.color.r = color[1]
-      marker_msg.color.g = color[2]
-      marker_msg.color.b = color[3]
-
-      return marker_msg
 
   def rpm_command_callback(self,rpm_command,uav_id):
       return
 
   def fm_command_callback(self,fm_command,uav_id):
+      #print("I am getting the thrust and moment command for UAV ", uav_id)
       self.uav_F[uav_id] = fm_command.thrust
       self.uav_M[0,uav_id] = fm_command.moments.x
       self.uav_M[1,uav_id] = fm_command.moments.y
       self.uav_M[2,uav_id] = fm_command.moments.z
+      #print("The uav_F is ", self.uav_F)
+      #print("The uav_M is ", self.uav_M)
