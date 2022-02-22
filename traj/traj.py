@@ -1,19 +1,25 @@
 #! /usr/bin/env python
 
 
-from generate_poly import generate_poly
+from RotorTM.utils.Optimization.entire_path.generate_poly import generate_poly
+from RotorTM.utils.Optimization.entire_path.generate_poly_coeff import generate_poly_coeff
+from RotorTM.utils.Optimization.optimize_traj import optimize_traj
+from RotorTM.utils.Optimization.entire_path.generate_polynomial_matrix import generate_polynomial_matrix
 from numpy import sin
 from numpy import cos
 import numpy as np
+from RotorTM.utils.Optimization.allocate_time import allocate_time
 
 
 class traj:
 	def __init__(self):
 		# for circles
+		self.state_struct = {}
 		self.Radius = None
 		self.ramp_theta_coeff = None
 		self.zcoeff = None
 		self.tf = None
+		self.last_pos = None
 		self.offset_pos = None
 		self.T = None 
 		self.omega_des = None
@@ -38,12 +44,8 @@ class traj:
 		self.polynomial_coeff = None
 		self.traj_constant = None
 
-	def circle(self, t, state_struct, init_pos = None, r = None, period = None, circle_duration = None):
+	def circle(self, t, init_pos = None, r = None, period = None, circle_duration = None):
 		# CIRCLE trajectory generator for a circle
-
-		# =================== Your code goes here ===================
-		# You have to set the pos, vel, acc, yaw and yawdot variables
-		
 
 		if (np.all(init_pos!=None)) and (r != None) and (period != None) and (circle_duration != None):
 			print('Generating Circular Trajectory ...')
@@ -108,7 +110,7 @@ class traj:
 				temp_pos = np.append(x_pos, y_pos, axis=0)
 				temp_pos = np.append(temp_pos, self.start[2], axis=0)
 				pos = np.add(self.offset_pos, temp_pos)
-				last_pos = pos
+				self.last_pos = pos
 				vel = np.append(x_vel, y_vel, axis=0)
 				vel = np.append(vel, np.array([0.0]), axis=0)
 				acc = np.append(x_acc, y_acc, axis=0)
@@ -125,21 +127,19 @@ class traj:
 				yaw = 0
 				yawdot = 0
 
-			state_struct["pos_des"] = pos
-			state_struct["vel_des"] = vel
-			state_struct["acc_des"] = acc
-			state_struct["jrk_des"] = jrk
-			state_struct["qd_yaw_des"] = yaw
-			state_struct["qd_yawdot_des"] = yawdot
-			state_struct["quat_des"] = np.array([1,0,0,0])
-			state_struct["omega_des"] = np.array([0,0,0])
-			return state_struct
+			self.state_struct["pos_des"] = pos
+			self.state_struct["vel_des"] = vel
+			self.state_struct["acc_des"] = acc
+			self.state_struct["jrk_des"] = jrk
+			self.state_struct["qd_yaw_des"] = yaw
+			self.state_struct["qd_yawdot_des"] = yawdot
+			self.state_struct["quat_des"] = np.array([1,0,0,0])
+			self.state_struct["omega_des"] = np.array([0,0,0])
 
 	def line_quintic_traj(self, t, map = None, path = None):
 
 		# map is a class 
 		# path is a 2D array
-		desired_state = {}
 		if (np.any(map!= None) ) and (np.any(path != None)):
 			self.mapquad = map
 			self.pathall = path
@@ -205,8 +205,8 @@ class traj:
 		else:
 				lengthtime = self.timepoint.shape[0]
 				length = lengthtime -1 
-				desired_state["yaw"] = 0
-				desired_state["yawdot"] = 0
+				self.state_struct["qd_yaw_des"] = 0
+				self.state_struct["qd_yawdot_des"] = 0
 				state = np.zeros((3, 3), dtype=float)
 				for i in range(1, length+1):
 					if (t >= self.timepoint[i-1][0]) and (t < self.timepoint[i][0]) and (self.timesegment[i-1, 1] == 0):
@@ -221,7 +221,72 @@ class traj:
 						state[0, :] = self.finalpath[lengthtime - 1, :]
 						state[1, :] = np.array([0,0,0])
 						state[2, :] = np.array([0,0,0])
-				desired_state["pos"] = np.transpose(state[0,:])
-				desired_state["vel"] = np.transpose(state[1,:])
-				desired_state["acc"] = np.transpose(state[2,:])
-				return desired_state
+				self.state_struct["pos_des"] = np.transpose(state[0,:])
+				self.state_struct["vel_des"] = np.transpose(state[1,:])
+				self.state_struct["acc_des"] = np.transpose(state[2,:])
+				self.state_struct["jrk_des"] = np.array([[0],[0],[0]])
+
+	# init optimization still needs work
+	def min_snap_traj_generator(self, t_current, path = None, options = None):
+		
+		if (np.any(path!= None) ) and (np.any(options != None)):
+			self.pathall = path
+			self.finalpath = path
+			self.traj_constant = options
+
+			if (self.traj_constant.pt_num-1 > self.traj_constant.total_traj_num):
+				self.traj_constant.pt_num = self.traj_constant.total_traj_num + 1
+
+			self.traj_constant.traj_num = self.traj_constant.pt_num -1
+			self.polynomial_coeff = generate_poly_coeff(self.traj_constant)
+			
+			# optimization
+			# skipping options
+
+			T_seg_c = allocate_time(path,self.traj_constant.max_vel,self.traj_constant.max_acc)
+			self.coefficient, self.timelist = optimize_traj(path, self.traj_constant, T_seg_c, self.traj_constant.cor_constraint)
+
+			# for testing only 
+			self.coefficient = np.array([[0,	0,	0,	-0.0416965619698132,	-0.218855981262230,	-0.0208482939048973,	0.00424521399370728,	-0.0251901718012580,	0.00212268167645621,	0.00459027025679635,	0.0222167480760644,	0.00229515499570285],
+										[0,	0,	0,	-0.0814617284400699,	-0.469566063947324,	-0.0407308912865352,	0.0275479920453524,	-0.0179498997335257,	0.0137742475703451,	0.0118057902230596,	0.0623377330609565,	0.00590295642097165],
+										[0,	0,	0,	-0.0803408604327523,	-0.551727479722655,	-0.0401704607750187,	0.0949170196048935,	0.112624383038113,	0.0474589936469037,	0.00411933277946876,	0.0575517458974790,	0.00205975572807737],
+										[-0.0249656167735726,	-0.426569039465686,	-0.0124828290725290,	0.106121451973093,	0.404135871202583,	0.0530607521375807,	0.0859282067852385,	0.177728245067686,	0.0429636891834999,	-0.0417837413463769,	-0.112778704823717,	-0.0208919058332887],
+										[0.0242038574976291,	0.214990722292932,	0.0121019398308200,	-0.0222871727141851,	-0.0749990722400463,	-0.0111435916898159,	-0.0529474360850257,	-0.103304068719143,	-0.0264735800578703,	0.0157155526648616,	0.0335421691862252,	0.00785777974313101],
+										[-0.00373462924007937,	-0.0272001398473725,	-0.00186731607510025,	0.00134432536799305,	0.00426206626558220,	0.000672163015238655,	0.0120293360085826,	0.0231969692411790,	0.00601464120309192,	-0.00241789734889025,	-0.00467170989942681,	-0.00120894836962065],
+										[-2.48561205136277e-16,	-9.27996732877306e-16,	-1.24282002527195e-16,	4.33821379326722e-07,	1.62825901690269e-06,	2.16909907382701e-07,	-0.00158020559967943,	-0.00303823484295296,	-0.000790099322363965,	0.000213830650773867,	0.000391157592120971,	0.000106915219643745],
+										[-1.35632755842742e-15,	-5.07528217681406e-15,	-6.78171395489735e-16,	-6.58187453788788e-08,	-2.47037798415863e-07,	-3.29092510985259e-08,	0.000139951790592016,	0.000269070641338854,	6.99755790528368e-05,	-1.26268454291684e-05,	-2.20318910770929e-05,	-6.31341100126710e-06],
+										[-1.26582141131039e-15,	-4.75862346128331e-15	,-6.32917809185207e-16,	6.89704835974672e-09,	2.58867966276567e-08,	3.44851113793549e-09,	-8.63682647884204e-06,	-1.66043686290165e-05,	-4.31839321718896e-06,	5.18822850783462e-07,	8.55770929089490e-07,	2.59410691959851e-07],
+										[4.50722490689024e-16,	1.69328680108062e-15,	2.25363774930036e-16,	-4.75568765410979e-10,	-1.78496436433108e-09,	-2.37783463180274e-10,	3.53727601156553e-07,	6.80013783190245e-07,	1.76862960062070e-07,	-1.41222589051678e-08,	-2.17631026419158e-08,	-7.06110173966658e-09],
+										[-5.76929731399120e-17,	-2.16702982455500e-16,	-2.88468103656573e-17,	1.94285790156342e-11,	7.29219709326689e-11,	9.71425114127762e-12,	-8.65345808413739e-09,	-1.66348693650874e-08,	-4.32670798611338e-09,	2.29094164166653e-10,	3.24641345793079e-10,	1.14546489579265e-10],
+										[2.73089088765438e-18,	1.02567335313399e-17,	1.36546077070260e-18,	-3.56454792477659e-13,	-1.33789766014606e-12,	-1.78226678213842e-13,	9.58016947914100e-11,	1.84155298279425e-10,	4.79006089179353e-11,	-1.67709361404298e-12,	-2.13689385905371e-12,	-8.38541270003930e-13]])
+
+		else:
+			for i in range(1, self.traj_constant.total_traj_num+1):
+
+				if (self.traj_constant.pt_num == 2) or (i%(self.traj_constant.pt_num-1) == 1):
+					t_start = self.timelist[i-1,0]
+				
+				if (t_current >= self.timelist[i-1,0]) and (t_current < self.timelist[i,0]):
+					
+					time_term = t_current - t_start
+					time_matrix = generate_polynomial_matrix(self.traj_constant.max_exponent,3,time_term)
+					state = np.matmul(np.multiply(self.polynomial_coeff[0:4,:], time_matrix), self.coefficient[:,(i-1)*self.traj_constant.dim:i*self.traj_constant.dim])
+					
+				elif t_current >= self.timelist[self.traj_constant.total_traj_num-1]:
+					
+					state = np.zeros((4, 3), dtype=float)
+					state[0,:] = self.finalpath[self.traj_constant.total_traj_num:self.traj_constant.total_traj_num+1,:]
+					state[1,:] = np.array([[0,0,0]])
+					state[2,:] = np.array([[0,0,0]])
+					state[3,:] = np.array([[0,0,0]])
+
+			self.state_struct["pos_des"] = np.transpose(state[0,:])
+			self.state_struct["vel_des"] = np.transpose(state[1,:])
+			self.state_struct["acc_des"] = np.transpose(state[2,:])
+			self.state_struct["jrk_des"] = np.transpose(state[3,:])
+			self.state_struct["qd_yaw_des"] = np.array([[0]])
+			self.state_struct["qd_yawdot_des"] = np.array([[0]])
+			self.state_struct["quat_des"] = np.array([[1,0,0,0]])
+			self.state_struct["omega_des"] = np.array([[0,0,0]])
+
+
