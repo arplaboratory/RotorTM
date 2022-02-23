@@ -175,6 +175,7 @@ def cooperative_hybrid_test_trajectory(start = None,loadstart = None,loadstop = 
             quad_state[qn][np.arange[1,3+1]] = quad_and_cable_state(np.arange(1,3+1))
             quad_state[qn][np.arange[4,6+1]] = payload_state(np.arange(4,6+1)) + payload_rot * cross(payload_state(np.arange(11,13+1)),pl_params.rho_vec_list(:,qn)) - pl_params.cable_length(qn) * quad_and_cable_state(np.arange(quad_dim_num + 4,end()+1))
             cable_point_list = np.array([cable_point_list,attach_qn,quad_and_cable_state(np.arange(1,3+1))])
+
         path_msg.points(iter).x = payload_state(1)
         path_msg.points(iter).y = payload_state(2)
         path_msg.points(iter).z = payload_state(3)

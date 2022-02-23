@@ -13,5 +13,7 @@
   <arg name="mav_name" value="dragonfly3" />
  </include>
 
+<include file="$(find rotor_tm)/launch/rviz.launch">
+ </include>
 
  </launch>

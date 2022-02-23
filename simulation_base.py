@@ -61,11 +61,9 @@ class simulation_base():
       # Visualization Init
       self.cable_marker_scale = 0.01 * np.ones(3)
       self.cable_marker_color = np.array([1.0,0.5,0.5,0.5])
-      self.cable_marker_msg = rosutilslib.init_marker_msg(Marker(),5,0,self.worldframe,self.cable_marker_scale,self.cable_marker_color)
       self.uav_marker_scale = 0.5 * np.ones(3)
       self.uav_marker_color = np.array([1.0,0.0,0.0,1.0])
       self.uav_mesh = self.uav_params.mesh_path
-      self.uav_marker_msg = rosutilslib.init_marker_msg(Marker(),10,0,self.worldframe,self.uav_marker_scale,self.uav_marker_color,self.uav_mesh)
       self.payload_marker_scale = np.ones(3)
       self.payload_marker_color = np.array([1.0,0.745,0.812,0.941])
       self.payload_mesh = self.pl_params.mesh_path
@@ -115,30 +113,31 @@ class simulation_base():
         payload_odom = Odometry()
         payload_odom.header.stamp = current_time
         payload_odom.header.frame_id = self.worldframe 
-        payload_odom.pose.pose.position.x    = sol.y[:,1][0]
-        payload_odom.pose.pose.position.y    = sol.y[:,1][1]
-        payload_odom.pose.pose.position.z    = sol.y[:,1][2]
-        payload_odom.twist.twist.linear.x    = sol.y[:,1][3]
-        payload_odom.twist.twist.linear.y    = sol.y[:,1][4]
-        payload_odom.twist.twist.linear.z    = sol.y[:,1][5]
-        payload_odom.pose.pose.orientation.w = sol.y[:,1][6]
-        payload_odom.pose.pose.orientation.x = sol.y[:,1][7]
-        payload_odom.pose.pose.orientation.y = sol.y[:,1][8]
-        payload_odom.pose.pose.orientation.z = sol.y[:,1][9]
-        payload_odom.twist.twist.angular.x   = sol.y[:,1][10]
-        payload_odom.twist.twist.angular.y   = sol.y[:,1][11]
-        payload_odom.twist.twist.angular.z   = sol.y[:,1][12]
+        payload_odom.pose.pose.position.x    = x[0]
+        payload_odom.pose.pose.position.y    = x[1]
+        payload_odom.pose.pose.position.z    = x[2]
+        payload_odom.twist.twist.linear.x    = x[3]
+        payload_odom.twist.twist.linear.y    = x[4]
+        payload_odom.twist.twist.linear.z    = x[5]
+        payload_odom.pose.pose.orientation.w = x[6]
+        payload_odom.pose.pose.orientation.x = x[7]
+        payload_odom.pose.pose.orientation.y = x[8]
+        payload_odom.pose.pose.orientation.z = x[9]
+        payload_odom.twist.twist.angular.x   = x[10]
+        payload_odom.twist.twist.angular.y   = x[11]
+        payload_odom.twist.twist.angular.z   = x[12]
         self.payload_odom_publisher.publish(payload_odom)
 
         payload_rotmat = utilslib.QuatToRot(sol.y[:,0][6:10])
 
         system_marker = MarkerArray()
+        cable_point_list = np.zeros((2*self.nquad,3))
         for uav_id in range(self.nquad):
             # Publish UAV odometry
             uav_odom = Odometry()
             uav_odom.header.stamp = current_time
             uav_odom.header.frame_id = self.worldframe 
-            uav_state = sol.y[:,1][self.pl_dim_num+self.uav_dim_num*uav_id:self.pl_dim_num+self.uav_dim_num*(uav_id+1)]
+            uav_state = x[self.pl_dim_num+self.uav_dim_num*uav_id:self.pl_dim_num+self.uav_dim_num*(uav_id+1)]
             #print("The uav", uav_id + 1, "_state is",uav_state)
             #print("The full state is",x)
             uav_odom.pose.pose.position.x = uav_state[0]
@@ -161,8 +160,8 @@ class simulation_base():
             attach_odom.header.stamp = current_time
             attach_odom.header.frame_id = self.worldframe 
             #TODO: continue here publish the attach odom. 
-            attach_pos = sol.y[:,1][0:3] + np.matmul(payload_rotmat, self.rho_vec_list[:,uav_id])
-            attach_vel = sol.y[:,1][3:6] + np.matmul(payload_rotmat, np.cross(sol.y[:,0][10:13], self.rho_vec_list[:,uav_id]))
+            attach_pos = x[0:3] + np.matmul(payload_rotmat, self.rho_vec_list[:,uav_id])
+            attach_vel = x[3:6] + np.matmul(payload_rotmat, np.cross(sol.y[:,0][10:13], self.rho_vec_list[:,uav_id]))
             attach_odom.pose.pose.position.x = attach_pos[0]
             attach_odom.pose.pose.position.y = attach_pos[1]
             attach_odom.pose.pose.position.z = attach_pos[2]
@@ -171,12 +170,17 @@ class simulation_base():
             attach_odom.twist.twist.linear.z = attach_vel[2]
             self.attach_publisher[uav_id].publish(attach_odom)
 
-            system_marker.markers.append(rosutilslib.update_marker_msg(self.uav_marker_msg,uav_state[0:3],uav_state[6:10]))
+            cable_point_list[2*uav_id,:] = uav_state[0:3]
+            cable_point_list[2*uav_id+1,:] = attach_pos[0:3]
+            uav_marker_msg = rosutilslib.init_marker_msg(Marker(),10,0,self.worldframe,self.uav_marker_scale,self.uav_marker_color,self.uav_mesh)
+            uav_marker = rosutilslib.update_marker_msg(uav_marker_msg,uav_state[0:3],uav_state[6:10],uav_id)
+            system_marker.markers.append(uav_marker)
 
         # Update cable visualization
-        # system_marker.markers.append(update_line_list_msg(self.cable_marker_msg,cable_point_list,nquad + 1))
+        cable_marker_msg = rosutilslib.init_marker_msg(Marker(),5,0,self.worldframe,self.cable_marker_scale,self.cable_marker_color)
+        system_marker.markers.append(rosutilslib.update_line_msg(cable_marker_msg,cable_point_list,uav_id + 1))
         # Update payload visualization
-        system_marker.markers.append(rosutilslib.update_marker_msg(self.payload_marker_msg,x[0:3],x[6:10]))
+        system_marker.markers.append(rosutilslib.update_marker_msg(self.payload_marker_msg,x[0:3],x[6:10],uav_id+2))
         self.system_publisher.publish(system_marker)
 
         rate.sleep()    

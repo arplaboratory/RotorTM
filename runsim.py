@@ -10,9 +10,9 @@ import scipy
 import simulation_base
 
 if __name__ == '__main__':
-  uav_params_path = '/home/guanrui/ws/transportation_ws/src/RotorTM/config/uav_params/snapdragonfly.yaml'
-  payload_params_path = '/home/guanrui/ws/transportation_ws/src/RotorTM/config/load_params/triangular_payload.yaml'
-  mechanism_params_path = '/home/guanrui/ws/transportation_ws/src/RotorTM/config/attach_mechanism/3_robots_cable_mechanism.yaml'
+  uav_params_path = '/home/guanrui/ws/trspt_ws/src/RotorTM/config/uav_params/snapdragonfly.yaml'
+  payload_params_path = '/home/guanrui/ws/trspt_ws/src/RotorTM/config/load_params/triangular_payload.yaml'
+  mechanism_params_path = '/home/guanrui/ws/trspt_ws/src/RotorTM/config/attach_mechanism/3_robots_cable_mechanism.yaml'
   
   read_params_funcs = read_params.read_params()
   pl_params, quad_params = read_params_funcs.system_setup(payload_params_path,uav_params_path,mechanism_params_path)

@@ -9,4 +9,4 @@ max_rpm: 16400
 min_rpm: 5500
 motor_coefficients: 4.0172e-07
 
-mesh_path: "package://rotor_tm/mesh/hummingbird.mesh"
+mesh_path: "package://rotor_tm/mesh/snapdragonflight.stl"

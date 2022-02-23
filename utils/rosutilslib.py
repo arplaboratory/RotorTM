@@ -1,5 +1,6 @@
 import rospy
 import numpy as np
+from geometry_msgs.msg import Point
 
 def init_marker_msg(marker_msg, marker_type, action, frame_id, scale = [1,1,1], color = [1,0,0,0], mesh_resource=''):
 
@@ -32,6 +33,20 @@ def update_marker_msg(marker_stamped_msg, position, orientation, marker_id = 0):
     marker_stamped_msg.pose.orientation.z = orientation[3]
 
     marker_stamped_msg.id = int(marker_id)
+    return marker_stamped_msg
+
+def update_line_msg(marker_stamped_msg, point_list, marker_id = 0):
+
+    num_of_pts,col = point_list.shape
+
+    marker_stamped_msg.id = int(marker_id)
+    for i in range(num_of_pts):
+        new_point = Point()
+        new_point.x = point_list[i,0]
+        new_point.y = point_list[i,1]
+        new_point.z = point_list[i,2]
+        marker_stamped_msg.points.append(new_point)
+
     return marker_stamped_msg
 
 def update_odometry_msg(odometry_stamped_msg, position = np.array([0,0,0]), orientation = np.array([1,0,0,0]), linear_velocity = np.array([0,0,0]), angular_velocity = np.array([0,0,0])):
