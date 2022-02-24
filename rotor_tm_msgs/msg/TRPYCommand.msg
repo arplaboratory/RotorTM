@@ -1,0 +1,10 @@
+Header header
+float64 thrust
+float64 roll
+float64 pitch
+float64 yaw
+geometry_msgs/Vector3 angular_velocity
+geometry_msgs/Quaternion quaternion 
+float64[3] kR
+float64[3] kOm
+quadrotor_msgs/AuxCommand aux

@@ -1,5 +1,4 @@
-#! /usr/bin/env python
-
+#! /usr/bin/env python3
 import traj
 import rospy
 from rospy import Time
@@ -8,6 +7,8 @@ import map
 import create_options
 # need to build quadrotor_msgs package
 from quadrotor_msgs.msg import PositionCommand
+from nav_msgs.msg import Odometry
+from rotor_tm.srv import Circle
 
 
 class traj_node:
@@ -21,6 +22,30 @@ class traj_node:
 		self.time_reference = None
 		self.map = None
 		self.path = None
+
+		rospy.init_node('traj_node')
+		## init a traj
+		# 1 -> circle traj
+		# 2 -> line traj
+		# 3 -> min snap traj
+		traj_type = 3
+		if (traj_type == 1):
+			traj_item = self.circular_traj_init()
+		elif (traj_type == 2):
+			traj_item = self.line_traj_init()
+		else:
+			traj_item = self.min_snap_traj_init()
+		## create a node called 'traj_node'
+
+		## ROS Subscriber 
+		rospy.Subscriber('/Enter_Name', Odometry, self.odom_callback, (traj_item, traj, traj_type))
+
+		## ROS Server
+        #s = rospy.Service('Circle', AddTwoInts, handle_add_two_ints)
+        #s = rospy.Service('Line', AddTwoInts, handle_add_two_ints)
+        #s = rospy.Service('Min_Derivative', AddTwoInts, handle_add_two_ints)
+
+		rospy.spin()
 	
 	def circular_traj_init(self, radius = 1.0, period = 6.0, duration = 6.0, payload_start = np.array([[0.0], [0.0], [0.0], [1.0], [0.0], [0.0], [0.0]])):
 		## initialize circular traj
@@ -51,66 +76,43 @@ class traj_node:
 		snap_traj.min_snap_traj_generator(self, path=path, options=traj_constant)
 		return snap_traj
 
-def callback(data, arg):
-	t = rospy.get_time()
-	now = rospy.get_rostime()
-	traj_item = arg[0]
-	traj = arg[1]
-	check = arg[2]
-	if (check==1):
-		traj_item.circle(t-traj.time_reference)
-	elif (check==2):
-		traj_item.line_quintic_traj(t-traj.time_reference)
-	else: 
-		traj_item.min_snap_traj_generator(t-traj.time_reference)
+	def odom_callback(self, data, arg):
+		t = rospy.get_time()
+		now = rospy.get_rostime()
+		traj_item = arg[0]
+		traj = arg[1]
+		check = arg[2]
 
-	pub = rospy.Publisher('des_traj', PositionCommand)
+		if (check==1):
+			traj_item.circle(t-traj.time_reference)
+		elif (check==2):
+			traj_item.line_quintic_traj(t-traj.time_reference)
+		else: 
+			traj_item.min_snap_traj_generator(t-traj.time_reference)
 
-	message = PositionCommand()
-	message.header.stamp.secs = now.secs
-	message.header.stamp.nsecs = now.nsecs
-	message.position.x=traj_item.state_struct["pos_des"][0]
-	message.position.y=traj_item.state_struct["pos_des"][1]
-	message.position.z=traj_item.state_struct["pos_des"][2]
-	message.velocity.x=traj_item.state_struct["vel_des"][0]
-	message.velocity.y=traj_item.state_struct["vel_des"][1]
-	message.velocity.z=traj_item.state_struct["vel_des"][2]
-	message.acceleration.x=traj_item.state_struct["acc_des"][0]
-	message.acceleration.y=traj_item.state_struct["acc_des"][1]
-	message.acceleration.z=traj_item.state_struct["acc_des"][2]
-	message.jerk.x=traj_item.state_struct["jrk_des"][0]
-	message.jerk.y=traj_item.state_struct["jrk_des"][1]
-	message.jerk.z=traj_item.state_struct["jrk_des"][2]
-	message.yaw=traj_item.state_struct["qd_yaw_des"]
-	message.yaw_dot=traj_item.state_struct["qd_yawdot_des"]
-	pub.publish(message)
+		pub = rospy.Publisher('des_traj', PositionCommand)
 
-# chmod +x traj_node.py
-# under workspace, rosrun pacakge_name traj_node.py
-# run after simulation is running
-# min_snap_traj still needs work
+		message = PositionCommand()
+		message.header.stamp.secs = now.secs
+		message.header.stamp.nsecs = now.nsecs
+		message.position.x=traj_item.state_struct["pos_des"][0]
+		message.position.y=traj_item.state_struct["pos_des"][1]
+		message.position.z=traj_item.state_struct["pos_des"][2]
+		message.velocity.x=traj_item.state_struct["vel_des"][0]
+		message.velocity.y=traj_item.state_struct["vel_des"][1]
+		message.velocity.z=traj_item.state_struct["vel_des"][2]
+		message.acceleration.x=traj_item.state_struct["acc_des"][0]
+		message.acceleration.y=traj_item.state_struct["acc_des"][1]
+		message.acceleration.z=traj_item.state_struct["acc_des"][2]
+		message.jerk.x=traj_item.state_struct["jrk_des"][0]
+		message.jerk.y=traj_item.state_struct["jrk_des"][1]
+		message.jerk.z=traj_item.state_struct["jrk_des"][2]
+		message.yaw=traj_item.state_struct["qd_yaw_des"]
+		message.yaw_dot=traj_item.state_struct["qd_yawdot_des"]
+		pub.publish(message)
 
 def main():
-	## create a node called 'traj_node'
-	rospy.init_node('traj_node')
-	
-	## init a traj
-	# 1 -> circle traj
-	# 2 -> line traj
-	# 3 -> min snap traj
-	traj_type = 3
-	
-	traj = traj_node()
-	if (traj_type == 1):
-		traj_item = traj.circular_traj_init()
-	elif (traj_type == 2):
-		traj_item = traj.line_traj_init()
-	else:
-		traj_item = traj.min_snap_traj_init()
-
-	## subscribe to simulation publication, publishing trajectory using callback function
-	rospy.Subscriber('/Enter Name', PositionCommand, callback, (traj_item, traj, traj_type))
-	rospy.spin()
+	traj_node()
 
 if __name__ == '__main__':
 	main()

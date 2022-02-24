@@ -1,11 +1,13 @@
 #! /usr/bin/env python
 
 import numpy as np
-from generate_path_with_time import generate_path_with_time
-from RotorTM.utils.Optimization.entire_path.generate_H import generate_H
-from generate_constraint import generate_constaint
-from generate_corridor_constraint import generate_corridor_constraint
-from quadprog import quadprog_solve_qp
+from utils.Optimization.generate_path_with_time import generate_path_with_time
+from utils.Optimization.entire_path.generate_H import generate_H
+from utils.Optimization.generate_constraint import generate_constaint
+from utils.Optimization.generate_corridor_constraint import generate_corridor_constraint
+from cvxopt import matrix
+from cvxopt.blas import dot
+from cvxopt.solvers import qp
 
 # quadprog still not working
 # needs rest is working fine
@@ -41,6 +43,8 @@ def optimize_traj(finalpath, traj_constant, T_seg_all, cor_constraint):
         A_corr, b_corr = generate_corridor_constraint(cor_constraint, path_with_time, traj_constant)
         A = np.append(A, A_corr, axis=0)
         b = np.append(b, b_corr, axis=0)
+        qp_sol = qp(matrix(H_result), matrix(np.zeros(H_result.shape[0])), matrix(A), matrix(b), matrix(Aeq), matrix(beq))
+        coeff_curr = qp_sol['x']
         #coeff_curr = quadprog(
         #    P = H_result, 
         #    q = np.zeros((H_result.shape[0],1), dtype=float).reshape(H_result.shape[0]),
@@ -48,13 +52,8 @@ def optimize_traj(finalpath, traj_constant, T_seg_all, cor_constraint):
         #    h = np.zeros((beq.shape[0],1),      dtype=float),
         #    Aeq = Aeq,
         #    beq = beq)
-        coeff_curr = quadprog_solve_qp(   P = H_result,                                       
-                                            q = np.zeros((H_result.shape[0],1), dtype=float).reshape(H_result.shape[0]),   
-                                            G = np.zeros((0,H_result.shape[0]),      dtype=float),   
-                                            h = np.zeros((0,1),      dtype=float),   
-                                            A = Aeq,
-                                            b = beq)
         
+        #coeff_curr = 
         #coeff_curr1 = quadprog_solve_qp(   P = H_result,                                       
         #                                    q = np.zeros((H_result.shape[0],1), dtype=float).reshape(H_result.shape[0]),   
         #                                    G = np.zeros((0,Aeq.shape[1]),      dtype=float),   

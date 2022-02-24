@@ -1,8 +1,7 @@
 #! /usr/bin/env python
 
 import numpy as np
-from sympy import re
-from RotorTM.utils.Optimization.entire_path.generate_poly import generate_poly
+from utils.Optimization.entire_path.generate_poly import generate_poly
 import scipy
 
 # test passed
@@ -20,12 +19,12 @@ def generate_constaint(path, traj_constant):
     accel_limit = np.array([[max_acc, max_acc, max_acc]])
 
     # these init may cause error
-    A = np.zeros((0,traj_num*dim*num_coeff),dtype=float)
+    A = np.zeros((traj_num*dim*num_coeff,traj_num*dim*num_coeff),dtype=float)
     Aeq = np.array([[]])
     Aeq_pos = np.zeros((traj_num*dim*2, traj_num*dim*num_coeff), dtype=float)
     Aeq_vel = np.zeros(((traj_num+1)*dim, traj_num*dim*num_coeff), dtype=float)
     Aeq_acc = np.zeros(((traj_num+1)*dim, traj_num*dim*num_coeff), dtype=float)
-    b = np.zeros((0,1),dtype=float)
+    b = np.zeros((traj_num*dim*num_coeff,1),dtype=float)
     beq = np.array([[]])
     beq_pos = np.zeros((traj_num*dim*2, 1), dtype=float)
     beq_vel = np.zeros(((traj_num+1)*dim, 1), dtype=float)

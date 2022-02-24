@@ -21,8 +21,8 @@ class options:
         self.nc = None
 
     def create_default_option(self, pathlength = 5):
-        self.max_diff = 6
-        self.max_exponent = 11
+        self.max_diff = 4
+        self.max_exponent = 6
         self.max_vel = 3
         self.max_acc = 10
         self.dim = 3

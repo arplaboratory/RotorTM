@@ -10,7 +10,6 @@ from quadrotor_msgs.msg import RPMCommand, FMCommand
 from utils import utilslib, rosutilslib
 import time
 
-
 class simulation_base():
   def __init__(self,pl_params,uav_params):
       rospy.init_node('simulation')

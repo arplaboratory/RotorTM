@@ -1,8 +1,8 @@
 <?xml version="1.0"?>
 <package format="2">
-  <name>rotor_tm</name>
+  <name>rotor_tm_msgs</name>
   <version>0.0.0</version>
-  <description>The rotor_tm package</description>
+  <description>The rotor_tm_msgs package</description>
 
   <!-- One maintainer tag required, multiple allowed, one person per tag -->
   <!-- Example:  -->
@@ -36,7 +36,6 @@
   <build_depend>std_msgs</build_depend>
   <build_depend>sensor_msgs</build_depend>
   <build_depend>message_generation</build_depend>
-  <build_depend>std_srvs</build_depend>
 
   <!-- Dependencies needed after this package is compiled. -->
   <exec_depend>rospy</exec_depend>
@@ -45,7 +44,6 @@
   <exec_depend>std_msgs</exec_depend>
   <exec_depend>sensor_msgs</exec_depend>
   <exec_depend>message_runtime</exec_depend>
-  <exec_depend>std_srvs</exec_depend>
 
 
   <!-- The export tag contains other, unspecified, tags -->
