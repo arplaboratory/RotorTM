@@ -1,6 +1,6 @@
 from unittest import result
 import numpy as np
-from utils.Optimization.generate_2pt_corridor_constraint import generate_2pt_corridor_constraint
+from Optimization.generate_2pt_corridor_constraint import generate_2pt_corridor_constraint
 # untested
 def generate_corridor_constraint(cor_constraint, path_with_time, traj_constant):
     traj_num = path_with_time.shape[0]-1

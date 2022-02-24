@@ -6,9 +6,9 @@ import numpy as np
 import map
 import create_options
 # need to build quadrotor_msgs package
-from quadrotor_msgs.msg import PositionCommand
+from rotor_tm_msgs.msg import PositionCommand
 from nav_msgs.msg import Odometry
-from rotor_tm.srv import Circle
+from rotor_tm_traj.srv import Circle
 
 
 class traj_node:
@@ -22,8 +22,11 @@ class traj_node:
 		self.time_reference = None
 		self.map = None
 		self.path = None
+		self.curr_pose = np.append(np.zeros(3),np.array([1,0,0,0]))
 
+		## create a node called 'traj_node'
 		rospy.init_node('traj_node')
+
 		## init a traj
 		# 1 -> circle traj
 		# 2 -> line traj
@@ -35,13 +38,15 @@ class traj_node:
 			traj_item = self.line_traj_init()
 		else:
 			traj_item = self.min_snap_traj_init()
-		## create a node called 'traj_node'
 
 		## ROS Subscriber 
-		rospy.Subscriber('/Enter_Name', Odometry, self.odom_callback, (traj_item, traj, traj_type))
+		rospy.Subscriber('payload/odom', Odometry, self.odom_callback, (traj_item, traj, traj_type))
 
-		## ROS Server
-        #s = rospy.Service('Circle', AddTwoInts, handle_add_two_ints)
+		## ROS Publisher
+		self.des_traj_pub = rospy.Publisher('payload/des_traj', PositionCommand, queue_size=10)
+
+        ## ROS Server
+		s = rospy.Service('Circle', Circle, self.circle_traj_cb)
         #s = rospy.Service('Line', AddTwoInts, handle_add_two_ints)
         #s = rospy.Service('Min_Derivative', AddTwoInts, handle_add_two_ints)
 
@@ -53,6 +58,17 @@ class traj_node:
 		self.period = period
 		self.duration = duration
 		self.payload_start = payload_start
+		circular_traj = traj.traj()
+		self.time_reference = rospy.get_time()
+		circular_traj.circle(0, init_pos=self.payload_start[0:3,:], r=self.radius, period=self.period, circle_duration=self.duration)
+		return circular_traj
+
+	def circle_traj_cb(self, req):
+		## call circular traj services
+		#self.radius = req.radius
+		#self.period = req.T
+		#self.duration = req.duration
+		#self.payload_start = payload_start
 		circular_traj = traj.traj()
 		self.time_reference = rospy.get_time()
 		circular_traj.circle(0, init_pos=self.payload_start[0:3,:], r=self.radius, period=self.period, circle_duration=self.duration)
@@ -84,13 +100,12 @@ class traj_node:
 		check = arg[2]
 
 		if (check==1):
-			traj_item.circle(t-traj.time_reference)
+			traj_item.circle(t-self.time_reference)
 		elif (check==2):
-			traj_item.line_quintic_traj(t-traj.time_reference)
+			traj_item.line_quintic_traj(t-self.time_reference)
 		else: 
-			traj_item.min_snap_traj_generator(t-traj.time_reference)
-
-		pub = rospy.Publisher('des_traj', PositionCommand)
+			print(t-self.time_reference)
+			traj_item.min_snap_traj_generator(t-self.time_reference)
 
 		message = PositionCommand()
 		message.header.stamp.secs = now.secs
@@ -107,9 +122,14 @@ class traj_node:
 		message.jerk.x=traj_item.state_struct["jrk_des"][0]
 		message.jerk.y=traj_item.state_struct["jrk_des"][1]
 		message.jerk.z=traj_item.state_struct["jrk_des"][2]
-		message.yaw=traj_item.state_struct["qd_yaw_des"]
-		message.yaw_dot=traj_item.state_struct["qd_yawdot_des"]
-		pub.publish(message)
+		message.quaternion.w=traj_item.state_struct["quat_des"][0]
+		message.quaternion.x=traj_item.state_struct["quat_des"][1]
+		message.quaternion.y=traj_item.state_struct["quat_des"][2]
+		message.quaternion.z=traj_item.state_struct["quat_des"][3]
+		message.angular_velocity.x=traj_item.state_struct["omega_des"][0]
+		message.angular_velocity.y=traj_item.state_struct["omega_des"][1]
+		message.angular_velocity.z=traj_item.state_struct["omega_des"][2]
+		self.des_traj_pub.publish(message)
 
 def main():
 	traj_node()

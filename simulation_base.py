@@ -6,7 +6,7 @@ import scipy.integrate
 from scipy.spatial.transform import Rotation as rot_math
 from visualization_msgs.msg import MarkerArray, Marker
 from nav_msgs.msg import Odometry 
-from quadrotor_msgs.msg import RPMCommand, FMCommand 
+from rotor_tm_msgs.msg import RPMCommand, FMCommand 
 from utils import utilslib, rosutilslib
 import time
 
@@ -49,6 +49,7 @@ class simulation_base():
       for i in range(self.nquad):
           self.robot_odom_publisher.append(rospy.Publisher(self.mav_name + str(i+1) + '/odom',Odometry,queue_size=10))
           self.attach_publisher.append(rospy.Publisher(self.mav_name + str(i+1) + '/attach',Odometry,queue_size=10))
+          
 
       # ROS Subscriber 
       self.robot_command_subscriber = []

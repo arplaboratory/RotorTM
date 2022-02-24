@@ -1,3 +1,3 @@
 Header header
 int32[4] rpms
-quadrotor_msgs/AuxCommand aux
+rotor_tm_msgs/AuxCommand aux

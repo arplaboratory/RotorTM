@@ -3,7 +3,7 @@ uint8 TAKEOFF=1
 uint8 LAND=2
 uint8 COPR_FLY=3
 Header header
-quadrotor_msgs/PositionCommand pos_cmd
+rotor_tm_msgs/PositionCommand pos_cmd
 geometry_msgs/Vector3[] acc 
 geometry_msgs/Vector3[] estimated_acc 
 geometry_msgs/Vector3[] mu 

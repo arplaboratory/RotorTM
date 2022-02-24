@@ -1,10 +1,10 @@
 #! /usr/bin/env python
 
 import numpy as np
-from utils.Optimization.generate_path_with_time import generate_path_with_time
-from utils.Optimization.entire_path.generate_H import generate_H
-from utils.Optimization.generate_constraint import generate_constaint
-from utils.Optimization.generate_corridor_constraint import generate_corridor_constraint
+from Optimization.generate_path_with_time import generate_path_with_time
+from Optimization.entire_path.generate_H import generate_H
+from Optimization.generate_constraint import generate_constaint
+from Optimization.generate_corridor_constraint import generate_corridor_constraint
 from cvxopt import matrix
 from cvxopt.blas import dot
 from cvxopt.solvers import qp
@@ -37,34 +37,25 @@ def optimize_traj(finalpath, traj_constant, T_seg_all, cor_constraint):
             return coefficient, timelist_all
 
         path_with_time, timelist_i = generate_path_with_time(path, traj_constant, T_seg, 0)
+
+        # Generate Quadratic Weight matrix
         H_result = generate_H(traj_constant, timelist_i)
 
+        # Generate constraint for conitinuity and max and min limit 
         A, b, Aeq, beq = generate_constaint(path_with_time, traj_constant)
+
+        # Generate corridor constraint
         A_corr, b_corr = generate_corridor_constraint(cor_constraint, path_with_time, traj_constant)
         A = np.append(A, A_corr, axis=0)
         b = np.append(b, b_corr, axis=0)
+
+        # Solve the quadrotor programming
         qp_sol = qp(matrix(H_result), matrix(np.zeros(H_result.shape[0])), matrix(A), matrix(b), matrix(Aeq), matrix(beq))
-        coeff_curr = qp_sol['x']
-        #coeff_curr = quadprog(
-        #    P = H_result, 
-        #    q = np.zeros((H_result.shape[0],1), dtype=float).reshape(H_result.shape[0]),
-        #    G = np.zeros((beq.shape[0],Aeq.shape[1]),      dtype=float),
-        #    h = np.zeros((beq.shape[0],1),      dtype=float),
-        #    Aeq = Aeq,
-        #    beq = beq)
-        
-        #coeff_curr = 
-        #coeff_curr1 = quadprog_solve_qp(   P = H_result,                                       
-        #                                    q = np.zeros((H_result.shape[0],1), dtype=float).reshape(H_result.shape[0]),   
-        #                                    G = np.zeros((0,Aeq.shape[1]),      dtype=float),   
-        #                                    h = np.zeros((beq.shape[0],0),      dtype=float),   
-        #                                    A = Aeq,
-        #                                    b = beq)
 
-
-        
+        # Append the coefficients
+        coeff_curr = np.array(qp_sol['x'])
         coeff = np.append(coeff, coeff_curr)
 
-    coefficient = coeff.reshape((num_coeff, total_traj_num*dim))
+    coefficient = coeff.reshape((total_traj_num*dim, num_coeff)).T
     return coefficient, timelist_all
         

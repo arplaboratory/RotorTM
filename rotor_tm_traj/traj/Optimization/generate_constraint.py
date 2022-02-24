@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 
 import numpy as np
-from utils.Optimization.entire_path.generate_poly import generate_poly
+from Optimization.entire_path.generate_poly import generate_poly
 import scipy
 
 # test passed

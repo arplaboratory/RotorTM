@@ -1,5 +1,4 @@
-float32 Ax
-float32 Ay
+float32 radius
 float32 T
 float32 duration
 ---
