@@ -8,7 +8,6 @@ from Optimization.optimize_traj import optimize_traj
 from Optimization.entire_path.generate_polynomial_matrix import generate_polynomial_matrix
 from Optimization.allocate_time import allocate_time
 
-
 class traj:
 	def __init__(self):
 		# for circles
@@ -48,8 +47,7 @@ class traj:
 		if (np.all(init_pos!=None)) and (r != None) and (period != None) and (circle_duration != None):
 			print('Generating Circular Trajectory ...')
 			self.Radius = r
-			offset_pos_temp = np.append(init_pos[0]-self.Radius, init_pos[1], axis=0)
-			self.offset_pos = np.append(offset_pos_temp, np.array([0]))
+			self.offset_pos = np.array([init_pos[0]-self.Radius, init_pos[1], init_pos[2]])
 			self.T = period
 			self.omega_des = 2*np.pi/self.T
 			self.alpha_des = np.pi/40
@@ -64,13 +62,18 @@ class traj:
 			self.ramp_dist = sum(np.multiply(self.ramp_theta_coeff, np.array([[1],[1/2],[1/3],[1/4],[1/5],[1/6]])))
 			self.circle_dist = self.omega_des*self.duration
 			self.tf = self.ramp_t * 2 + self.duration
-			final_theta = 2 * self.ramp_dist + self.circle_dist
-			x_pos = self.Radius * np.cos(final_theta)
-			y_pos = self.Radius * np.sin(final_theta)
-			stop_pos_temp = np.append(x_pos, y_pos, axis=0)
-			stop_pos_temp = np.append(stop_pos_temp, self.start[2], axis=0)
-			stop = np.add(self.offset_pos, stop_pos_temp)
+
+			#final_theta = 2 * self.ramp_dist[0] + self.circle_dist
+			#x_pos = self.Radius * np.cos(final_theta)
+			#y_pos = self.Radius * np.sin(final_theta)
+			#print("The x_pos is", x_pos)
+			#print("The y_pos is", y_pos)
+			#stop_pos_temp = np.append(x_pos, y_pos, axis=0)
+			#stop_pos_temp = np.append(stop_pos_temp, self.start[2], axis=0)
+			#stop = np.add(self.offset_pos, stop_pos_temp)
 		else:
+			print("The t is ", t)
+			print("The tf is ", self.tf)
 			if t < self.tf:
 				if t<=self.ramp_t:  # ramping up the circle
 					dt = t/self.ramp_t
@@ -105,25 +108,16 @@ class traj:
 				x_jrk = self.Radius * sin(theta_d[0]) * theta_d[1]**3 - 3 * self.Radius * cos(theta_d[0]) * theta_d[1] * theta_d[2] - self.Radius * sin(theta_d[0]) * theta_d[3]
 				y_jrk = -self.Radius * cos(theta_d[0]) * theta_d[1]**3 - 3 * self.Radius * sin(theta_d[0]) * theta_d[1] * theta_d[2] + self.Radius * cos(theta_d[0]) * theta_d[3]
 
-				temp_pos = np.append(x_pos, y_pos, axis=0)
-				temp_pos = np.append(temp_pos, self.start[2], axis=0)
-				pos = np.add(self.offset_pos, temp_pos)
-				self.last_pos = pos
-				vel = np.append(x_vel, y_vel, axis=0)
-				vel = np.append(vel, np.array([0.0]), axis=0)
-				acc = np.append(x_acc, y_acc, axis=0)
-				acc = np.append(acc, np.array([0.0]), axis=0)
-				jrk = np.append(x_jrk, y_jrk, axis=0)
-				jrk = np.append(jrk, np.array([0.0]), axis=0)
-				yaw = 0
-				yawdot = 0
+				pos = self.offset_pos + np.array([x_pos[0], y_pos[0], 0]) 
+				self.last_pos = pos 
+				vel = np.array([x_vel[0], y_vel[0], 0.0])
+				acc = np.array([x_acc[0], y_acc[0], 0.0])
+				jrk = np.array([x_jrk[0], y_jrk[0], 0.0])
 			else:
 				pos = self.last_pos
 				vel = np.array([[0],[0],[0]])
 				acc = np.array([[0],[0],[0]])
 				jrk = np.array([[0],[0],[0]])
-				yaw = 0
-				yawdot = 0
 
 			self.state_struct["pos_des"] = pos
 			self.state_struct["vel_des"] = vel
@@ -137,6 +131,7 @@ class traj:
 		# map is a class 
 		# path is a 2D array
 		if (np.any(map!= None) ) and (np.any(path != None)):
+			print("Generating quintic trajectory")
 			self.mapquad = map
 			self.pathall = path
 			pathqn = self.pathall # ####may need modification
@@ -215,6 +210,7 @@ class traj:
 						state[0, :] = self.finalpath[lengthtime - 1, :]
 						state[1, :] = np.array([0,0,0])
 						state[2, :] = np.array([0,0,0])
+
 				self.state_struct["pos_des"] = np.transpose(state[0,:])
 				self.state_struct["vel_des"] = np.transpose(state[1,:])
 				self.state_struct["acc_des"] = np.transpose(state[2,:])
@@ -222,10 +218,10 @@ class traj:
 				self.state_struct["quat_des"] = np.array([1,0,0,0])
 				self.state_struct["omega_des"] = np.array([0,0,0])
 
-	# init optimization still needs work
 	def min_snap_traj_generator(self, t_current, path = None, options = None):
 		
 		if (np.any(path!= None) ) and (np.any(options != None)):
+			print("The path is ", path)
 			self.pathall = path
 			self.finalpath = path
 			self.traj_constant = options
@@ -237,8 +233,8 @@ class traj:
 			self.polynomial_coeff = generate_poly_coeff(self.traj_constant)
 			
 			# optimization
-			# skipping options
 			T_seg_c = allocate_time(path,self.traj_constant.max_vel,self.traj_constant.max_acc)
+			print(T_seg_c)
 			self.coefficient, self.timelist = optimize_traj(path, self.traj_constant, T_seg_c, self.traj_constant.cor_constraint)
 
 		else:

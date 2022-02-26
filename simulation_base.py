@@ -49,7 +49,7 @@ class simulation_base():
       for i in range(self.nquad):
           self.robot_odom_publisher.append(rospy.Publisher(self.mav_name + str(i+1) + '/odom',Odometry,queue_size=10))
           self.attach_publisher.append(rospy.Publisher(self.mav_name + str(i+1) + '/attach',Odometry,queue_size=10))
-          
+           
 
       # ROS Subscriber 
       self.robot_command_subscriber = []

@@ -23,8 +23,8 @@ def optimize_traj(finalpath, traj_constant, T_seg_all, cor_constraint):
     timelist = np.array([[]])
     path_with_time_all, timelist_all = generate_path_with_time(finalpath, traj_constant, T_seg_all)
 
-
     for i in range(1, pt_num-1, total_traj_num+2): 
+        print("Generating coefficients")
         if (i+pt_num-1) >= total_traj_num+1:
             path = finalpath[i-1:total_traj_num+1, :]
             T_seg = T_seg_all[i-1:total_traj_num]
@@ -56,6 +56,7 @@ def optimize_traj(finalpath, traj_constant, T_seg_all, cor_constraint):
         coeff_curr = np.array(qp_sol['x'])
         coeff = np.append(coeff, coeff_curr)
 
+    print(coeff)
     coefficient = coeff.reshape((total_traj_num*dim, num_coeff)).T
     return coefficient, timelist_all
         

@@ -8,7 +8,7 @@ import create_options
 # need to build quadrotor_msgs package
 from rotor_tm_msgs.msg import PositionCommand
 from nav_msgs.msg import Odometry
-from rotor_tm_traj.srv import Circle
+from rotor_tm_traj.srv import Circle, Line
 
 
 class traj_node:
@@ -20,117 +20,110 @@ class traj_node:
 		self.duration = None
 		self.payload_start = None
 		self.time_reference = None
-		self.map = None
+		self.map = map.map()
+		self.map.load_map()
 		self.path = None
 		self.curr_pose = np.append(np.zeros(3),np.array([1,0,0,0]))
+		self.traj_start = False 
 
 		## create a node called 'traj_node'
-		rospy.init_node('traj_node')
-
-		## init a traj
-		# 1 -> circle traj
-		# 2 -> line traj
-		# 3 -> min snap traj
-		traj_type = 3
-		if (traj_type == 1):
-			traj_item = self.circular_traj_init()
-		elif (traj_type == 2):
-			traj_item = self.line_traj_init()
-		else:
-			traj_item = self.min_snap_traj_init()
+		node_name = 'traj_generator'
+		rospy.init_node(node_name)
 
 		## ROS Subscriber 
-		rospy.Subscriber('payload/odom', Odometry, self.odom_callback, (traj_item, traj, traj_type))
+		rospy.Subscriber('payload/odom', Odometry, self.odom_callback)
 
 		## ROS Publisher
 		self.des_traj_pub = rospy.Publisher('payload/des_traj', PositionCommand, queue_size=10)
 
         ## ROS Server
-		s = rospy.Service('Circle', Circle, self.circle_traj_cb)
-        #s = rospy.Service('Line', AddTwoInts, handle_add_two_ints)
-        #s = rospy.Service('Min_Derivative', AddTwoInts, handle_add_two_ints)
+		server = []
+		server.append(rospy.Service(node_name + '/Circle', Circle, self.circle_traj_cb))
+		server.append(rospy.Service(node_name + '/Line', Line, self.line_traj_cb))
+		server.append(rospy.Service(node_name + '/Min_Derivative_Line', Line, self.min_derivative_line_traj_cb))
+
+		print("Trajectory Generator Initialization Finished")
 
 		rospy.spin()
 	
-	def circular_traj_init(self, radius = 1.0, period = 6.0, duration = 6.0, payload_start = np.array([[0.0], [0.0], [0.0], [1.0], [0.0], [0.0], [0.0]])):
-		## initialize circular traj
-		self.radius = radius
-		self.period = period
-		self.duration = duration
-		self.payload_start = payload_start
-		circular_traj = traj.traj()
-		self.time_reference = rospy.get_time()
-		circular_traj.circle(0, init_pos=self.payload_start[0:3,:], r=self.radius, period=self.period, circle_duration=self.duration)
-		return circular_traj
-
 	def circle_traj_cb(self, req):
 		## call circular traj services
-		#self.radius = req.radius
-		#self.period = req.T
-		#self.duration = req.duration
-		#self.payload_start = payload_start
-		circular_traj = traj.traj()
+		self.current_traj = traj.traj()
 		self.time_reference = rospy.get_time()
-		circular_traj.circle(0, init_pos=self.payload_start[0:3,:], r=self.radius, period=self.period, circle_duration=self.duration)
-		return circular_traj
+		self.traj_type = 1
+		self.current_traj.circle(0, self.curr_state[0:3], req.radius, req.T, req.duration)
+		self.traj_start = True
 
-	def line_traj_init(self, specified_map = None, path = np.array([[0., 0., 0.], [0.5, -0.5, 0.25], [1.0, 0.0, 0.5], [1.5, -0.5, 0.75], [-2.0, 0.0, 1.0], [1.0, 3.0, 0.5], [-1.0, 3.0, 0.5], [1.0, 3.0, 0.5], [-1.0, 3.0, 0.5]])):
-		## initialize line traj
-		self.map = map.map()
-		self.map.load_map()
-		self.path = path
-		line_traj = traj.traj()
+	def line_traj_cb(self, req):
+		## call quintic line traj services
+		path = [[self.curr_state[0],self.curr_state[1],self.curr_state[2]]]
+		for pt_idx in range(len(req.path)):
+			pt = req.path[pt_idx]
+			path.append([pt.x,pt.y,pt.z])
+		
+		self.current_traj = traj.traj()
 		self.time_reference = rospy.get_time()
-		line_traj.line_quintic_traj(0, map=self.map, path=self.path)
-		return line_traj
+		self.traj_type = 2
+		self.current_traj.line_quintic_traj(0, self.map, np.array(path))
+		self.traj_start = True
 
-	def min_snap_traj_init(self, path = np.array([[0.0,0.0,0.0],[0.5,-0.5,0.25],[1.0,0.0,0.5],[1.5,-0.5,0.75],[2.0,0.0,1.0]]), options = None):
+	def min_derivative_line_traj_cb(self, req):
+		## call minimum derivative traj services
+		path = [[self.curr_state[0],self.curr_state[1],self.curr_state[2]]]
+		for pt_idx in range(len(req.path)):
+			pt = req.path[pt_idx]
+			path.append([pt.x,pt.y,pt.z])
+		
+		path = np.array(path)
 		traj_constant = create_options.options()
 		traj_constant.create_default_option(path.shape[0])
-		snap_traj = traj.traj()
+		self.current_traj = traj.traj()
 		self.time_reference = rospy.get_time()
-		snap_traj.min_snap_traj_generator(self, path=path, options=traj_constant)
-		return snap_traj
+		self.traj_type = 3
+		self.current_traj.min_snap_traj_generator(self, path, options=traj_constant)
+		self.traj_start = True
 
-	def odom_callback(self, data, arg):
+	def odom_callback(self, data):
 		t = rospy.get_time()
 		now = rospy.get_rostime()
-		traj_item = arg[0]
-		traj = arg[1]
-		check = arg[2]
 
-		if (check==1):
-			traj_item.circle(t-self.time_reference)
-		elif (check==2):
-			traj_item.line_quintic_traj(t-self.time_reference)
-		else: 
-			print(t-self.time_reference)
-			traj_item.min_snap_traj_generator(t-self.time_reference)
+		self.curr_state = np.array([data.pose.pose.position.x,data.pose.pose.position.y,data.pose.pose.position.z,\
+									data.pose.pose.orientation.w, data.pose.pose.orientation.x,data.pose.pose.orientation.y,data.pose.pose.orientation.z])
 
-		message = PositionCommand()
-		message.header.stamp.secs = now.secs
-		message.header.stamp.nsecs = now.nsecs
-		message.position.x=traj_item.state_struct["pos_des"][0]
-		message.position.y=traj_item.state_struct["pos_des"][1]
-		message.position.z=traj_item.state_struct["pos_des"][2]
-		message.velocity.x=traj_item.state_struct["vel_des"][0]
-		message.velocity.y=traj_item.state_struct["vel_des"][1]
-		message.velocity.z=traj_item.state_struct["vel_des"][2]
-		message.acceleration.x=traj_item.state_struct["acc_des"][0]
-		message.acceleration.y=traj_item.state_struct["acc_des"][1]
-		message.acceleration.z=traj_item.state_struct["acc_des"][2]
-		message.jerk.x=traj_item.state_struct["jrk_des"][0]
-		message.jerk.y=traj_item.state_struct["jrk_des"][1]
-		message.jerk.z=traj_item.state_struct["jrk_des"][2]
-		message.quaternion.w=traj_item.state_struct["quat_des"][0]
-		message.quaternion.x=traj_item.state_struct["quat_des"][1]
-		message.quaternion.y=traj_item.state_struct["quat_des"][2]
-		message.quaternion.z=traj_item.state_struct["quat_des"][3]
-		message.angular_velocity.x=traj_item.state_struct["omega_des"][0]
-		message.angular_velocity.y=traj_item.state_struct["omega_des"][1]
-		message.angular_velocity.z=traj_item.state_struct["omega_des"][2]
-		self.des_traj_pub.publish(message)
-
+		'''
+		if self.traj_start:
+			if (self.traj_type == 1):
+				self.current_traj.circle(t-self.time_reference)
+			elif (self.traj_type == 2):
+				self.current_traj.line_quintic_traj(t-self.time_reference)
+			else: 
+				self.current_traj.min_snap_traj_generator(t-self.time_reference)
+			
+			# Publish the command
+			message = PositionCommand()
+			message.header.stamp.secs = now.secs
+			message.header.stamp.nsecs = now.nsecs
+			message.position.x=self.current_traj.state_struct["pos_des"][0]
+			message.position.y=self.current_traj.state_struct["pos_des"][1]
+			message.position.z=self.current_traj.state_struct["pos_des"][2]
+			message.velocity.x=self.current_traj.state_struct["vel_des"][0]
+			message.velocity.y=self.current_traj.state_struct["vel_des"][1]
+			message.velocity.z=self.current_traj.state_struct["vel_des"][2]
+			message.acceleration.x=self.current_traj.state_struct["acc_des"][0]
+			message.acceleration.y=self.current_traj.state_struct["acc_des"][1]
+			message.acceleration.z=self.current_traj.state_struct["acc_des"][2]
+			message.jerk.x=self.current_traj.state_struct["jrk_des"][0]
+			message.jerk.y=self.current_traj.state_struct["jrk_des"][1]
+			message.jerk.z=self.current_traj.state_struct["jrk_des"][2]
+			message.quaternion.w=self.current_traj.state_struct["quat_des"][0]
+			message.quaternion.x=self.current_traj.state_struct["quat_des"][1]
+			message.quaternion.y=self.current_traj.state_struct["quat_des"][2]
+			message.quaternion.z=self.current_traj.state_struct["quat_des"][3]
+			message.angular_velocity.x=self.current_traj.state_struct["omega_des"][0]
+			message.angular_velocity.y=self.current_traj.state_struct["omega_des"][1]
+			message.angular_velocity.z=self.current_traj.state_struct["omega_des"][2]
+			self.des_traj_pub.publish(message)
+		'''
 def main():
 	traj_node()
 
