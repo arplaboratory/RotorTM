@@ -31,7 +31,7 @@ class traj_node:
 		# 1 -> circle traj
 		# 2 -> line traj
 		# 3 -> min snap traj
-		traj_type = 3
+		traj_type = 1
 		if (traj_type == 1):
 			traj_item = self.circular_traj_init()
 		elif (traj_type == 2):
