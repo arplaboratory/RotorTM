@@ -107,11 +107,6 @@ class controller_node:
                                         [payload_odom.twist.twist.angular.y],
                                         [payload_odom.twist.twist.angular.z]])
         self.pl["rot"] = QuatToRot(self.pl["quat"])
-        self.pl["quat_des"] = np.array([ [1.0],
-                                    [0.0],
-                                    [0.0],
-                                    [0.0]])
-        self.pl["omega_des"] = np.array([[0.0, 0.0, 0.0]])
 
     def desired_traj_callback(self, des_traj):
         self.pl["pos_des"] = np.array([ [des_traj.position.x],
@@ -126,6 +121,11 @@ class controller_node:
         self.pl["jrk_des"] = np.array([ [des_traj.jerk.x],
                                         [des_traj.jerk.y],
                                         [des_traj.jerk.z]])                     
+        self.pl["quat_des"] = np.array([ [1.0],
+                                    [0.0],
+                                    [0.0],
+                                    [0.0]])
+        self.pl["omega_des"] = np.array([[0.0, 0.0, 0.0]])
         self.pl["yaw_des"] = 0.0
         self.pl["yawdot_des"] = 0.0
         self.sim_subscriber()
