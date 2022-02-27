@@ -90,7 +90,6 @@ class traj_node:
 		self.curr_state = np.array([data.pose.pose.position.x,data.pose.pose.position.y,data.pose.pose.position.z,\
 									data.pose.pose.orientation.w, data.pose.pose.orientation.x,data.pose.pose.orientation.y,data.pose.pose.orientation.z])
 
-		'''
 		if self.traj_start:
 			if (self.traj_type == 1):
 				self.current_traj.circle(t-self.time_reference)
@@ -123,7 +122,7 @@ class traj_node:
 			message.angular_velocity.y=self.current_traj.state_struct["omega_des"][1]
 			message.angular_velocity.z=self.current_traj.state_struct["omega_des"][2]
 			self.des_traj_pub.publish(message)
-		'''
+
 def main():
 	traj_node()
 
