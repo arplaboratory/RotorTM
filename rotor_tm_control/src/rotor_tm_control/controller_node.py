@@ -1,4 +1,5 @@
 #!/usr/bin/python3
+from cv2 import circle
 import rospy
 import numpy as np
 from nav_msgs.msg import Odometry 
@@ -10,7 +11,9 @@ from rotor_tm_msgs.msg import FMCommand
 from rotor_tm_utils.QuatToRot import QuatToRot
 from rotor_tm_utils.vec2asym import vec2asym
 from rotor_tm_utils.RotToRPY_ZXY import RotToRPY_ZXY
-
+import rospkg
+from rotor_tm_traj.srv import Circle
+from rotor_tm_traj.srv import Line
 
 class controller_node:
 
@@ -20,12 +23,18 @@ class controller_node:
         self.qd = {}
         self.FM_pub = []
 
+        # get an instance of RosPack with the default search paths
+        rospack = rospkg.RosPack()
+
+        # get the file path for rotor_tm_config
+        path = rospack.get_path('rotor_tm_config')
+
         # directory information
-        uav_params_path = '/home/thomas_ubuntu/catkin_ws/src/RotorTM/config/uav_params/snapdragonfly.yaml'
-        payload_params_path = '/home/thomas_ubuntu/catkin_ws/src/RotorTM/config/load_params/triangular_payload.yaml'
-        mechanism_params_path = '/home/thomas_ubuntu/catkin_ws/src/RotorTM/config/attach_mechanism/3_robots_cable_mechanism.yaml'
-        payload_control_gain_path = '/home/thomas_ubuntu/catkin_ws/src/RotorTM/config/control_params/triangular_payload_cooperative_cable_gains.yaml'
-        uav_control_gain_path = '/home/thomas_ubuntu/catkin_ws/src/RotorTM/config/control_params/dragonfly_control_gains.yaml'
+        uav_params_path = path + '/config/uav_params/snapdragonfly.yaml'
+        payload_params_path = path + '/config/load_params/triangular_payload.yaml'
+        mechanism_params_path = path + '/config/attach_mechanism/3_robots_cable_mechanism.yaml'
+        payload_control_gain_path = path + '/config/control_params/triangular_payload_cooperative_cable_gains.yaml'
+        uav_control_gain_path = path + '/config/control_params/dragonfly_control_gains.yaml'
         
         # read yaml files
         read_params_funcs = read_params.read_params()
@@ -41,6 +50,12 @@ class controller_node:
         print("listening for messages...")
         print()
         # init subscribers
+
+        # pick one type of service and start:
+        #self.circle_client()
+        # self.line_client()
+        #self.min_derivative_lin_client()
+
         rospy.Subscriber('/payload/des_traj', PositionCommand, self.desired_traj_callback)
         rospy.Subscriber('/payload/odom', Odometry, self.pl_odom_callback)
 
@@ -55,6 +70,7 @@ class controller_node:
 
         rospy.spin()
 
+    
     def assembly_FM_message(self, F_list, M_list, uav_id):
         FM_message = FMCommand()
         FM_message.thrust = F_list[uav_id]
@@ -194,6 +210,30 @@ class controller_node:
 
         return RPM_message
     '''
+'''def circle_client(self):
+        rospy.wait_for_service("traj_generator/Circle")
+        traj = rospy.ServiceProxy("traj_generator/Circle", Circle)
+        try:
+            traj(1.0, 1.0, 6.0)
+        except rospy.ServiceException as exc:
+            print("Service did not process request: " + str(exc))
+
+    def line_client(self):
+        rospy.wait_for_service("traj_generator/Line")
+        traj = rospy.ServiceProxy("traj_generator/Line", Line)
+        path = np.array([[0.0,0.0,0.0],[0.5,-0.5,0.25],[1.0,0.0,0.5],[1.5,-0.5,0.75],[2.0,0.0,1.0]])
+        try:
+            traj(path)
+        except rospy.ServiceException as exc:
+            print("Service did not process request: " + str(exc))
+
+    def min_derivative_lin_client(self):
+        rospy.wait_for_service("traj_generator/Min_Derivative_Line")
+        traj = rospy.ServiceProxy("traj_generator/Min_Derivative_Line", Line)
+        try:
+            traj()
+        except rospy.ServiceException as exc:
+            print("Service did not process request: " + str(exc))'''
 
 
 def main():
