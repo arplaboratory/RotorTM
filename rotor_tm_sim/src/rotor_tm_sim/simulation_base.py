@@ -13,7 +13,7 @@ import time
 class simulation_base():
   def __init__(self,pl_params,uav_params):
       rospy.init_node('simulation')
-      self.rate = 100
+      self.rate = 2000
       rate = rospy.Rate(self.rate) # 1000hz
       t_span = (0,1/self.rate)
       self.worldframe = "simulator"
@@ -55,7 +55,6 @@ class simulation_base():
       self.robot_command_subscriber = []
       for uav_id in range(self.nquad):
           mav_name = self.mav_name + str(uav_id+1)
-          print('/'+mav_name+'/fm_cmd')
           self.robot_command_subscriber.append(rospy.Subscriber('/'+mav_name + '/rpm_cmd',RPMCommand,self.rpm_command_callback,uav_id))
           self.robot_command_subscriber.append(rospy.Subscriber('/'+mav_name + '/fm_cmd',FMCommand,self.fm_command_callback,uav_id))
     
@@ -445,10 +444,9 @@ class simulation_base():
       return
 
   def fm_command_callback(self,fm_command,uav_id):
-      print("I am getting the thrust and moment command for UAV")
+      # print("I am getting the thrust and moment command for UAV")
       self.uav_F[uav_id] = fm_command.thrust
       self.uav_M[0,uav_id] = fm_command.moments.x
       self.uav_M[1,uav_id] = fm_command.moments.y
       self.uav_M[2,uav_id] = fm_command.moments.z
-      #print("The uav_F is ", self.uav_F)
-      #print("The uav_M is ", self.uav_M)
+

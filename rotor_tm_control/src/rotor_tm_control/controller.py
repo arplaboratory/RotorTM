@@ -38,7 +38,7 @@ class controller:
         # Cable Direction Tracking Control
         mu_des = qd[qn]["mu_des"]
         xi_des = np.divide(-mu_des, np.linalg.norm(mu_des))
-        xi_des_dot = np.array([[0],[0],[0]])
+        xi_des_dot = np.array([[0.0],[0.0],[0.0]])
         w_des = np.cross(xi_des, xi_des_dot, axisa=0, axisb=0).T
         
         w = np.cross(xi, xidot, axisa=0, axisb=0).T
@@ -112,7 +112,7 @@ class controller:
         m = pl_params.mass
         nquad = pl_params.nquad
 
-        e3 = np.array([[0],[0],[1]])
+        e3 = np.array([[0],[0],[1.0]])
 
         Rot = ql["rot"]
         omega_asym = vec2asym(ql["omega"])
@@ -133,7 +133,7 @@ class controller:
         ## Attitude Control
 
         # Errors of anlges and angular velocities
-        e_Rot = np.matmul(np.transpose(Rot_des), Rot) - np.multiply(np.transpose(Rot),Rot_des)
+        e_Rot = Rot_des.T @ Rot - Rot.T @ Rot_des
         e_angle = np.divide(vee(e_Rot), 2)
         e_omega = ql["omega"] - Rot.T @ Rot_des @ omega_des.T 
         # e_omega = ql["omega"] - np.matmul(np.matmul(np.transpose(Rot), Rot_des), np.transpose(omega_des))
@@ -143,11 +143,11 @@ class controller:
         M = np.matmul(-pl_params.Kpe, e_angle) - np.matmul(pl_params.Kde, e_omega) # may need to be changed to scalar product
 
         # Cable tension distribution
-        diag_rot = np.array([[]])
+        diag_rot = np.zeros((0,0), dtype=float)
         for i in range(1, nquad+1):
             diag_rot = LA.block_diag(diag_rot, Rot)
 
-        mu = np.matmul(np.matmul(diag_rot, pl_params.pseudo_inv_P), np.append(np.matmul(np.transpose(Rot),F), M, axis=0))
+        mu = diag_rot @ pl_params.pseudo_inv_P @ np.append(Rot.T @ F, M, axis=0)
         for i in range(1, nquad+1):
             if (0>mu[3*i-1, 0]):
                 mu[3*i-1, 0] = 0 
@@ -171,6 +171,7 @@ class controller:
     
         return qd_F, qd_M
 
+    # untested
     def cooperative_payload_controller(self, ql, params):
         if not params["sim_start"]:
             # self.coeff0 = params.coeff0
@@ -241,6 +242,7 @@ class controller:
         drpy = np.array([0,0,0,0])
         return mu,att_acc_c
 
+    # untested
     def geometric_controller(self, qd, t, qn, params):
         if self.gd.size == 0:
             self.gd = np.zeros((0,3), dtype= float)
@@ -307,7 +309,8 @@ class controller:
         trpy = np.array([0,0,0,0])
         drpy = np.array([0,0,0,0])
         return F, M, trpy, drpy
-
+    
+    # untested
     def hover_controller(self, qd, t, qn, params):
         if self.gd.size == 0:
             self.gd = np.zeros((0,3), dtype= float)
@@ -381,6 +384,7 @@ class controller:
         drpy = np.array([0,0,0,0])
         return F, M, trpy, drpy
 
+    # untested
     def rigid_links_cooperative_payload_controller(self, ql, params):
         if not params["sim_start"]:
             self.icnt = 0
@@ -438,6 +442,7 @@ class controller:
 
         return u
 
+    # untested
     def single_payload_geometric_controller(self, ql, t, qd_params, pl_params):
         ## Parameter Initialization
         if not pl_params.sim_start:
