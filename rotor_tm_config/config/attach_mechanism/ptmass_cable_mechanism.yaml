@@ -1,5 +1,5 @@
 # Define the type of the connection
-type: "Cable" 
+mechanism_type: "Cable" 
 
 # Define the total number of robots
 num_of_robots: 1
