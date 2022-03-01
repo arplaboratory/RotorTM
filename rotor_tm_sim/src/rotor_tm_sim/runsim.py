@@ -15,22 +15,31 @@ if __name__ == '__main__':
   rospack = rospkg.RosPack()
   # get the file path for rotor_tm_config
   path = rospack.get_path('rotor_tm_config')
-  situation = "3 snapdragon flights with triangular payload using cable mechanisms"
+  situation = "rigid"
 
-  if situation == "3 snapdragon flights with triangular payload using cable mechanisms":
+  if situation == "multi":
     ###############     3 snapdragon flights with triangular payload using cable mechanisms     ##################
     uav_params_path = path + '/config/uav_params/snapdragonfly.yaml'
     payload_params_path = path + '/config/load_params/triangular_payload.yaml'
     mechanism_params_path = path + '/config/attach_mechanism/3_robots_cable_mechanism.yaml'
     payload_control_gain_path = path + '/config/control_params/triangular_payload_cooperative_cable_gains.yaml'
     uav_control_gain_path = path + '/config/control_params/dragonfly_control_gains.yaml'
-  elif situation == "1 snapdragon flights with point-mass payload using cable mechanisms":
+  elif situation == "ptmass":
     ###############     1 snapdragon flights with point-mass payload using cable mechanisms     ##################
     uav_params_path = path + '/config/uav_params/snapdragonfly.yaml'
     payload_params_path = path + '/config/load_params/pointmass_payload.yaml'
     mechanism_params_path = path + '/config/attach_mechanism/ptmass_cable_mechanism.yaml'
     payload_control_gain_path = path + '/config/control_params/pointmass_cable_gains.yaml'
     uav_control_gain_path = path + '/config/control_params/dragonfly_control_gains.yaml'
+  elif situation == "rigid":
+    #############     3 snapdragon flights with triangular payload using rigid link mechanisms     ################
+    uav_params_path = path + '/config/uav_params/snapdragonfly.yaml'
+    payload_params_path = path + '/config/load_params/triangular_payload.yaml'
+    mechanism_params_path = path + '/config/attach_mechanism/rigid_links_mechanism.yaml'
+    payload_control_gain_path = path + '/config/control_params/triangular_payload_cooperative_rigidlink_gains.yaml'
+    uav_control_gain_path = path + '/config/control_params/dragonfly_control_gains.yaml'
+
+
 
   read_params_funcs = read_params.read_params()
   pl_params, quad_params = read_params_funcs.system_setup(payload_params_path,uav_params_path,mechanism_params_path,payload_control_gain_path, uav_control_gain_path)

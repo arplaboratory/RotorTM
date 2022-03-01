@@ -91,12 +91,15 @@ class simulation_base():
         #tsave, xsave = scipy.integrate.solve_ivp(rotortm_simulation_base.run(), t_span, x, method='RK45', event = simulation_base.guard())
         # With event
         start = time.time()
-        if self.nquad == 1:
-            sol = scipy.integrate.solve_ivp(self.hybrid_ptmass_pl_transportationEOM, t_span, x, method= 'RK45', t_eval=t_span)
-        else:    
-            sol = scipy.integrate.solve_ivp(self.hybrid_cooperative_rigidbody_pl_transportationEOM, t_span, x, method='RK45', t_eval=t_span)
-        end = time.time()
-        x = sol.y[:,1]
+        if self.pl_params.id == "Rigid Link":
+            sol = scipy.integrate.solve_ivp(self.rigid_links_cooperative_rigidbody_pl_EOM, t_span, x, method= 'RK45', t_eval=t_span)
+        else:
+            if self.nquad == 1:
+                sol = scipy.integrate.solve_ivp(self.hybrid_ptmass_pl_transportationEOM, t_span, x, method= 'RK45', t_eval=t_span)
+            else:    
+                sol = scipy.integrate.solve_ivp(self.hybrid_cooperative_rigidbody_pl_transportationEOM, t_span, x, method='RK45', t_eval=t_span)
+            end = time.time()
+            x = sol.y[:,1]
 
         # The simulation must first run on the quadrotors
         # Then the simulation simulates the dynamics of the payload
@@ -205,6 +208,9 @@ class simulation_base():
 
         rate.sleep()    
 
+####################################################################################
+##################                    hybrid                    ####################
+####################################################################################
   def hybrid_cooperative_rigidbody_pl_transportationEOM(self, t, s): 
       # EOM Wrapper function for solving quadrotor equation of motion
       #	EOM takes in time, state vector
@@ -459,6 +465,11 @@ class simulation_base():
       sdot[12] = pqrdot[2]
       return sdot
 
+
+####################################################################################
+##################                    PTMASS                    ####################
+####################################################################################
+# untested
   def hybrid_ptmass_pl_transportationEOM(self, t, s):
       l = self.pl_params.cable_length
       plqd = {}
@@ -572,6 +583,82 @@ class simulation_base():
       sdot[16:19] = pqrdot
 
       return sdot
+
+
+####################################################################################
+##################                  Rigidlink                   ####################
+####################################################################################
+# untested
+  def rigid_links_cooperative_rigidbody_pl_EOM(self, t, s):
+      # s      - 13 x 1, state vector = [xL, yL, zL, xLd, yLd, zLd, qw, qx, qy, qz, pL,qL,rL]
+      # s             - (7*nquad + 6*nquad + 13) x 1,
+      #                 state vector = [xL, yL, zL, xLd, yLd, zLd,
+      #                                 qLw, qLx, qLy, qLz, pL, qL, rL,
+      #                                 [xQ, yQ, zQ, xQd, yQd, zQd]_i, i = 1,...,nquad
+      #                                 [qw, qx, qy, qz, pQuad, qQuad, rQuad]_i, i = 1,...,nquad
+      qd = {}
+      # extract payload state_vector
+      qd["pos"] = s[0:3]
+      qd["vel"] = s[3:6]
+      qd["quat"] = s[5:10]
+      qd["omega"] = s[10:13]
+      qd["rot"] = utilslib.QuatToRot(qd.quat).T
+      
+      robot_trust_moment = np.array((0,1), dtype=float)
+      for uav_id in range(self.nquad):
+          robot_trust_moment = np.vstack((robot_trust_moment, self.uav_F[uav_id], self.uav_M[0,uav_id], self.uav_M[1,uav_id], self.uav_M[2,uav_id]))
+
+      u = self.pl_params @ robot_trust_moment
+      F = u[0] * qd["rot"]
+      M = u[1:4]
+
+      return self.rigidbody_structEOM_readonly(t, qd, F, M)
+
+  def rigidbody_structEOM_readonly(self, t, s, F, M):
+      # Assign states
+      quat = s["quat"]
+      qW = quat[0]
+      qX = quat[1]
+      qY = quat[2]
+      qZ = quat[3]
+      omega = s["omega"]
+      p = omega[0]
+      q = omega[1]
+      r = omega[2]
+
+      # Payload quaternion first derivative
+      K_quat = 2; #this enforces the magnitude 1 constraint for the quaternion
+      quaterror = 1 - (qW**2 + qX**2 + qY**2 + qZ**2)
+      qLdot = -1/2*np.array([   [0, -p, -q, -r],
+                                [p,  0, -r,  q],
+                                [q,  r,  0, -p],
+                                [r, -q,  p,  0]]) @ quat + K_quat @ quaterror @ quat
+
+      # Payload Angular acceleration
+      # all uav orientations are the same
+      # pick first uav orientation
+      omgLdot = M - np.cross(omega,self.pl_params.struct_I @ s.omega, axisa=0, axisb=0).T
+
+      # Payload Acceleration
+      # combine robot's forces
+      accL = F @ s["rot"] /self.pl_params.struct_mass - self.pl_params.grav*np.array([[0],[0],[1]])
+
+      # Assemble sdot
+      sdotLoad = np.zeros((13,1), dtype=float)
+      sdotLoad[1:3,0] = s.vel
+      sdotLoad[4,0] = accL[0]
+      sdotLoad[5,0] = accL[1]
+      sdotLoad[6,0] = accL[2]
+
+      sdotLoad[7,0] = qLdot[0]
+      sdotLoad[8,0] = qLdot[1]
+      sdotLoad[9,0] = qLdot[2]
+      sdotLoad[10,0] = qLdot[3]
+
+      sdotLoad[11,0] = omgLdot[0]
+      sdotLoad[12,0] = omgLdot[1]
+      sdotLoad[13,0] = omgLdot[2]
+      return sdotLoad
 
   def rpm_command_callback(self,rpm_command,uav_id):
       return
