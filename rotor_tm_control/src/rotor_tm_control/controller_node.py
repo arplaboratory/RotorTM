@@ -1,4 +1,5 @@
 #!/usr/bin/python3
+import sys
 from cv2 import circle
 import rospy
 import numpy as np
@@ -20,8 +21,9 @@ from rotor_tm_traj.srv import Circle,Line
 
 class controller_node:
 
-    def __init__(self):
-
+    def __init__(self, node_id, single_node = True):
+        self.node_id = node_id
+        self.single_node = single_node
         self.pl = {}
         self.qd = {}
         self.FM_pub = []
@@ -50,29 +52,63 @@ class controller_node:
         print("init contoller_node")
         print()
 
-        ## create a node called 'controller_node'
-        rospy.init_node('controller_node')
-        # TODO: make this to ROS parameters
-        mav_name = 'dragonfly'
+        if self.single_node:
+            ## create a node called 'controller_node'
+            rospy.init_node('controller_node')
+            # TODO: make this to ROS parameters
+            mav_name = 'dragonfly'
 
-        # init ROS Subscribers
-        rospy.Subscriber('/payload/des_traj', PositionCommand, self.desired_traj_callback)
-        rospy.Subscriber('/payload/odom', Odometry, self.pl_odom_callback)
+            # init ROS Subscribers
+            rospy.Subscriber('/payload/des_traj', PositionCommand, self.desired_traj_callback)
+            rospy.Subscriber('/payload/odom', Odometry, self.pl_odom_callback)
 
-        for uav_id in range(self.pl_params.nquad):
-            mav_odom = mav_name + str(uav_id+1) + '/odom'
-            self.qd[uav_id] = {}
-            rospy.Subscriber(mav_odom, Odometry, self.qd_odom_callback, uav_id)
-        
-        # init ROS Publishers
-        self.cen_pl_cmd_pub = rospy.Publisher("/payload/cen_pl_cmd", CenPL_Command, queue_size = 10)
-        for i in range(self.pl_params.nquad):
-            FM_message_name = mav_name + str(i+1) + "/fm_cmd"
-            des_odom_name = mav_name + str(i+1) + "/des_odom"
-            self.FM_pub.append(rospy.Publisher(FM_message_name, FMCommand, queue_size=10))
-            self.des_odom_pub.append(rospy.Publisher(des_odom_name, Odometry, queue_size=10))
+            for uav_id in range(self.pl_params.nquad):
+                mav_odom = mav_name + str(uav_id+1) + '/odom'
+                self.qd[uav_id] = {}
+                rospy.Subscriber(mav_odom, Odometry, self.qd_odom_callback, uav_id)
+            
+            # init ROS Publishers
+            self.cen_pl_cmd_pub = rospy.Publisher("/payload/cen_pl_cmd", CenPL_Command, queue_size = 10)
+            for i in range(self.pl_params.nquad):
+                FM_message_name = mav_name + str(i+1) + "/fm_cmd"
+                des_odom_name = mav_name + str(i+1) + "/des_odom"
+                self.FM_pub.append(rospy.Publisher(FM_message_name, FMCommand, queue_size=10))
+                self.des_odom_pub.append(rospy.Publisher(des_odom_name, Odometry, queue_size=10))
 
-        rospy.spin()
+            rospy.spin()
+        else:
+            print("Using 3 controller nodes")
+            ## create a node called 'controller_node'
+            node_name = 'controller_'+str(self.node_id+1)
+            print(node_name)
+            rospy.init_node(node_name)
+            node_id += 1
+            # TODO: make this to ROS parameters
+            mav_name = '/dragonfly'
+
+            # init ROS Subscribers
+            rospy.Subscriber('/payload/des_traj', PositionCommand, self.desired_traj_callback)
+            rospy.Subscriber('/payload/odom', Odometry, self.pl_odom_callback)
+
+            for uav_id in range(self.pl_params.nquad):
+                mav_odom = mav_name + str(uav_id+1) + '/odom'
+                self.qd[uav_id] = {}
+                rospy.Subscriber(mav_odom, Odometry, self.qd_odom_callback, uav_id)
+                
+            # init ROS Publishers
+            FM_message_name = mav_name + str(self.node_id+1) + "/fm_cmd"
+            des_odom_name = mav_name + str(self.node_id+1) + "/des_odom"
+            self.cen_pl_cmd_pub = rospy.Publisher(node_name + "/payload/cen_pl_cmd", CenPL_Command, queue_size = 10)
+            self.FM_pub.append(rospy.Publisher(node_name +  FM_message_name, FMCommand, queue_size=10))
+            # self.des_odom_pub.append(rospy.Publisher(des_odom_name, Odometry, queue_size=10))
+
+            """for i in range(self.pl_params.nquad):
+                FM_message_name = mav_name + str(i+1) + "/fm_cmd"
+                des_odom_name = mav_name + str(i+1) + "/des_odom"
+                self.FM_pub.append(rospy.Publisher(node_name +  FM_message_name, FMCommand, queue_size=10))
+                # self.des_odom_pub.append(rospy.Publisher(des_odom_name, Odometry, queue_size=10))"""
+
+            rospy.spin()
 
     
     def assembly_FM_message(self, F_list, M_list, uav_id):
@@ -219,36 +255,45 @@ class controller_node:
 
         self.cen_pl_cmd_pub.publish(cen_pl_command)
         #F_list, M_list = self.controller.cooperative_suspended_payload_controller(self.pl, self.qd, self.pl_params, self.quad_params)
-
-        for i in range(self.pl_params.nquad):
-            FM_message = self.assembly_FM_message(F_list, M_list, i)
-            self.FM_pub[i].publish(FM_message)
-            '''des_odom = Odometry()
-            des_odom.pose.pose.position.x = rot_list[i][0,0]
-            des_odom.pose.pose.position.y = rot_list[i][1,0]
-            des_odom.pose.pose.position.z = rot_list[i][2,0]
-            des_odom.pose.pose.orientation.x = quat_list[i][0]
-            des_odom.pose.pose.orientation.y = quat_list[i][1]
-            des_odom.pose.pose.orientation.z = quat_list[i][2]
-            des_odom.pose.pose.orientation.w = quat_list[i][3]
-            self.des_odom_pub[i].publish(des_odom)'''
+        if self.single_node:
+            for i in range(self.pl_params.nquad):
+                FM_message = self.assembly_FM_message(F_list, M_list, i)
+                self.FM_pub[i].publish(FM_message)
+                '''des_odom = Odometry()
+                des_odom.pose.pose.position.x = rot_list[i][0,0]
+                des_odom.pose.pose.position.y = rot_list[i][1,0]
+                des_odom.pose.pose.position.z = rot_list[i][2,0]
+                des_odom.pose.pose.orientation.x = quat_list[i][0]
+                des_odom.pose.pose.orientation.y = quat_list[i][1]
+                des_odom.pose.pose.orientation.z = quat_list[i][2]
+                des_odom.pose.pose.orientation.w = quat_list[i][3]
+                self.des_odom_pub[i].publish(des_odom)'''
+        else:
+            FM_message = self.assembly_FM_message(F_list, M_list, self.node_id)
+            self.FM_pub[0].publish(FM_message)
 
             #RPM_message_name = '/dragonfly' + str(i+1) + "/rpm_cmd"
             #RPM_pub = rospy.Publisher(RPM_message_name, PositionCommand)
             #RPM_message = assembly_RPM_message(, i)
-            #RPM_pub.publish(RPM_message)
+            #RPM_pub.publish(RPM_message)'''
 
-    '''
-    def assembly_RPM_message(self, M_list):
-        RPM_message = RPMCommand()
+        '''
+        def assembly_RPM_message(self, M_list):
+            RPM_message = RPMCommand()
 
-        return RPM_message
-    '''
+            return RPM_message
+        '''
 
-def main():
-    controller_node()
+
+def main(node_id, single_node):
+    controller_node(node_id, single_node)
 
 
 if __name__ == '__main__':
-	main()
+    
+    if sys.argv[2] == 1:
+        main(int(sys.argv[1]), True)
+    else:
+        main(int(sys.argv[1]), False)
+    
         

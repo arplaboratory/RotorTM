@@ -434,6 +434,7 @@ class controller:
         M = - params.Kpe @ e_angle - params.Kde @ e_omega + np.cross(omega, params.struct_I @ omega)
 
         ## Quadrotor Thrust and Moment Distribution
+        # TODO ouput this u as F and M
         u = params["thrust_moment_distribution_mat"] @ np.vstack(tau. M)
 
         return u

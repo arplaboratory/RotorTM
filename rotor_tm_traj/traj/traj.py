@@ -132,7 +132,7 @@ class traj:
 			print("Generating quintic trajectory")
 			self.mapquad = map
 			self.pathall = path
-			pathqn = self.pathall # ####may need modification
+			pathqn = self.pathall # #### may need modification
 			ttotal = 10
 
 			xy_res = map.resolution[0]

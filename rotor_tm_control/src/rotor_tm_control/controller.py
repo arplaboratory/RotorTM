@@ -1,4 +1,4 @@
-#! /usr/bin/env python3
+#!/usr/bin/python3
 import numpy as np
 from rotor_tm_utils.vec2asym import vec2asym
 from rotor_tm_utils.QuatToRot import QuatToRot

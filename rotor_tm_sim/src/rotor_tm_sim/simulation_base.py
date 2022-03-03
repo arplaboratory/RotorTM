@@ -85,7 +85,7 @@ class simulation_base():
                       0.0,  0.0,    0.0,            # pl vel    6
                       1.0,  0.0,    0.0,    0.0,    # pl quat   10
                       0.0,  0.0,    0.0,            # pl omega  13
-                      0.0,  0.0,    0.5,            # qd pos    16
+                      0.0,  0.0,    0.0,            # qd pos    16
                       0.0,  0.0,    0.0,            # qd vel    19 
                       1.0,  0.0,    0.0,    0.0,    # qd quat   23
                       0.0,  0.0,    0.0])           # qd omega  26
@@ -104,8 +104,9 @@ class simulation_base():
       self.robot_command_subscriber = []
       for uav_id in range(self.nquad):
           mav_name = self.mav_name + str(uav_id+1)
-          self.robot_command_subscriber.append(rospy.Subscriber('/'+mav_name + '/rpm_cmd',RPMCommand,self.rpm_command_callback,uav_id))
-          self.robot_command_subscriber.append(rospy.Subscriber('/'+mav_name + '/fm_cmd',FMCommand,self.fm_command_callback,uav_id))
+          controller_name = "/controller_" + str(uav_id+1)
+          self.robot_command_subscriber.append(rospy.Subscriber(controller_name + '/' + mav_name + '/rpm_cmd',RPMCommand,self.rpm_command_callback,uav_id))
+          self.robot_command_subscriber.append(rospy.Subscriber(controller_name + '/' + mav_name + '/fm_cmd',FMCommand,self.fm_command_callback,uav_id))
     
       # Visualization Init
       self.cable_marker_scale = 0.01 * np.ones(3)

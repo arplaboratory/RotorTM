@@ -15,7 +15,7 @@ if __name__ == '__main__':
   rospack = rospkg.RosPack()
   # get the file path for rotor_tm_config
   path = rospack.get_path('rotor_tm_config')
-  situation = "rigid"
+  situation = "multi"
 
   if situation == "multi":
     ###############     3 snapdragon flights with triangular payload using cable mechanisms     ##################
