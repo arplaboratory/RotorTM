@@ -1,18 +1,18 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 import numpy as np
 from rotor_tm_utils.vec2asym import vec2asym
 from rotor_tm_utils.QuatToRot import QuatToRot
-from rotor_tm_utils.vee import vee
 import scipy.linalg as LA
 from rotor_tm_utils.vee import vee
 from rotor_tm_utils.RPYtoRot_ZXY import RPYtoRot_ZXY
+from rotor_tm_utils import utilslib 
+from scipy.spatial.transform import Rotation as tranrot
 
 
 class controller:
     def __init__(self):
         self.gd = np.zeros((0,0), dtype=float)
         self.icnt = None
-        # self.coeff0 = None
         
         # for hover_controller
         self.last_t = None
@@ -23,8 +23,6 @@ class controller:
             self.gd = np.zeros((0,3), dtype= float)
             self.icnt = 0
         
-        self.icnt += 1
-
         # Parameter Initialization
         m = params.mass
         l = params.l
@@ -47,10 +45,10 @@ class controller:
         e_w = w + np.cross(xi, np.cross(xi, w_des, axisa=0, axisb=0).T, axisa=0, axisb=0).T
 
         u_parallel = mu + m*l*np.linalg.norm(w)**2*xi + np.matmul(m*qd[qn]["xixiT"], qd[qn]["attach_accel"])
-
-        u_perpendicular = -m*l*np.cross(xi, params.Kxi @ e_xi + params.Kw @ e_w + xi.T @ w_des * xidot, axisa=0, axisb=0).T-m*np.cross(xi, np.cross(xi, qd[qn]["attach_accel"], axisa=0, axisb=0).T, axisa=0, axisb=0).T
+        u_perpendicular = -m*l*np.cross(xi, params.Kxi @ e_xi + params.Kw @ e_w + (xi.T @ w_des) * xi_des_dot, axisa=0, axisb=0).T - m*np.cross(xi, np.cross(xi, qd[qn]["attach_accel"], axisa=0, axisb=0).T, axisa=0, axisb=0).T
         Force = u_parallel + u_perpendicular
-        F = np.matmul(np.matmul(np.transpose(Force), rot), e3)
+        #F = np.dot(Force,np.matmul(rot,e3))
+        F = Force.T @ np.matmul(rot,e3)
 
         # Desired Attitude and Angular Velocity
         yaw_des = qd[qn]["yaw_des"]
@@ -58,13 +56,18 @@ class controller:
         Rot_des = np.zeros((3,3), dtype=float)
         Z_body_in_world = Force/np.linalg.norm(Force)
         Rot_des[:, 2:3] = Z_body_in_world
-        X_unit = np.array([[np.cos(yaw_des)], [np.sin(yaw_des)], [0]])
-        Y_body_in_world = np.cross(Z_body_in_world, X_unit, axisa=0, axisb=0).T
+        Y_unit = np.array([[-np.sin(yaw_des)], [np.cos(yaw_des)], [0]])
+        X_body_in_world = np.cross(Y_unit, Z_body_in_world, axisa=0, axisb=0).T
+        X_body_in_world = X_body_in_world/np.linalg.norm(X_body_in_world)
+        Rot_des[:,0:1] = X_body_in_world
+        Y_body_in_world = np.cross(Z_body_in_world, X_body_in_world, axisa=0, axisb=0).T
         Y_body_in_world = Y_body_in_world/np.linalg.norm(Y_body_in_world)
         Rot_des[:,1:2] = Y_body_in_world
-        X_body_in_world = np.cross(Y_body_in_world,Z_body_in_world, axisa=0, axisb=0).T
-        Rot_des[:,0:1] = X_body_in_world
 
+        #print(Rot_des)
+        #print(X_body_in_world)
+        #print(Y_body_in_world)
+        #print(Z_body_in_world)
         # p_des = -(m/F)*(jrk_des - (Z_body_in_world'*jrk_des)*Z_body_in_world)'*Y_body_in_world;
         # q_des = (m/F)*(jrk_des - (Z_body_in_world'*jrk_des)*Z_body_in_world)'*X_body_in_world;
         p_des = np.array([[0.0]])
@@ -76,10 +79,7 @@ class controller:
         # Quadrotor Attitude Control
         M = self.quadrotor_attitude_controller(qd[qn], params)
 
-        trpy = np.array([0,0,0,0])
-        drpy = np.array([0,0,0,0])
-
-        return F, M, trpy, drpy
+        return F, M, Rot_des
 
     # test passed
     def quadrotor_attitude_controller(self, qd, params):
@@ -88,13 +88,23 @@ class controller:
         omega_des = qd["omega_des"]
 
         # errors of angles and angular velocities
-        e_Rot = np.matmul(np.transpose(Rot_des), Rot) - np.matmul(np.transpose(Rot), Rot_des)
+        #e_Rot = np.matmul(np.transpose(Rot_des), Rot) - np.matmul(np.transpose(Rot), Rot_des)
+        e_Rot = np.matmul(Rot_des.T, Rot) - np.matmul(Rot.T, Rot_des)
         e_angle = vee(e_Rot)/2
+        '''print("The current rotation is")
+        print(Rot)
+        print("The des rotation is")
+        print(Rot_des)
+        print("The rotation error")
+        print(e_angle)'''
 
-        e_omega = qd["omega"] - Rot.T @ Rot_des @ omega_des
+        e_omega = qd["omega"] - np.matmul(Rot.T, np.matmul(Rot_des, omega_des))
         # e_omega = qd["omega"] - np.matmul(np.matmul(np.transpose(Rot), Rot_des), omega_des)
         # moment
-        M = -params.Kpe @ e_angle - params.Kde @ e_omega + np.cross(qd["omega"], params.I @ qd["omega"], axisa=0, axisb=0).T
+        M = np.cross(qd["omega"], np.matmul(params.I, qd["omega"]), axisa=0, axisb=0).T - np.matmul(params.Kpe, e_angle) - np.matmul(params.Kde, e_omega) 
+        #print("The e_angle", e_angle)
+        #print("The @ multiply", params.Kpe @ e_angle)
+        #print("The matmul multiply", np.matmul(params.Kpe, e_angle))
         return M
 
     # test passed
@@ -116,7 +126,7 @@ class controller:
 
         Rot = ql["rot"]
         omega_asym = vec2asym(ql["omega"])
-        Rot_des = np.transpose(QuatToRot(quat_des))
+        Rot_des = utilslib.QuatToRot(quat_des)
 
         ## Position control
         #  Position error
@@ -131,7 +141,6 @@ class controller:
         F = m*g*e3  + m*acceleration_des
 
         ## Attitude Control
-
         # Errors of anlges and angular velocities
         e_Rot = Rot_des.T @ Rot - Rot.T @ Rot_des
         e_angle = np.divide(vee(e_Rot), 2)
@@ -151,7 +160,8 @@ class controller:
         for i in range(1, nquad+1):
             if (0>mu[3*i-1, 0]):
                 mu[3*i-1, 0] = 0 
-            else:
+                print("mu is less than zero")
+            else:# Is this really necessary? 
                 mu[3*i-1, 0] = mu[3*i-1, 0]
 
         att_acc_c = acceleration_des + g*e3 + np.matmul(np.matmul(np.matmul(Rot, omega_asym), omega_asym), pl_params.rho_vec_list)
@@ -159,17 +169,22 @@ class controller:
         # Quadrotor Attitude Controller
         qd_F = {}
         qd_M = {}
+        qd_rot_des = {}
+        qd_quat_des = {}
 
-        for qn in range(1, nquad+1):
-            qd[qn-1]["yaw_des"] = 0
-            qd[qn-1]["yawdot_des"] = 0
-            qd[qn-1]["mu_des"] = mu[3*qn-3:3*qn]
-            qd[qn-1]["attach_accel"] = att_acc_c[:,qn-1:qn]
-            [F_qn, M_qn, trpy, drpy] = self.cooperative_attitude_controller(qd, qn-1, qd_params)
-            qd_F[qn-1] = F_qn
-            qd_M[qn-1] = M_qn
+        for qn in range(0, nquad):
+            qd[qn]["yaw_des"] = 0
+            qd[qn]["yawdot_des"] = 0
+            qd[qn]["mu_des"] = mu[3*qn:3*(qn+1)]
+            qd[qn]["attach_accel"] = att_acc_c[:,qn].reshape((3,1))
+            [F_qn, M_qn, Rot_des_qn] = self.cooperative_attitude_controller(qd, qn, qd_params)
+            qd_F[qn] = F_qn
+            qd_M[qn] = M_qn
+            qd_quat_des[qn] = tranrot.from_matrix(Rot_des_qn).as_quat() 
+            qd_rot_des[qn] = Rot_des_qn 
     
-        return qd_F, qd_M
+        #return qd_F, qd_M
+        return mu, att_acc_c, qd_F, qd_M, qd_quat_des, qd_rot_des
 
     # untested
     def cooperative_payload_controller(self, ql, params):
@@ -188,7 +203,7 @@ class controller:
 
         Rot = ql["rot"]
         omega_asym = vec2asym(ql["omega"])
-        Rot_des = np.transpose(QuatToRot(quat_des))
+        Rot_des = utilslib.QuatToRot(quat_des)
 
         ## Position control
         # jerk_des = ql.jerk_des;
@@ -204,7 +219,6 @@ class controller:
         F = m*g*e3  + m*acceleration_des
 
         ## Attitude Control
-
         # Errors of anlges and angular velocities
         e_Rot = np.matmul(np.transpose(Rot_des), Rot) - np.matmul(np.transpose(Rot), Rot_des)
         e_angle = vee(e_Rot)/2
@@ -226,20 +240,7 @@ class controller:
         
 
         att_acc_c = acceleration_des + g @ e3 + Rot @ omega_asym @ omega_asym @ params.rho_vec_list
-        ## Cable optimal distribution
-        # P_bar_world = diag_rot * params.P_bar;
-        # rho_vec_world = Rot * params.rho_vec_list;
-        # [mu, nullspace_coeff] = optimal_cable_distribution(P_bar_world, rho_vec_world, mu, params, coeff0);
-        # coeff0 = nullspace_coeff;
-        ##
 
-        #g d(icnt,:) = [t, phi_des, qd{qn}.euler(1)];  % for graphing
-
-        # =================== Your code ends here ===================
-
-        # Output trpy and drpy as in hardware
-        trpy = np.array([0,0,0,0])
-        drpy = np.array([0,0,0,0])
         return mu,att_acc_c
 
     # untested

@@ -2,18 +2,21 @@
 from cv2 import circle
 import rospy
 import numpy as np
+import rospkg
+from rotor_tm_control.controller import controller
+
 from nav_msgs.msg import Odometry 
+from rotor_tm_msgs.msg import PositionCommand,RPMCommand,FMCommand
+from rotor_tm_msgs.msg import CenPL_Command
+from geometry_msgs.msg import Vector3
+
 from rotor_tm_utils import read_params
-from rotor_tm_control import controller
-from rotor_tm_msgs.msg import PositionCommand
-from rotor_tm_msgs.msg import RPMCommand
-from rotor_tm_msgs.msg import FMCommand
+from rotor_tm_utils import utilslib 
 from rotor_tm_utils.QuatToRot import QuatToRot
 from rotor_tm_utils.vec2asym import vec2asym
 from rotor_tm_utils.RotToRPY_ZXY import RotToRPY_ZXY
-import rospkg
-from rotor_tm_traj.srv import Circle
-from rotor_tm_traj.srv import Line
+
+from rotor_tm_traj.srv import Circle,Line
 
 class controller_node:
 
@@ -22,6 +25,7 @@ class controller_node:
         self.pl = {}
         self.qd = {}
         self.FM_pub = []
+        self.des_odom_pub = []
 
         # get an instance of RosPack with the default search paths
         rospack = rospkg.RosPack()
@@ -35,6 +39,7 @@ class controller_node:
         mechanism_params_path = path + '/config/attach_mechanism/3_robots_cable_mechanism.yaml'
         payload_control_gain_path = path + '/config/control_params/triangular_payload_cooperative_cable_gains.yaml'
         uav_control_gain_path = path + '/config/control_params/dragonfly_control_gains.yaml'
+        self.controller = controller()
         
         # read yaml files
         read_params_funcs = read_params.read_params()
@@ -44,29 +49,28 @@ class controller_node:
         print("#################")
         print("init contoller_node")
         print()
+
         ## create a node called 'controller_node'
         rospy.init_node('controller_node')
-        print("#################")
-        print("listening for messages...")
-        print()
-        # init subscribers
+        # TODO: make this to ROS parameters
+        mav_name = 'dragonfly'
 
-        # pick one type of service and start:
-        #self.circle_client()
-        # self.line_client()
-        #self.min_derivative_lin_client()
-
+        # init ROS Subscribers
         rospy.Subscriber('/payload/des_traj', PositionCommand, self.desired_traj_callback)
         rospy.Subscriber('/payload/odom', Odometry, self.pl_odom_callback)
 
         for uav_id in range(self.pl_params.nquad):
-            mav_name = 'dragonfly' + str(uav_id+1) + '/odom'
-            rospy.Subscriber(mav_name, Odometry, self.qd_odom_callback, (uav_id, self.pl_params.nquad))
+            mav_odom = mav_name + str(uav_id+1) + '/odom'
+            self.qd[uav_id] = {}
+            rospy.Subscriber(mav_odom, Odometry, self.qd_odom_callback, uav_id)
         
-        # init publishers
+        # init ROS Publishers
+        self.cen_pl_cmd_pub = rospy.Publisher("/payload/cen_pl_cmd", CenPL_Command, queue_size = 10)
         for i in range(self.pl_params.nquad):
-            FM_message_name = '/dragonfly' + str(i+1) + "/fm_cmd"
+            FM_message_name = mav_name + str(i+1) + "/fm_cmd"
+            des_odom_name = mav_name + str(i+1) + "/des_odom"
             self.FM_pub.append(rospy.Publisher(FM_message_name, FMCommand, queue_size=10))
+            self.des_odom_pub.append(rospy.Publisher(des_odom_name, Odometry, queue_size=10))
 
         rospy.spin()
 
@@ -78,31 +82,41 @@ class controller_node:
         FM_message.moments.y = M_list[uav_id][1]
         FM_message.moments.z = M_list[uav_id][2]
         return FM_message
-    
-    def qd_odom_callback(self, uav_odom, curr_and_max):
-        arg = curr_and_max[0]
-        max = curr_and_max[1]
-        self.qd[arg] = {}
-        self.qd[arg]["pos"] = np.array( [[uav_odom.pose.pose.position.x],
+
+    def qd_odom_callback(self, uav_odom, uav_id):
+        
+        self.qd[uav_id]["pos"] = np.array( [[uav_odom.pose.pose.position.x],
                                          [uav_odom.pose.pose.position.y],
                                          [uav_odom.pose.pose.position.z]])
-        self.qd[arg]["vel"] = np.array( [[uav_odom.twist.twist.linear.x],
+        self.qd[uav_id]["vel"] = np.array( [[uav_odom.twist.twist.linear.x],
                                          [uav_odom.twist.twist.linear.y],
                                          [uav_odom.twist.twist.linear.z]]) 
-        self.qd[arg]["quat"] = np.array([[uav_odom.pose.pose.orientation.w],
+        self.qd[uav_id]["quat"] = np.array([[uav_odom.pose.pose.orientation.w],
                                          [uav_odom.pose.pose.orientation.x],
                                          [uav_odom.pose.pose.orientation.y],
                                          [uav_odom.pose.pose.orientation.z]]) 
-        self.qd[arg]["omega"] = np.array( [ [uav_odom.twist.twist.angular.x],
+        self.qd[uav_id]["omega"] = np.array([[uav_odom.twist.twist.angular.x],
                                             [uav_odom.twist.twist.angular.y],
                                             [uav_odom.twist.twist.angular.z]]) 
-        Rot = QuatToRot(self.qd[arg]["quat"])
-        phi, theta, yaw = RotToRPY_ZXY(Rot)
-        self.qd[arg]["euler"] = np.array([[phi],[theta],[yaw]])
-        self.qd[arg]["rot"] = Rot.T
+        Rot = utilslib.QuatToRot(self.qd[uav_id]["quat"])
+        self.qd[uav_id]["rot"] = Rot
+        rho_vec = self.pl_params.rho_vec_list[:,uav_id].reshape((3,1))
+        cable_len = self.pl_params.cable_length[uav_id]
+        pl_rot = self.pl["rot"]
+        pl_pos = self.pl["pos"]
+        pl_omega_asym = vec2asym(self.pl["omega"])
 
-        #if arg == max-1:
-         #   self.sim_subscriber()
+        robot_attach_vector = self.pl["pos"] + pl_rot @ rho_vec - self.qd[uav_id]["pos"]
+        qd_xi = robot_attach_vector / np.linalg.norm(robot_attach_vector) 
+        qd_xidot = (self.pl["vel"] + pl_rot @ pl_omega_asym @ rho_vec - self.qd[uav_id]["vel"]) #/ cable_len
+        #print("qd xi of",uav_id, qd_xi)
+
+        xi = qd_xi.reshape((3,1))
+        self.qd[uav_id]["xi"] = xi
+        self.qd[uav_id]["xixiT"] = xi @ xi.T
+        self.qd[uav_id]["xidot"] = qd_xidot.reshape((3,1))
+        self.qd[uav_id]["yaw_des"] = 0
+        self.qd[uav_id]["yawdot_des"] = 0
 
     def pl_odom_callback(self, payload_odom):
 
@@ -122,7 +136,7 @@ class controller_node:
         self.pl["omega"] = np.array([   [payload_odom.twist.twist.angular.x],
                                         [payload_odom.twist.twist.angular.y],
                                         [payload_odom.twist.twist.angular.z]])
-        self.pl["rot"] = QuatToRot(self.pl["quat"])
+        self.pl["rot"] = utilslib.QuatToRot(self.pl["quat"])
 
     def desired_traj_callback(self, des_traj):
         self.pl["pos_des"] = np.array([ [des_traj.position.x],
@@ -168,36 +182,56 @@ class controller_node:
 
         qd_xidot = (self.pl["vel"] + pl_rot @ pl_omega_asym @ rho_vec_list - qd_vel) / cable_len_list
 
-        for qn in range(1, pl_params.nquad+1):
-            self.qd[qn-1]["xi"] = qd_xi[:, qn-1:qn]
-            self.qd[qn-1]["xixiT"] = qd_xi[:, qn-1:qn] @ qd_xi[:, qn-1:qn].T
-            self.qd[qn-1]["xidot"] = qd_xidot[:, qn-1:qn]
-            self.qd[qn-1]["yaw_des"] = 0
-            self.qd[qn-1]["yawdot_des"] = 0
-
-    '''    print()
-        print(pl["vel"])
-        print()
-        print(pl_rot)
-        print()
-        print(pl_omega_asym)
-        print()
-        print(rho_vec_list)
-        print()
-        print(qd_vel)
-        print()
-        print(cable_len_list)'''
+        for qn in range(pl_params.nquad):
+            xi = qd_xi[:, qn].reshape((3,1))
+            self.qd[qn]["xi"] = xi
+            self.qd[qn]["xixiT"] = xi @ xi.T
+            self.qd[qn]["xidot"] = qd_xidot[:, qn].reshape((3,1))
+            self.qd[qn]["yaw_des"] = 0
+            self.qd[qn]["yawdot_des"] = 0
+            #print("The uav id is", qn)
+            #print("and the qd is", self.qd[qn]["xi"])
+        
 
     def sim_subscriber(self):
-        print("#########################")
-        print("publishing controls...")
-        cont = controller()
-        self.controller_setup(self.pl_params)
-        F_list, M_list = cont.cooperative_suspended_payload_controller(self.pl, self.qd, self.pl_params, self.quad_params)
+        #print("#########################")
+        #print("publishing controls...")
+        #self.controller_setup(self.pl_params)
+        mu, att_acc, F_list, M_list, quat_list, rot_list = self.controller.cooperative_suspended_payload_controller(self.pl, self.qd, self.pl_params, self.quad_params)
+        cen_pl_command = CenPL_Command()
+        cen_pl_command.header.stamp = rospy.get_rostime()
+        cen_pl_command.header.frame_id = "simulator" 
+        cen_pl_command.copr_status = 3
+        for i in range(self.pl_params.nquad):
+            acc_command = Vector3()
+            acc_command.x = att_acc[0,i]
+            acc_command.y = att_acc[1,i]
+            acc_command.z = att_acc[2,i]
+
+            mu_command = Vector3()
+            mu_command.x = mu[3*i,0]
+            mu_command.y = mu[3*i+1,0]
+            mu_command.z = mu[3*i+2,0]
+
+            cen_pl_command.acc.append(acc_command)
+            cen_pl_command.mu.append(mu_command)
+            cen_pl_command.estimated_acc.append(acc_command)
+
+        self.cen_pl_cmd_pub.publish(cen_pl_command)
+        #F_list, M_list = self.controller.cooperative_suspended_payload_controller(self.pl, self.qd, self.pl_params, self.quad_params)
 
         for i in range(self.pl_params.nquad):
             FM_message = self.assembly_FM_message(F_list, M_list, i)
             self.FM_pub[i].publish(FM_message)
+            '''des_odom = Odometry()
+            des_odom.pose.pose.position.x = rot_list[i][0,0]
+            des_odom.pose.pose.position.y = rot_list[i][1,0]
+            des_odom.pose.pose.position.z = rot_list[i][2,0]
+            des_odom.pose.pose.orientation.x = quat_list[i][0]
+            des_odom.pose.pose.orientation.y = quat_list[i][1]
+            des_odom.pose.pose.orientation.z = quat_list[i][2]
+            des_odom.pose.pose.orientation.w = quat_list[i][3]
+            self.des_odom_pub[i].publish(des_odom)'''
 
             #RPM_message_name = '/dragonfly' + str(i+1) + "/rpm_cmd"
             #RPM_pub = rospy.Publisher(RPM_message_name, PositionCommand)
@@ -210,31 +244,6 @@ class controller_node:
 
         return RPM_message
     '''
-'''def circle_client(self):
-        rospy.wait_for_service("traj_generator/Circle")
-        traj = rospy.ServiceProxy("traj_generator/Circle", Circle)
-        try:
-            traj(1.0, 1.0, 6.0)
-        except rospy.ServiceException as exc:
-            print("Service did not process request: " + str(exc))
-
-    def line_client(self):
-        rospy.wait_for_service("traj_generator/Line")
-        traj = rospy.ServiceProxy("traj_generator/Line", Line)
-        path = np.array([[0.0,0.0,0.0],[0.5,-0.5,0.25],[1.0,0.0,0.5],[1.5,-0.5,0.75],[2.0,0.0,1.0]])
-        try:
-            traj(path)
-        except rospy.ServiceException as exc:
-            print("Service did not process request: " + str(exc))
-
-    def min_derivative_lin_client(self):
-        rospy.wait_for_service("traj_generator/Min_Derivative_Line")
-        traj = rospy.ServiceProxy("traj_generator/Min_Derivative_Line", Line)
-        try:
-            traj()
-        except rospy.ServiceException as exc:
-            print("Service did not process request: " + str(exc))'''
-
 
 def main():
     controller_node()
