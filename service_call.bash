@@ -1,5 +1,6 @@
-rosservice call /traj_generator/Circle 1.0 1.0 6.0
+rosservice call /traj_generator/Circle 1.0 10.0 10.0
 
+read -n 1 -s                                   
 rosservice call /traj_generator/Line "path:
 - x: 0.0
   y: 0.0
@@ -17,6 +18,7 @@ rosservice call /traj_generator/Line "path:
   y: 0.0
   z: 1.0"
   
+read -n 1 -s                                   
 rosservice call /traj_generator/Min_Derivative_Line "path:
 - x: 0.0
   y: 0.0

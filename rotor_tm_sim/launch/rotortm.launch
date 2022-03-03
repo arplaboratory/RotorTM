@@ -1,0 +1,16 @@
+<launch>
+    <node pkg="rotor_tm" type="runsim.py" name="sim" output="screen">
+    </node>
+    <node pkg="rotor_tm_traj" type="traj_node.py" name="traj" output="screen">
+    </node>
+  <node pkg="rotor_tm_control" type="controller_node.py" name="controller" output="screen">
+  </node>
+
+    <!--include file="$(find rotor_tm)/launch/rotortm_robot.launch">
+       <arg name="mav_name" value="dragonfly1" />
+    </include-->
+
+<include file="$(find rotor_tm)/launch/rviz.launch">
+ </include>
+
+ </launch>
