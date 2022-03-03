@@ -13,8 +13,8 @@ import time
 class simulation_base():
   def __init__(self,pl_params,uav_params):
       rospy.init_node('simulation')
-      self.rate = 2000
-      rate = rospy.Rate(self.rate) # 1000hz
+      self.rate = 100
+      rate = rospy.Rate(self.rate) # 100hz
       t_span = (0,1/self.rate)
       self.worldframe = "simulator"
 
@@ -133,13 +133,24 @@ class simulation_base():
         system_marker = MarkerArray()
         cable_point_list = np.zeros((2*self.nquad,3))
         for uav_id in range(self.nquad):
+            uav_state = x[self.pl_dim_num+self.uav_dim_num*uav_id:self.pl_dim_num+self.uav_dim_num*(uav_id+1)]
+            attach_pos = x[0:3] + np.matmul(payload_rotmat, self.rho_vec_list[:,uav_id])
+            attach_vel = x[3:6] + np.matmul(payload_rotmat, np.cross(sol.y[:,0][10:13], self.rho_vec_list[:,uav_id]))
+            #print("old norm is", np.linalg.norm(uav_state[0:3] - attach_pos[0:3]))
+            if not self.cable_is_slack[uav_id]:
+                uav_attach_vector = uav_state[0:3] - attach_pos[0:3]
+                uav_attach_distance = np.linalg.norm(uav_attach_vector)
+                if uav_attach_distance > self.cable_len_list[uav_id]:
+                    xi = uav_attach_vector/uav_attach_distance
+                    uav_state[0:3] = attach_pos[0:3] + self.cable_len_list[uav_id] * xi
+                    #print(uav_state[0:3])
+                    #print(x[self.pl_dim_num+self.uav_dim_num*uav_id:self.pl_dim_num+self.uav_dim_num*(uav_id+1)])
+                    #print("new norm is", np.linalg.norm(uav_state[0:3] - attach_pos[0:3]))
+                    
             # Publish UAV odometry
             uav_odom = Odometry()
             uav_odom.header.stamp = current_time
             uav_odom.header.frame_id = self.worldframe 
-            uav_state = x[self.pl_dim_num+self.uav_dim_num*uav_id:self.pl_dim_num+self.uav_dim_num*(uav_id+1)]
-            #print("The uav", uav_id + 1, "_state is",uav_state)
-            #print("The full state is",x)
             uav_odom.pose.pose.position.x = uav_state[0]
             uav_odom.pose.pose.position.y = uav_state[1]
             uav_odom.pose.pose.position.z = uav_state[2]
@@ -160,8 +171,6 @@ class simulation_base():
             attach_odom.header.stamp = current_time
             attach_odom.header.frame_id = self.worldframe 
             #TODO: continue here publish the attach odom. 
-            attach_pos = x[0:3] + np.matmul(payload_rotmat, self.rho_vec_list[:,uav_id])
-            attach_vel = x[3:6] + np.matmul(payload_rotmat, np.cross(sol.y[:,0][10:13], self.rho_vec_list[:,uav_id]))
             attach_odom.pose.pose.position.x = attach_pos[0]
             attach_odom.pose.pose.position.y = attach_pos[1]
             attach_odom.pose.pose.position.z = attach_pos[2]
@@ -444,7 +453,6 @@ class simulation_base():
       return
 
   def fm_command_callback(self,fm_command,uav_id):
-      # print("I am getting the thrust and moment command for UAV")
       self.uav_F[uav_id] = fm_command.thrust
       self.uav_M[0,uav_id] = fm_command.moments.x
       self.uav_M[1,uav_id] = fm_command.moments.y
