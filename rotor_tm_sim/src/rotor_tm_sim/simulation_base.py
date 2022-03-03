@@ -7,7 +7,7 @@ from scipy.spatial.transform import Rotation as rot_math
 from visualization_msgs.msg import MarkerArray, Marker
 from nav_msgs.msg import Odometry 
 from rotor_tm_msgs.msg import RPMCommand, FMCommand 
-from rotor_tm_utils import utilslib, rosutilslib
+from rotor_tm_utils import utilslib, rosutilslib, QuatToRot
 import time
 
 class simulation_base():
@@ -26,20 +26,70 @@ class simulation_base():
       self.uav_dim_num = 13
       self.mav_name = 'dragonfly'
       self.sim_start = False
-      self.uav_F = np.matmul(self.pl_params.pseudo_inv_P, np.array([0,0,self.pl_params.mass * self.pl_params.grav,0,0,0])) + np.kron([1]*self.nquad, [0,0,self.uav_params.mass * self.pl_params.grav]) 
-      self.uav_F = self.uav_F.reshape(3,self.nquad)[:,2]
-      self.uav_M = np.zeros((3,self.nquad))
-      self.cable_is_slack = np.zeros(self.nquad)
 
-      self.rho_vec_list = self.pl_params.rho_vec_list
-      self.cable_len_list = np.array(self.pl_params.cable_length)
+      if self.nquad != 1:
+        if self.pl_params.id == "Cable":
+            self.uav_F = np.matmul(self.pl_params.pseudo_inv_P, np.array([0,0,self.pl_params.mass * self.pl_params.grav,0,0,0])) + np.kron([1]*self.nquad, [0,0,self.uav_params.mass * self.pl_params.grav]) 
+            self.uav_F = self.uav_F.reshape(3,self.nquad)[:,2]
+            self.uav_M = np.zeros((3,self.nquad))
+            self.cable_is_slack = np.zeros(self.nquad)
 
-      x = np.zeros(self.pl_dim_num + self.uav_dim_num * self.nquad)
-      for i in range(self.nquad+1): 
-        if i > 0:
-            print("initalizing robot ", i)
-            x[i*13:i*13+3] = x[0:3] + self.rho_vec_list[:,i-1] + np.array([0,0,self.cable_len_list[i-1]])
-        x[i*13 + 6] = 1
+            self.rho_vec_list = self.pl_params.rho_vec_list
+            self.cable_len_list = np.array(self.pl_params.cable_length)
+
+            x = np.zeros(self.pl_dim_num + self.uav_dim_num * self.nquad)
+            for i in range(self.nquad+1): 
+                if i > 0:
+                    print("initalizing robot ", i)
+                    x[i*13:i*13+3] = x[0:3] + self.rho_vec_list[:,i-1] + np.array([0,0,self.cable_len_list[i-1]])
+                x[i*13 + 6] = 1
+        else: ## rigid link
+            print("Initalizing payload-robot rigidlink structure")
+            weight = self.pl_params.struct_mass * self.uav_params.grav
+            for uav_id in range(self.nquad):
+                self.uav_F[uav_id] = weight/self.nquad
+            self.uav_M = np.zeros((3,self.nquad))
+            self.cable_is_slack = np.zeros(self.nquad)
+            # TODO how to deal with rho_vec_list
+            # self.rho_vec_list = self.pl_params.rho_vec_list
+            self.cable_len_list = np.array(self.pl_params.cable_length)
+            # x = (26, 1) state init
+            # TODO assembly state
+                                                        # Name      Element Location
+            x = np.array([0.0,  0.0,    0.0,            # pl pos    3
+                          0.0,  0.0,    0.0,            # pl vel    6
+                          1.0,  0.0,    0.0,    0.0,    # pl quat   10
+                          0.0,  0.0,    0.0,            # pl omega  13
+                          0.0,  0.0,    0.5,            # qd pos    16
+                          0.0,  0.0,    0.0,            # qd vel    19 
+                          1.0,  0.0,    0.0,    0.0,    # qd quat   23
+                          0.0,  0.0,    0.0])           # qd omega  26
+      else:
+        ## init for ptmass
+        ## init force to [sum of (quad and payload mass)] * gravity
+        ## init M to [0; 0; 0]
+        ## init calbe to taut
+        ## init rho_vec_list = [] (empty)
+        ## init cable_len_list = cable_length (read)
+        ## init state x as a (26, 1) state vector with inital position hard code to (0, 0, 0.5)
+        print("Initalizing ptmass robot")
+        self.uav_F = (self.pl_params.mass + self.uav_params.mass) * self.uav_params.grav
+        self.uav_M = np.zeros((3,self.nquad), dtype=float)
+        self.cable_is_slack = np.zeros(self.nquad)
+        self.rho_vec_list = self.pl_params.rho_vec_list
+        self.cable_len_list = np.array(self.pl_params.cable_length)
+        
+        # x = (26, 1) state init
+                                                    # Name      Element Location
+        x = np.array([0.0,  0.0,    0.0,            # pl pos    3
+                      0.0,  0.0,    0.0,            # pl vel    6
+                      1.0,  0.0,    0.0,    0.0,    # pl quat   10
+                      0.0,  0.0,    0.0,            # pl omega  13
+                      0.0,  0.0,    0.5,            # qd pos    16
+                      0.0,  0.0,    0.0,            # qd vel    19 
+                      1.0,  0.0,    0.0,    0.0,    # qd quat   23
+                      0.0,  0.0,    0.0])           # qd omega  26
+
 
       # ROS Publisher 
       self.system_publisher = rospy.Publisher('system/marker',MarkerArray,queue_size=10)
@@ -50,7 +100,6 @@ class simulation_base():
           self.robot_odom_publisher.append(rospy.Publisher(self.mav_name + str(i+1) + '/odom',Odometry,queue_size=10))
           self.attach_publisher.append(rospy.Publisher(self.mav_name + str(i+1) + '/attach',Odometry,queue_size=10))
            
-
       # ROS Subscriber 
       self.robot_command_subscriber = []
       for uav_id in range(self.nquad):
@@ -74,9 +123,15 @@ class simulation_base():
         #tsave, xsave = scipy.integrate.solve_ivp(rotortm_simulation_base.run(), t_span, x, method='RK45', event = simulation_base.guard())
         # With event
         start = time.time()
-        sol = scipy.integrate.solve_ivp(self.hybrid_cooperative_rigidbody_pl_transportationEOM, t_span, x, method='RK45', t_eval=t_span)
-        end = time.time()
-        x = sol.y[:,1]
+        if self.pl_params.id == "Rigid Link":
+            sol = scipy.integrate.solve_ivp(self.rigid_links_cooperative_rigidbody_pl_EOM, t_span, x, method= 'RK45', t_eval=t_span)
+        else:
+            if self.nquad == 1:
+                sol = scipy.integrate.solve_ivp(self.hybrid_ptmass_pl_transportationEOM, t_span, x, method= 'RK45', t_eval=t_span)
+            else:    
+                sol = scipy.integrate.solve_ivp(self.hybrid_cooperative_rigidbody_pl_transportationEOM, t_span, x, method='RK45', t_eval=t_span)
+            end = time.time()
+            x = sol.y[:,1]
 
         # The simulation must first run on the quadrotors
         # Then the simulation simulates the dynamics of the payload
@@ -170,7 +225,9 @@ class simulation_base():
             attach_odom = Odometry()
             attach_odom.header.stamp = current_time
             attach_odom.header.frame_id = self.worldframe 
-            #TODO: continue here publish the attach odom. 
+            # TODO: continue here publish the attach odom. 
+            attach_pos = x[0:3] + np.matmul(payload_rotmat, self.rho_vec_list[:,uav_id])
+            attach_vel = x[3:6] + np.matmul(payload_rotmat, np.cross(sol.y[:,0][10:13], self.rho_vec_list[:,uav_id]))
             attach_odom.pose.pose.position.x = attach_pos[0]
             attach_odom.pose.pose.position.y = attach_pos[1]
             attach_odom.pose.pose.position.z = attach_pos[2]
@@ -194,6 +251,9 @@ class simulation_base():
 
         rate.sleep()    
 
+####################################################################################
+##################                    hybrid                    ####################
+####################################################################################
   def hybrid_cooperative_rigidbody_pl_transportationEOM(self, t, s): 
       # EOM Wrapper function for solving quadrotor equation of motion
       #	EOM takes in time, state vector
@@ -449,6 +509,236 @@ class simulation_base():
       return sdot
 
 
+####################################################################################
+##################                    PTMASS                    ####################
+####################################################################################
+# partially tested (tested without controller)
+  def hybrid_ptmass_pl_transportationEOM(self, t, s):
+    # QUADEOM Wrapper function for solving quadrotor equation of motion
+    # 	quadEOM takes in time, state vector, and output the derivative of the state vector, the
+    # 	actual calcution is done in quadEOM_readonly.
+    #
+    # INPUTS:
+    # t             - 1 x 1, time
+    # s computed    - 19 x 1, state vector = [xL, yL, zL, xLd, yLd, zLd,
+    #                                         xQ, yQ, zQ, xQd, yQd, zQd,
+    #                                         qw, qx, qy, qz, pQ, qQ, rQ]
+    #
+    # take_in/output- 23 x 1, state vector(dot-elementwise) = [ xL,     yL,     zL,     xLd,    yLd,    zLd,
+    #                                                           qLw = 0,qLx = 0,qLy = 0,qLz = 0,pL = 0, qL = 0, rL = 0,
+    #                                                           xQ,     yQ,     zQ,     xQd,    yQd,    zQd
+    #                                                           qw,     qx,     qy,     qz,     pQuad,  qQuad,  rQuad]
+    #
+    #                   ,where [xL, yL, zL] is payload postion
+    #                          [xLd, yLd, zLd], is payload linear velocity
+    #                          [xQ, yQ, zQ] is quadrotor position
+    #                          [xQd, yQd, zQd] is quadrotor velocity
+    #                          [qw, qx, qy, qz] is quadrotor orientation in quaternion
+    #                          [pQ, qQ, rQ] is quadrotor angular velocity in its own frame
+    # OUTPUTS:
+    # sdot          - 23 x 1, derivative of state vector s as mentioned above (some values are forced to 0)
+      l = self.pl_params.cable_length
+      plqd = {}
+      # convert state s to plqd
+      plqd["pos"] = s[0:3]
+      plqd["vel"] = s[3:6]
+      plqd["qd_pos"] = s[13:16]
+      plqd["qd_vel"] = s[16:19]
+      plqd["qd_quat"] = s[19:23]
+      plqd["qd_omega"] = s[23:26]
+      Rot = utilslib.QuatToRot(s[19:23])
+      plqd["qd_rot"] = Rot.T
+      quad_load_rel_pos = plqd["qd_pos"]-plqd["pos"]
+      quad_load_rel_vel = plqd["qd_vel"]-plqd["vel"]
+
+      if self.cable_is_slack[0]:   
+          return self.slack_ptmass_payload_quadEOM_readonly(t, plqd, self.uav_F, self.uav_M)
+      else:
+          plqd["xi"] = -quad_load_rel_pos/l
+          plqd["xidot"] = -quad_load_rel_vel/l
+          return self.taut_ptmass_payload_quadEOM_readonly(t, plqd, self.uav_F, self.uav_M)
+
+  def slack_ptmass_payload_quadEOM_readonly(self, t, plqd, F, M):
+      # Assign params and states
+      mQ  =   self.uav_params.mass
+      e3  =   np.array([[0.0],[0.0],[1.0]])
+      g   =   self.uav_params.grav * e3
+      wRb =   plqd["qd_rot"];   # Rotation matrix of the quadrotor
+      qd_quat     =   plqd["qd_quat"]
+      qd_omega    =   plqd["qd_omega"]
+      p = qd_omega[0]
+      q = qd_omega[1]
+      r = qd_omega[2]
+
+      # Obtain Quadrotor Force Vector
+      quad_force_vector = F * wRb @ e3 
+
+      # Solving for Quadrotor Acceleration
+      accQ = quad_force_vector/mQ - g; 
+
+      # Solving for Quadrotor Angular Velocity
+      K_quat = 2.0 # this enforces the magnitude 1 constraint for the quaternion
+      quaterror = 1 - np.linalg.norm(qd_quat)
+
+      qdot = -1/2*np.array([[0, -p, -q, -r],
+                            [p,  0, -r,  q],
+                            [q,  r,  0, -p],
+                            [r, -q,  p,  0]]) @ qd_quat + K_quat * quaterror * qd_quat
+
+      # Solving for Quadrotor Angular Acceleration
+      pqrdot   = self.uav_params.invI @ (M - np.reshape(np.cross(qd_omega, self.uav_params.I @ qd_omega, axisa=0, axisb=0), (3,1)))
+      
+      # Assemble sdot
+      sdot = np.zeros((26,1), dtype=float)
+      sdot[0:3, 0] = plqd["vel"]
+      sdot[3:6] = -g
+      sdot[13:16, 0] = plqd["qd_vel"]
+      sdot[16:19, 0:1] = accQ
+      sdot[19:23, 0] = qdot
+      sdot[23:26] = pqrdot
+      sdot = sdot[:,0]
+
+      return sdot
+
+  def taut_ptmass_payload_quadEOM_readonly(self, t, plqd, F, M):
+      mL = self.pl_params.mass
+      mQ = self.uav_params.mass
+      total_mass = mL + mQ
+      l = self.pl_params.cable_length
+      xi = plqd["xi"]
+      xidot = plqd["xidot"]
+      xi_omega = np.cross(xi,xidot)
+      e3=np.array([[0.0],[0.0],[1.0]])
+      g = self.uav_params.grav * e3
+      wRb=plqd["qd_rot"]    #Rotation matrix of the quadrotor
+      qd_quat = plqd["qd_quat"]
+      qd_omega = plqd["qd_omega"]
+      p = qd_omega[0]
+      q = qd_omega[1]
+      r = qd_omega[2]
+      # Obtain tension vector
+      quad_force_vector = F * wRb @ e3
+      quad_centrifugal_f = mQ * l * (xi_omega.T @ xi_omega)
+      tension_vector = mL * (-xi.T.reshape(1,3) @ quad_force_vector + quad_centrifugal_f) * xi.reshape(3,1) / total_mass
+      # Solving for Load Acceleration
+      accL = - tension_vector / mL - g
+
+      # Solving for Quadrotor Acceleration
+      accQ = (quad_force_vector + tension_vector) / mQ - g
+
+      # Solving for Quadrotor Angular Velocity
+      K_quat = 2 # this enforces the magnitude 1 constraint for the quaternion
+      quaterror = 1 - np.linalg.norm(qd_quat)
+      qdot = -1/2*np.array([[0, -p, -q, -r],
+                            [p,  0, -r,  q],
+                            [q,  r,  0, -p],
+                            [r, -q,  p,  0]]) @ qd_quat.reshape((qd_quat.shape[0], 1)) + K_quat * quaterror * qd_quat.reshape((qd_quat.shape[0], 1))
+
+      # Solving for Quadrotor Angular Acceleration
+      pqrdot   = self.uav_params.invI @ (M - np.cross(qd_omega, self.uav_params.I @ qd_omega, axisa=0, axisb=0).T.reshape(3, 1))
+      '''   debug print()
+      print(plqd["vel"].reshape(3, 1))
+      print(plqd["vel"].reshape(3, 1).shape)
+      print(accL)
+      print(accL.shape)
+      print(plqd["qd_vel"].reshape(3, 1))
+      print(plqd["qd_vel"].reshape(3, 1).shape)
+      print(accQ)
+      print(accQ.shape)
+      print(qdot)
+      print(qdot.shape)
+      print(pqrdot)
+      print(pqrdot.shape)
+      print()'''
+      # Assemble sdot
+      sdot = np.zeros((26,1), dtype=float)
+      sdot[0:3] = plqd["vel"].reshape(3, 1)
+      sdot[3:6] = accL
+      sdot[13:16] = plqd["qd_vel"].reshape(3, 1)
+      sdot[16:19] = accQ
+      sdot[19:23] = qdot
+      sdot[23:26] = pqrdot
+      sdot = sdot[:,0]
+
+      return sdot
+
+
+####################################################################################
+##################                  Rigidlink                   ####################
+####################################################################################
+# untested
+  def rigid_links_cooperative_rigidbody_pl_EOM(self, t, s):
+    # s                 - 13 x 1, state vector = [xL, yL, zL, xLd, yLd, zLd, qw, qx, qy, qz, pL,qL,rL]
+    # take_in/output    - 23 x 1, state vector(dot-elementwise) = [ xL,     yL,     zL,     xLd,    yLd,        zLd,
+    #                                                               qLw = 0,qLx = 0,qLy = 0,qLz = 0,pL,         qL,         rL,
+    #                                                               xQ = 0, yQ = 0, zQ = 0, xQd = 0,yQd = 0,    zQd = 0,
+    #                                                               qw,     qx,     qy,     qz,     pQuad = 0,  qQuad = 0,  rQuad = 0]
+      qd = {}
+      # extract payload state_vector
+      qd["pos"] = s[0:3]
+      qd["vel"] = s[3:6]
+      qd["quat"] = s[5:10]
+      qd["omega"] = s[10:13]
+      qd["rot"] = utilslib.QuatToRot(qd.quat).T
+      
+      robot_trust_moment = np.array((0,1), dtype=float)
+      for uav_id in range(self.nquad):
+          robot_trust_moment = np.vstack((robot_trust_moment, self.uav_F[uav_id], self.uav_M[0,uav_id], self.uav_M[1,uav_id], self.uav_M[2,uav_id]))
+
+      u = self.pl_params @ robot_trust_moment
+      F = u[0] * qd["rot"]
+      M = u[1:4]
+
+      return self.rigidbody_structEOM_readonly(t, qd, F, M)
+
+  def rigidbody_structEOM_readonly(self, t, s, F, M):
+      # Assign states
+      quat = s["quat"]
+      qW = quat[0]
+      qX = quat[1]
+      qY = quat[2]
+      qZ = quat[3]
+      omega = s["omega"]
+      p = omega[0]
+      q = omega[1]
+      r = omega[2]
+
+      # Payload quaternion first derivative
+      K_quat = 2; #this enforces the magnitude 1 constraint for the quaternion
+      quaterror = 1 - (qW**2 + qX**2 + qY**2 + qZ**2)
+      qLdot = -1/2*np.array([   [0, -p, -q, -r],
+                                [p,  0, -r,  q],
+                                [q,  r,  0, -p],
+                                [r, -q,  p,  0]]) @ quat + K_quat @ quaterror @ quat
+
+      # Payload Angular acceleration
+      # all uav orientations are the same
+      # pick first uav orientation
+      omgLdot = M - np.cross(omega,self.pl_params.struct_I @ s.omega, axisa=0, axisb=0).T
+
+      # Payload Acceleration
+      # combine robot's forces
+      accL = F @ s["rot"] /self.pl_params.struct_mass - self.pl_params.grav*np.array([[0],[0],[1]])
+
+      # Assemble sdot
+      sdotLoad = np.zeros((13,1), dtype=float)
+      sdotLoad[1:3,0] = s.vel
+      sdotLoad[4,0] = accL[0]
+      sdotLoad[5,0] = accL[1]
+      sdotLoad[6,0] = accL[2]
+
+      sdotLoad[7,0] = qLdot[0]
+      sdotLoad[8,0] = qLdot[1]
+      sdotLoad[9,0] = qLdot[2]
+      sdotLoad[10,0] = qLdot[3]
+
+      sdotLoad[11,0] = omgLdot[0]
+      sdotLoad[12,0] = omgLdot[1]
+      sdotLoad[13,0] = omgLdot[2]
+      return sdotLoad
+
+
+##################                  Call backs                  ####################
   def rpm_command_callback(self,rpm_command,uav_id):
       return
 

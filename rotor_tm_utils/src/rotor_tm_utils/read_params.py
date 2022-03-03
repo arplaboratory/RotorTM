@@ -2,12 +2,14 @@
 #from MpcControl import *
 import numpy as np
 import numpy.linalg as LA
+import scipy.linalg as sLA
 from pathlib import Path
 import os
 from dataclasses import dataclass
 import yaml
 import inspect
 from rotor_tm_utils import utilslib
+from rotor_tm_utils.RPYtoRot_ZXY import RPYtoRot_ZXY
 
 # Class to store various parameters of the UAV and the controller
 @dataclass
@@ -74,7 +76,6 @@ class read_params:
     params.Kd = payload_control_gains.Kd
     params.Kpe = payload_control_gains.Kpe
     params.Kde = payload_control_gains.Kde
-    quad_params.l = mechanism_params.cable_length[0]
     quad_params.Kp = uav_control_gains.Kp
     quad_params.Kd = uav_control_gains.Kd
     quad_params.Kpe = uav_control_gains.Kpe
@@ -86,7 +87,10 @@ class read_params:
 
     ## Set up parameters
     if params.mechanism_type == 'Cable':
+        params.id = "Cable"
         ## This section sets up the essential controller parameters for cable suspended payload
+        ## store cable length in both payload and uav params
+        quad_params.l = mechanism_params.cable_length[0] 
         params.cable_length = mechanism_params.cable_length
         if params.payload_type == 'Rigid Body':
           # Geometric parameters matrix for cooperative geometric controller
@@ -94,35 +98,44 @@ class read_params:
           params.pseudo_inv_P = np.matmul(P.T, LA.inv(np.matmul(P, P.T)))
           params.P = P
     else:
-        if mechanism_params.type == 'Rigid Link':
+        if params.mechanism_type == 'Rigid Link':
+          params.id = "Rigid Link"
           a = 1
           # This section sets up the essential controller parameters for payload with rigid links
           ## Physical properties of structure
           # Calculate the inertia and mass of the entire structure
-          #params.struct_I = params.I
-          #params.struct_mass = params.mass
-          #rho_c = np.zeros((3,1))
-          #for k in np.arange(1,params.nquad+1).reshape(-1):
-          #    params.struct_mass = params.struct_mass + quad_params.mass
-          #    rho_c = rho_c + quad_params.mass * mechanism_params.rho_vec_list(:,k)
-          #rho_c = rho_c / (quad_params.mass * params.nquad + params.mass)
-          #params.struct_I = params.struct_I + params.mass * np.array([[rho_c(2) ** 2,0,0],[0,rho_c(1) ** 2,0],[0,0,rho_c(1) ** 2 + rho_c(2) ** 2]])
+          params.struct_I = params.I
+          params.struct_mass = params.mass
+          rho_c = np.zeros((1,3), dtype=float)
+          for k in np.arange(1,params.nquad+1):
+              params.struct_mass = params.struct_mass + quad_params.mass
+              rho_c = rho_c + quad_params.mass * mechanism_params.rho_vec_list[:,k-1].T
+
+          rho_c = rho_c / (quad_params.mass * params.nquad + params.mass)
+          rho_c = rho_c.T
+ 
+          params.struct_I = params.struct_I + params.mass * np.array([[rho_c[1, 0]**2,0,0],[0,rho_c[0, 0]**2,0],[0,0,rho_c[0, 0]**2+rho_c[1, 0]**2]])
+
           ## Calculate the geometric constraints of the structure
-          #A = []
-          #for k in np.arange(1,params.nquad+1).reshape(-1):
-          #    rho = mechanism_params.rho_vec_list(:,k) - rho_c
-          #    R = np.transpose(RPYToRot_ZXY(0,0,mechanism_params.yaw_list(k)))
-          #    params.struct_I = params.struct_I + R * quad_params.I * np.transpose(R) + quad_params.mass * np.array([[rho(2) ** 2,0,0],[0,rho(1) ** 2,0],[0,0,rho(1) ** 2 + rho(2) ** 2]])
-          #    A = np.array([A,np.array([[1,0,0,0],[np.array([[rho(2)],[rho(1)],[0]]),R]])])
-          #params.rho_load = - rho_c
-          #params.rho_robot = mechanism_params.rho_vec_list - rho_c
-          #params.A = A
+          A = np.zeros((4,0), dtype=float)
+          for k in np.arange(1,params.nquad+1).reshape(-1):
+              rho = mechanism_params.rho_vec_list[:, k-1] - rho_c.T
+              rho = rho.T
+              R = np.transpose(RPYtoRot_ZXY(0,0,mechanism_params.yaw_list[k-1]))
+              params.struct_I = params.struct_I + R @ quad_params.I @ R.T + quad_params.mass * np.array([[rho[1,0]**2,0,0],[0,rho[0,0]**2,0],[0,0,rho[0,0]**2+rho[1,0]**2]])
+              A = np.hstack((A, np.vstack((np.array([1,0,0,0]), np.hstack((np.array([[rho[1,0]],[rho[0,0]],[0.0]]), R))))))
+          params.rho_load = -rho_c
+          params.rho_robot = mechanism_params.rho_vec_list - rho_c
+          params.A = A
+
           ## Distribution matrix
-          #W = []
-          #for k in np.arange(1,params.nquad+1).reshape(-1):
-          #    W = blkdiag(W,np.array([[1,np.zeros((1,3))],[np.zeros((3,1)),10 * np.eye(3)]]))
-          #invW = inv(W)
-          #params.thrust_moment_distribution_mat = invW * np.transpose(A) * inv(A * invW * np.transpose(A))
+          W = np.zeros((0,0), dtype=float)
+          for k in np.arange(1,params.nquad+1):
+              W = sLA.block_diag(W, np.array([[1,0,0,0],[0,10,0,0],[0,0,10,0],[0,0,0,10]]))
+
+          invW = LA.inv(W)
+          params.thrust_moment_distribution_mat = invW @ np.transpose(A) @ LA.inv(A @ invW @ np.transpose(A))
+
     return params, quad_params
 
   def read_uav_control_gains(self, path = None):
