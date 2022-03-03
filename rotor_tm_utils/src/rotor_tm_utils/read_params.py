@@ -87,9 +87,10 @@ class read_params:
 
     ## Set up parameters
     if params.mechanism_type == 'Cable':
-        quad_params.l = mechanism_params.cable_length[0]
         params.id = "Cable"
         ## This section sets up the essential controller parameters for cable suspended payload
+        ## store cable length in both payload and uav params
+        quad_params.l = mechanism_params.cable_length[0] 
         params.cable_length = mechanism_params.cable_length
         if params.payload_type == 'Rigid Body':
           # Geometric parameters matrix for cooperative geometric controller

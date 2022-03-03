@@ -14,7 +14,7 @@ class simulation_base():
   def __init__(self,pl_params,uav_params):
       rospy.init_node('simulation')
       self.rate = 2000
-      rate = rospy.Rate(self.rate) # 1000hz
+      rate = rospy.Rate(self.rate) # 2000hz
       t_span = (0,1/self.rate)
       self.worldframe = "simulator"
 
@@ -28,35 +28,68 @@ class simulation_base():
       self.sim_start = False
 
       if self.nquad != 1:
-        self.uav_F = np.matmul(self.pl_params.pseudo_inv_P, np.array([0,0,self.pl_params.mass * self.pl_params.grav,0,0,0])) + np.kron([1]*self.nquad, [0,0,self.uav_params.mass * self.pl_params.grav]) 
-        self.uav_F = self.uav_F.reshape(3,self.nquad)[:,2]
-        self.uav_M = np.zeros((3,self.nquad))
-        self.cable_is_slack = np.zeros(self.nquad)
+        if self.pl_params.id == "Cable":
+            self.uav_F = np.matmul(self.pl_params.pseudo_inv_P, np.array([0,0,self.pl_params.mass * self.pl_params.grav,0,0,0])) + np.kron([1]*self.nquad, [0,0,self.uav_params.mass * self.pl_params.grav]) 
+            self.uav_F = self.uav_F.reshape(3,self.nquad)[:,2]
+            self.uav_M = np.zeros((3,self.nquad))
+            self.cable_is_slack = np.zeros(self.nquad)
 
-        self.rho_vec_list = self.pl_params.rho_vec_list
-        self.cable_len_list = np.array(self.pl_params.cable_length)
+            self.rho_vec_list = self.pl_params.rho_vec_list
+            self.cable_len_list = np.array(self.pl_params.cable_length)
 
-        x = np.zeros(self.pl_dim_num + self.uav_dim_num * self.nquad)
-        for i in range(self.nquad+1): 
-          if i > 0:
-              print("initalizing robot ", i)
-              x[i*13:i*13+3] = x[0:3] + self.rho_vec_list[:,i-1] + np.array([0,0,self.cable_len_list[i-1]])
-          x[i*13 + 6] = 1
-
+            x = np.zeros(self.pl_dim_num + self.uav_dim_num * self.nquad)
+            for i in range(self.nquad+1): 
+                if i > 0:
+                    print("initalizing robot ", i)
+                    x[i*13:i*13+3] = x[0:3] + self.rho_vec_list[:,i-1] + np.array([0,0,self.cable_len_list[i-1]])
+                x[i*13 + 6] = 1
+        else: ## rigid link
+            print("Initalizing payload-robot rigidlink structure")
+            weight = self.pl_params.struct_mass * self.uav_params.grav
+            for uav_id in range(self.nquad):
+                self.uav_F[uav_id] = weight/self.nquad
+            self.uav_M = np.zeros((3,self.nquad))
+            self.cable_is_slack = np.zeros(self.nquad)
+            # TODO how to deal with rho_vec_list
+            # self.rho_vec_list = self.pl_params.rho_vec_list
+            self.cable_len_list = np.array(self.pl_params.cable_length)
+            # x = (26, 1) state init
+            # TODO assembly state
+                                                        # Name      Element Location
+            x = np.array([0.0,  0.0,    0.0,            # pl pos    3
+                          0.0,  0.0,    0.0,            # pl vel    6
+                          1.0,  0.0,    0.0,    0.0,    # pl quat   10
+                          0.0,  0.0,    0.0,            # pl omega  13
+                          0.0,  0.0,    0.5,            # qd pos    16
+                          0.0,  0.0,    0.0,            # qd vel    19 
+                          1.0,  0.0,    0.0,    0.0,    # qd quat   23
+                          0.0,  0.0,    0.0])           # qd omega  26
       else:
-        '''
-        Need a custimized init for ptmass case. Publishing data needs to be changed as well.
-        Old state is (13, 1)
-        New state is (19, 1)
-        self.uav_F = np.zeros((3, 1), dtype=float)
+        ## init for ptmass
+        ## init force to [sum of (quad and payload mass)] * gravity
+        ## init M to [0; 0; 0]
+        ## init calbe to taut
+        ## init rho_vec_list = [] (empty)
+        ## init cable_len_list = cable_length (read)
+        ## init state x as a (26, 1) state vector with inital position hard code to (0, 0, 0.5)
+        print("Initalizing ptmass robot")
+        self.uav_F = (self.pl_params.mass + self.uav_params.mass) * self.uav_params.grav
         self.uav_M = np.zeros((3,self.nquad), dtype=float)
-        self.uav_M = np.zeros((3,self.nquad))
         self.cable_is_slack = np.zeros(self.nquad)
-
         self.rho_vec_list = self.pl_params.rho_vec_list
         self.cable_len_list = np.array(self.pl_params.cable_length)
+        
+        # x = (26, 1) state init
+                                                    # Name      Element Location
+        x = np.array([0.0,  0.0,    0.0,            # pl pos    3
+                      0.0,  0.0,    0.0,            # pl vel    6
+                      1.0,  0.0,    0.0,    0.0,    # pl quat   10
+                      0.0,  0.0,    0.0,            # pl omega  13
+                      0.0,  0.0,    0.5,            # qd pos    16
+                      0.0,  0.0,    0.0,            # qd vel    19 
+                      1.0,  0.0,    0.0,    0.0,    # qd quat   23
+                      0.0,  0.0,    0.0])           # qd omega  26
 
-        x = np.array([0,0,0,0,0,0,0,0,0.5,0,0,0,1.0,0,0,0,0,0,0])'''
 
       # ROS Publisher 
       self.system_publisher = rospy.Publisher('system/marker',MarkerArray,queue_size=10)
@@ -67,7 +100,6 @@ class simulation_base():
           self.robot_odom_publisher.append(rospy.Publisher(self.mav_name + str(i+1) + '/odom',Odometry,queue_size=10))
           self.attach_publisher.append(rospy.Publisher(self.mav_name + str(i+1) + '/attach',Odometry,queue_size=10))
            
-
       # ROS Subscriber 
       self.robot_command_subscriber = []
       for uav_id in range(self.nquad):
@@ -182,7 +214,7 @@ class simulation_base():
             attach_odom = Odometry()
             attach_odom.header.stamp = current_time
             attach_odom.header.frame_id = self.worldframe 
-            #TODO: continue here publish the attach odom. 
+            # TODO: continue here publish the attach odom. 
             attach_pos = x[0:3] + np.matmul(payload_rotmat, self.rho_vec_list[:,uav_id])
             attach_vel = x[3:6] + np.matmul(payload_rotmat, np.cross(sol.y[:,0][10:13], self.rho_vec_list[:,uav_id]))
             attach_odom.pose.pose.position.x = attach_pos[0]
@@ -469,28 +501,51 @@ class simulation_base():
 ####################################################################################
 ##################                    PTMASS                    ####################
 ####################################################################################
-# untested
+# partially tested (tested without controller)
   def hybrid_ptmass_pl_transportationEOM(self, t, s):
+    # QUADEOM Wrapper function for solving quadrotor equation of motion
+    # 	quadEOM takes in time, state vector, and output the derivative of the state vector, the
+    # 	actual calcution is done in quadEOM_readonly.
+    #
+    # INPUTS:
+    # t             - 1 x 1, time
+    # s computed    - 19 x 1, state vector = [xL, yL, zL, xLd, yLd, zLd,
+    #                                         xQ, yQ, zQ, xQd, yQd, zQd,
+    #                                         qw, qx, qy, qz, pQ, qQ, rQ]
+    #
+    # take_in/output- 23 x 1, state vector(dot-elementwise) = [ xL,     yL,     zL,     xLd,    yLd,    zLd,
+    #                                                           qLw = 0,qLx = 0,qLy = 0,qLz = 0,pL = 0, qL = 0, rL = 0,
+    #                                                           xQ,     yQ,     zQ,     xQd,    yQd,    zQd
+    #                                                           qw,     qx,     qy,     qz,     pQuad,  qQuad,  rQuad]
+    #
+    #                   ,where [xL, yL, zL] is payload postion
+    #                          [xLd, yLd, zLd], is payload linear velocity
+    #                          [xQ, yQ, zQ] is quadrotor position
+    #                          [xQd, yQd, zQd] is quadrotor velocity
+    #                          [qw, qx, qy, qz] is quadrotor orientation in quaternion
+    #                          [pQ, qQ, rQ] is quadrotor angular velocity in its own frame
+    # OUTPUTS:
+    # sdot          - 23 x 1, derivative of state vector s as mentioned above (some values are forced to 0)
       l = self.pl_params.cable_length
       plqd = {}
       # convert state s to plqd
       plqd["pos"] = s[0:3]
       plqd["vel"] = s[3:6]
-      plqd["qd_pos"] = s[6:9]
-      plqd["qd_vel"] = s[9:12]
-      plqd["qd_quat"] = s[12:16]
-      plqd["qd_omega"] = s[16:19]
-      Rot = utilslib.QuatToRot(s[12:16])
+      plqd["qd_pos"] = s[13:16]
+      plqd["qd_vel"] = s[16:19]
+      plqd["qd_quat"] = s[19:23]
+      plqd["qd_omega"] = s[23:26]
+      Rot = utilslib.QuatToRot(s[19:23])
       plqd["qd_rot"] = Rot.T
       quad_load_rel_pos = plqd["qd_pos"]-plqd["pos"]
       quad_load_rel_vel = plqd["qd_vel"]-plqd["vel"]
 
-      if not self.cable_is_slack[0]:          
-          return self.slack_ptmass_payload_quadEOM_readonly(t, plqd, self.uav_F[0,0], self.uav_M)
+      if self.cable_is_slack[0]:   
+          return self.slack_ptmass_payload_quadEOM_readonly(t, plqd, self.uav_F, self.uav_M)
       else:
           plqd["xi"] = -quad_load_rel_pos/l
           plqd["xidot"] = -quad_load_rel_vel/l
-          return self.taut_ptmass_payload_quadEOM_readonly(t, plqd, self.uav_F[0,0], self.uav_M)
+          return self.taut_ptmass_payload_quadEOM_readonly(t, plqd, self.uav_F, self.uav_M)
 
   def slack_ptmass_payload_quadEOM_readonly(self, t, plqd, F, M):
       # Assign params and states
@@ -523,13 +578,13 @@ class simulation_base():
       pqrdot   = self.uav_params.invI @ (M - np.reshape(np.cross(qd_omega, self.uav_params.I @ qd_omega, axisa=0, axisb=0), (3,1)))
       
       # Assemble sdot
-      sdot = np.zeros((19,1), dtype=float)
+      sdot = np.zeros((26,1), dtype=float)
       sdot[0:3, 0] = plqd["vel"]
       sdot[3:6] = -g
-      sdot[6:9, 0] = plqd["qd_vel"]
-      sdot[9:12, 0:1] = accQ
-      sdot[12:16, 0] = qdot
-      sdot[16:19] = pqrdot
+      sdot[13:16, 0] = plqd["qd_vel"]
+      sdot[16:19, 0:1] = accQ
+      sdot[19:23, 0] = qdot
+      sdot[23:26] = pqrdot
       sdot = sdot[:,0]
 
       return sdot
@@ -543,19 +598,17 @@ class simulation_base():
       xidot = plqd["xidot"]
       xi_omega = np.cross(xi,xidot)
       e3=np.array([[0.0],[0.0],[1.0]])
-      g = self.uav_params.grav @ e3
+      g = self.uav_params.grav * e3
       wRb=plqd["qd_rot"]    #Rotation matrix of the quadrotor
       qd_quat = plqd["qd_quat"]
       qd_omega = plqd["qd_omega"]
       p = qd_omega[0]
       q = qd_omega[1]
       r = qd_omega[2]
-
       # Obtain tension vector
       quad_force_vector = F * wRb @ e3
-      quad_centrifugal_f = mQ @ l @ (xi_omega.T @ xi_omega)
-      tension_vector = mL * (-xi.T @ quad_force_vector + quad_centrifugal_f) @ xi / total_mass
-
+      quad_centrifugal_f = mQ * l * (xi_omega.T @ xi_omega)
+      tension_vector = mL * (-xi.T.reshape(1,3) @ quad_force_vector + quad_centrifugal_f) * xi.reshape(3,1) / total_mass
       # Solving for Load Acceleration
       accL = - tension_vector / mL - g
 
@@ -568,19 +621,33 @@ class simulation_base():
       qdot = -1/2*np.array([[0, -p, -q, -r],
                             [p,  0, -r,  q],
                             [q,  r,  0, -p],
-                            [r, -q,  p,  0]]) @ qd_quat + K_quat @ quaterror @ qd_quat
+                            [r, -q,  p,  0]]) @ qd_quat.reshape((qd_quat.shape[0], 1)) + K_quat * quaterror * qd_quat.reshape((qd_quat.shape[0], 1))
 
       # Solving for Quadrotor Angular Acceleration
-      pqrdot   = self.uav_params.invI * (M - np.cross(qd_omega, self.uav_params.I @ qd_omega))
-
+      pqrdot   = self.uav_params.invI @ (M - np.cross(qd_omega, self.uav_params.I @ qd_omega, axisa=0, axisb=0).T.reshape(3, 1))
+      '''   debug print()
+      print(plqd["vel"].reshape(3, 1))
+      print(plqd["vel"].reshape(3, 1).shape)
+      print(accL)
+      print(accL.shape)
+      print(plqd["qd_vel"].reshape(3, 1))
+      print(plqd["qd_vel"].reshape(3, 1).shape)
+      print(accQ)
+      print(accQ.shape)
+      print(qdot)
+      print(qdot.shape)
+      print(pqrdot)
+      print(pqrdot.shape)
+      print()'''
       # Assemble sdot
-      sdot = np.zeros((19,1), dtype=float)
-      sdot[0:3] = plqd["vel"]
+      sdot = np.zeros((26,1), dtype=float)
+      sdot[0:3] = plqd["vel"].reshape(3, 1)
       sdot[3:6] = accL
-      sdot[6:9] = plqd["qd_vel"]
-      sdot[9:12] = accQ
-      sdot[12:16] = qdot
-      sdot[16:19] = pqrdot
+      sdot[13:16] = plqd["qd_vel"].reshape(3, 1)
+      sdot[16:19] = accQ
+      sdot[19:23] = qdot
+      sdot[23:26] = pqrdot
+      sdot = sdot[:,0]
 
       return sdot
 
@@ -590,12 +657,11 @@ class simulation_base():
 ####################################################################################
 # untested
   def rigid_links_cooperative_rigidbody_pl_EOM(self, t, s):
-      # s      - 13 x 1, state vector = [xL, yL, zL, xLd, yLd, zLd, qw, qx, qy, qz, pL,qL,rL]
-      # s             - (7*nquad + 6*nquad + 13) x 1,
-      #                 state vector = [xL, yL, zL, xLd, yLd, zLd,
-      #                                 qLw, qLx, qLy, qLz, pL, qL, rL,
-      #                                 [xQ, yQ, zQ, xQd, yQd, zQd]_i, i = 1,...,nquad
-      #                                 [qw, qx, qy, qz, pQuad, qQuad, rQuad]_i, i = 1,...,nquad
+    # s                 - 13 x 1, state vector = [xL, yL, zL, xLd, yLd, zLd, qw, qx, qy, qz, pL,qL,rL]
+    # take_in/output    - 23 x 1, state vector(dot-elementwise) = [ xL,     yL,     zL,     xLd,    yLd,        zLd,
+    #                                                               qLw = 0,qLx = 0,qLy = 0,qLz = 0,pL,         qL,         rL,
+    #                                                               xQ = 0, yQ = 0, zQ = 0, xQd = 0,yQd = 0,    zQd = 0,
+    #                                                               qw,     qx,     qy,     qz,     pQuad = 0,  qQuad = 0,  rQuad = 0]
       qd = {}
       # extract payload state_vector
       qd["pos"] = s[0:3]
@@ -660,6 +726,8 @@ class simulation_base():
       sdotLoad[13,0] = omgLdot[2]
       return sdotLoad
 
+
+##################                  Call backs                  ####################
   def rpm_command_callback(self,rpm_command,uav_id):
       return
 
