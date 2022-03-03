@@ -53,11 +53,20 @@ class controller_node:
         print()
 
         if self.single_node:
-            ## create a node called 'controller_node'
+            ##
+            ## Important Notice:
+            ## to make topic name consistant with multi_node case
+            ## so that simulation_base does not need to differeinate single_node and multi_node case
+            ## the published topics from this single node has the same naming convention
+            ## as the multi_node case:
+            ## controller_#/dragonfly#/fm_cmd
+            ## please note that all of these are topics under a single node
+            ##
+            
             rospy.init_node('controller_node')
             # TODO: make this to ROS parameters
             mav_name = 'dragonfly'
-
+            
             # init ROS Subscribers
             rospy.Subscriber('/payload/des_traj', PositionCommand, self.desired_traj_callback)
             rospy.Subscriber('/payload/odom', Odometry, self.pl_odom_callback)
@@ -72,11 +81,22 @@ class controller_node:
             for i in range(self.pl_params.nquad):
                 FM_message_name = mav_name + str(i+1) + "/fm_cmd"
                 des_odom_name = mav_name + str(i+1) + "/des_odom"
-                self.FM_pub.append(rospy.Publisher(FM_message_name, FMCommand, queue_size=10))
+                FM_prefix = "controller_"+str(i+1)+"/"
+                self.FM_pub.append(rospy.Publisher(FM_prefix + FM_message_name, FMCommand, queue_size=10))
                 self.des_odom_pub.append(rospy.Publisher(des_odom_name, Odometry, queue_size=10))
 
             rospy.spin()
         else:
+            ##
+            ## the published topics from this single node has the same naming convention
+            ## as the single_node case:
+            ## controller_#/dragonfly#/fm_cmd
+            ## However, controller_x publishes only controller_x/dragonflyx/fm_cmd message
+            ## e.g.
+            ## node: controller_1
+            ## Only Publication: controller_1/dragonfly1/fm_cmd message
+            ##
+
             print("Using 3 controller nodes")
             ## create a node called 'controller_node'
             node_name = 'controller_'+str(self.node_id+1)
@@ -286,14 +306,14 @@ class controller_node:
 
 
 def main(node_id, single_node):
+
     controller_node(node_id, single_node)
 
 
 if __name__ == '__main__':
-    
-    if sys.argv[2] == 1:
+    if int(sys.argv[2]) == 1:
         main(int(sys.argv[1]), True)
     else:
         main(int(sys.argv[1]), False)
-    
+ 
         
