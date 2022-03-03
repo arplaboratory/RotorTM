@@ -72,8 +72,6 @@ class traj:
 			#stop_pos_temp = np.append(stop_pos_temp, self.start[2], axis=0)
 			#stop = np.add(self.offset_pos, stop_pos_temp)
 		else:
-			print("The t is ", t)
-			print("The tf is ", self.tf)
 			if t < self.tf:
 				if t<=self.ramp_t:  # ramping up the circle
 					dt = t/self.ramp_t
