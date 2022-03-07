@@ -7,7 +7,7 @@ from scipy.spatial.transform import Rotation as rot_math
 from visualization_msgs.msg import MarkerArray, Marker
 from nav_msgs.msg import Odometry 
 from rotor_tm_msgs.msg import RPMCommand, FMCommand 
-from rotor_tm_utils import utilslib, rosutilslib, QuatToRot
+from rotor_tm_utils import utilslib, rosutilslib
 import time
 
 class simulation_base():
@@ -73,7 +73,7 @@ class simulation_base():
         ## init cable_len_list = cable_length (read)
         ## init state x as a (26, 1) state vector with inital position hard code to (0, 0, 0.5)
         print("Initalizing ptmass robot")
-        self.uav_F = (self.pl_params.mass + self.uav_params.mass) * self.uav_params.grav
+        self.uav_F = (self.pl_params.mass + self.uav_params.mass + 0.0000000001) * self.uav_params.grav
         self.uav_M = np.zeros((3,self.nquad), dtype=float)
         self.cable_is_slack = np.zeros(self.nquad)
         self.rho_vec_list = self.pl_params.rho_vec_list
@@ -85,7 +85,7 @@ class simulation_base():
                       0.0,  0.0,    0.0,            # pl vel    6
                       1.0,  0.0,    0.0,    0.0,    # pl quat   10
                       0.0,  0.0,    0.0,            # pl omega  13
-                      0.0,  0.0,    0.0,            # qd pos    16
+                      0.0,  0.0,    0.5,            # qd pos    16
                       0.0,  0.0,    0.0,            # qd vel    19 
                       1.0,  0.0,    0.0,    0.0,    # qd quat   23
                       0.0,  0.0,    0.0])           # qd omega  26
@@ -561,6 +561,7 @@ class simulation_base():
 
   def slack_ptmass_payload_quadEOM_readonly(self, t, plqd, F, M):
       # Assign params and states
+      print("I'm in slack ptmass eom")
       mQ  =   self.uav_params.mass
       e3  =   np.array([[0.0],[0.0],[1.0]])
       g   =   self.uav_params.grav * e3
@@ -623,7 +624,6 @@ class simulation_base():
       tension_vector = mL * (-xi.T.reshape(1,3) @ quad_force_vector + quad_centrifugal_f) * xi.reshape(3,1) / total_mass
       # Solving for Load Acceleration
       accL = - tension_vector / mL - g
-
       # Solving for Quadrotor Acceleration
       accQ = (quad_force_vector + tension_vector) / mQ - g
 
