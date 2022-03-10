@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 #from MpcControl import *
+import sys
 import numpy as np
 from pathlib import Path
 import os
@@ -15,7 +16,7 @@ if __name__ == '__main__':
   rospack = rospkg.RosPack()
   # get the file path for rotor_tm_config
   path = rospack.get_path('rotor_tm_config')
-  situation = "ptmass"
+  situation = sys.argv[1]
 
   if situation == "multi":
     ###############     3 snapdragon flights with triangular payload using cable mechanisms     ##################

@@ -253,28 +253,34 @@ class controller_node:
         #print("#########################")
         #print("publishing controls...")
         #self.controller_setup(self.pl_params)
-        mu, att_acc, F_list, M_list, quat_list, rot_list = self.controller.cooperative_suspended_payload_controller(self.pl, self.qd, self.pl_params, self.quad_params)
-        cen_pl_command = CenPL_Command()
-        cen_pl_command.header.stamp = rospy.get_rostime()
-        cen_pl_command.header.frame_id = "simulator" 
-        cen_pl_command.copr_status = 3
-        for i in range(self.pl_params.nquad):
-            acc_command = Vector3()
-            acc_command.x = att_acc[0,i]
-            acc_command.y = att_acc[1,i]
-            acc_command.z = att_acc[2,i]
+        if self.pl_params.mechanism_type == 'Rigid Link':
+            None
+        elif self.pl_params.mechanism_type == 'Cable':
+            if self.pl_params.payload_type == 'Rigid Body':
+                mu, att_acc, F_list, M_list, quat_list, rot_list = self.controller.cooperative_suspended_payload_controller(self.pl, self.qd, self.pl_params, self.quad_params)
+                cen_pl_command = CenPL_Command()
+                cen_pl_command.header.stamp = rospy.get_rostime()
+                cen_pl_command.header.frame_id = "simulator" 
+                cen_pl_command.copr_status = 3
+                for i in range(self.pl_params.nquad):
+                    acc_command = Vector3()
+                    acc_command.x = att_acc[0,i]
+                    acc_command.y = att_acc[1,i]
+                    acc_command.z = att_acc[2,i]
 
-            mu_command = Vector3()
-            mu_command.x = mu[3*i,0]
-            mu_command.y = mu[3*i+1,0]
-            mu_command.z = mu[3*i+2,0]
+                    mu_command = Vector3()
+                    mu_command.x = mu[3*i,0]
+                    mu_command.y = mu[3*i+1,0]
+                    mu_command.z = mu[3*i+2,0]
 
-            cen_pl_command.acc.append(acc_command)
-            cen_pl_command.mu.append(mu_command)
-            cen_pl_command.estimated_acc.append(acc_command)
+                    cen_pl_command.acc.append(acc_command)
+                    cen_pl_command.mu.append(mu_command)
+                    cen_pl_command.estimated_acc.append(acc_command)
 
-        self.cen_pl_cmd_pub.publish(cen_pl_command)
-        #F_list, M_list = self.controller.cooperative_suspended_payload_controller(self.pl, self.qd, self.pl_params, self.quad_params)
+                self.cen_pl_cmd_pub.publish(cen_pl_command)
+            elif self.pl_params.payload_type == 'Point Mass':
+                F_list, M_list = self.controller.single_payload_geometric_controller(ql = self.qd, pl_params = self.pl_params, qd_params = self.quad_params)
+        
         if self.single_node:
             for i in range(self.pl_params.nquad):
                 FM_message = self.assembly_FM_message(F_list, M_list, i)
