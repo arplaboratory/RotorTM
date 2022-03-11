@@ -34,8 +34,8 @@ if __name__ == '__main__':
     uav_control_gain_path = path + '/config/control_params/dragonfly_control_gains.yaml'
   elif situation == "rigid":
     #############     3 snapdragon flights with triangular payload using rigid link mechanisms     ################
-    uav_params_path = path + '/config/uav_params/snapdragonfly.yaml'
-    payload_params_path = path + '/config/load_params/triangular_payload.yaml'
+    uav_params_path = path + '/config/uav_params/snapdragonfly_sameasMatlab.yaml'
+    payload_params_path = path + '/config/load_params/triangular_payload_sameasMatlab.yaml'
     mechanism_params_path = path + '/config/attach_mechanism/rigid_links_mechanism.yaml'
     payload_control_gain_path = path + '/config/control_params/triangular_payload_cooperative_rigidlink_gains.yaml'
     uav_control_gain_path = path + '/config/control_params/dragonfly_control_gains.yaml'

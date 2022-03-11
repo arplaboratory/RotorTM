@@ -100,7 +100,7 @@ class read_params:
     else:
         if params.mechanism_type == 'Rigid Link':
           params.id = "Rigid Link"
-          a = 1
+          params.cable_length = np.zeros((mechanism_params.num_of_robots, ), dtype=float)
           # This section sets up the essential controller parameters for payload with rigid links
           ## Physical properties of structure
           # Calculate the inertia and mass of the entire structure
