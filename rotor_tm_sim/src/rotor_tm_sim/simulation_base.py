@@ -73,7 +73,7 @@ class simulation_base():
         ## init cable_len_list = cable_length (read)
         ## init state x as a (26, 1) state vector with inital position hard code to (0, 0, 0.5)
         print("Initalizing ptmass robot")
-        self.uav_F = (self.pl_params.mass + self.uav_params.mass + 0.0000000001) * self.uav_params.grav
+        self.uav_F = np.array([(self.pl_params.mass + self.uav_params.mass) * self.uav_params.grav])
         self.uav_M = np.zeros((3,self.nquad), dtype=float)
         self.cable_is_slack = np.zeros(self.nquad)
         self.rho_vec_list = self.pl_params.rho_vec_list
@@ -131,8 +131,8 @@ class simulation_base():
                 sol = scipy.integrate.solve_ivp(self.hybrid_ptmass_pl_transportationEOM, t_span, x, method= 'RK45', t_eval=t_span)
             else:    
                 sol = scipy.integrate.solve_ivp(self.hybrid_cooperative_rigidbody_pl_transportationEOM, t_span, x, method='RK45', t_eval=t_span)
-            end = time.time()
-            x = sol.y[:,1]
+        end = time.time()
+        x = sol.y[:,1]
 
         # The simulation must first run on the quadrotors
         # Then the simulation simulates the dynamics of the payload
@@ -744,8 +744,19 @@ class simulation_base():
       return
 
   def fm_command_callback(self,fm_command,uav_id):
-      self.uav_F[uav_id] = fm_command.thrust
-      self.uav_M[0,uav_id] = fm_command.moments.x
-      self.uav_M[1,uav_id] = fm_command.moments.y
-      self.uav_M[2,uav_id] = fm_command.moments.z
+        if self.pl_params.mechanism_type == 'Rigid Link':
+            None
+        elif self.pl_params.mechanism_type == 'Cable':
+            if self.pl_params.payload_type == 'Rigid Body':
+                self.uav_F[uav_id] = fm_command.thrust
+                self.uav_M[0,uav_id] = fm_command.moments.x
+                self.uav_M[1,uav_id] = fm_command.moments.y
+                self.uav_M[2,uav_id] = fm_command.moments.z
+            elif self.pl_params.payload_type == 'Point Mass':
+                self.uav_F[0] = fm_command.thrust
+                self.uav_M[0,0] = fm_command.moments.x
+                self.uav_M[1,0] = fm_command.moments.y
+                self.uav_M[2,0] = fm_command.moments.z
+      
+
 

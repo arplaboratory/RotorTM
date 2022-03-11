@@ -21,7 +21,7 @@ from rotor_tm_traj.srv import Circle,Line
 
 class controller_node:
 
-    def __init__(self, node_id, single_node = True):
+    def __init__(self, node_id, single_node = True, situation="multi"):
         self.node_id = node_id
         self.single_node = single_node
         self.pl = {}
@@ -34,13 +34,28 @@ class controller_node:
 
         # get the file path for rotor_tm_config
         path = rospack.get_path('rotor_tm_config')
+        if situation == "multi":
+            ###############     3 snapdragon flights with triangular payload using cable mechanisms     ##################
+            uav_params_path = path + '/config/uav_params/snapdragonfly.yaml'
+            payload_params_path = path + '/config/load_params/triangular_payload.yaml'
+            mechanism_params_path = path + '/config/attach_mechanism/3_robots_cable_mechanism.yaml'
+            payload_control_gain_path = path + '/config/control_params/triangular_payload_cooperative_cable_gains.yaml'
+            uav_control_gain_path = path + '/config/control_params/dragonfly_control_gains.yaml'
+        elif situation == "ptmass":
+            ###############     1 snapdragon flights with point-mass payload using cable mechanisms     ##################
+            uav_params_path = path + '/config/uav_params/snapdragonfly.yaml'
+            payload_params_path = path + '/config/load_params/pointmass_payload.yaml'
+            mechanism_params_path = path + '/config/attach_mechanism/ptmass_cable_mechanism.yaml'
+            payload_control_gain_path = path + '/config/control_params/pointmass_cable_gains.yaml'
+            uav_control_gain_path = path + '/config/control_params/dragonfly_control_gains.yaml'
+        elif situation == "rigid":
+            #############     3 snapdragon flights with triangular payload using rigid link mechanisms     ################
+            uav_params_path = path + '/config/uav_params/snapdragonfly.yaml'
+            payload_params_path = path + '/config/load_params/triangular_payload.yaml'
+            mechanism_params_path = path + '/config/attach_mechanism/rigid_links_mechanism.yaml'
+            payload_control_gain_path = path + '/config/control_params/triangular_payload_cooperative_rigidlink_gains.yaml'
+            uav_control_gain_path = path + '/config/control_params/dragonfly_control_gains.yaml'
 
-        # directory information
-        uav_params_path = path + '/config/uav_params/snapdragonfly.yaml'
-        payload_params_path = path + '/config/load_params/triangular_payload.yaml'
-        mechanism_params_path = path + '/config/attach_mechanism/3_robots_cable_mechanism.yaml'
-        payload_control_gain_path = path + '/config/control_params/triangular_payload_cooperative_cable_gains.yaml'
-        uav_control_gain_path = path + '/config/control_params/dragonfly_control_gains.yaml'
         self.controller = controller()
         
         # read yaml files
@@ -132,12 +147,23 @@ class controller_node:
 
     
     def assembly_FM_message(self, F_list, M_list, uav_id):
-        FM_message = FMCommand()
-        FM_message.thrust = F_list[uav_id]
-        FM_message.moments.x = M_list[uav_id][0]
-        FM_message.moments.y = M_list[uav_id][1]
-        FM_message.moments.z = M_list[uav_id][2]
-        return FM_message
+        if self.pl_params.mechanism_type == 'Rigid Link':
+            None
+        elif self.pl_params.mechanism_type == 'Cable':
+            if self.pl_params.payload_type == 'Rigid Body':
+                FM_message = FMCommand()
+                FM_message.thrust = F_list[uav_id]
+                FM_message.moments.x = M_list[uav_id][0]
+                FM_message.moments.y = M_list[uav_id][1]
+                FM_message.moments.z = M_list[uav_id][2]
+                return FM_message
+            elif self.pl_params.payload_type == 'Point Mass':
+                FM_message = FMCommand()
+                FM_message.thrust = F_list[0,0]
+                FM_message.moments.x = M_list[0,0][0]
+                FM_message.moments.y = M_list[1,0][0]
+                FM_message.moments.z = M_list[2,0][0]
+                return FM_message
 
     def qd_odom_callback(self, uav_odom, uav_id):
         
@@ -247,7 +273,25 @@ class controller_node:
             self.qd[qn]["yawdot_des"] = 0
             #print("The uav id is", qn)
             #print("and the qd is", self.qd[qn]["xi"])
-        
+
+    def assembly_plqd(self):
+        plqd = {}
+        plqd["pos"] = self.pl["pos"]
+        plqd["vel"] = self.pl["vel"]
+        plqd["qd_pos"] = self.qd[0]["pos"]
+        plqd["qd_vel"] = self.qd[0]["vel"]
+        plqd["qd_quat"] = self.qd[0]["quat"]
+        plqd["qd_omega"] = self.qd[0]["omega"]
+        plqd["qd_rot"] = self.qd[0]["rot"]
+        plqd["pos_des"] = self.pl["pos_des"]
+        plqd["vel_des"] = self.pl["vel_des"]
+        plqd["acc_des"] = self.pl["acc_des"]
+        plqd["jrk_des"] = self.pl["jrk_des"]
+        plqd["qd_yaw_des"] = self.qd[0]["yaw_des"] 
+        plqd["qd_yawdot_des"] = self.qd[0]["yawdot_des"]
+        plqd["quat_des"] = self.pl["quat_des"]
+        plqd["omega_des"] = self.pl["omega_des"]
+        return plqd
 
     def sim_subscriber(self):
         #print("#########################")
@@ -279,7 +323,8 @@ class controller_node:
 
                 self.cen_pl_cmd_pub.publish(cen_pl_command)
             elif self.pl_params.payload_type == 'Point Mass':
-                F_list, M_list = self.controller.single_payload_geometric_controller(ql = self.qd, pl_params = self.pl_params, qd_params = self.quad_params)
+                plqd = self.assembly_plqd()
+                F_list, M_list = self.controller.single_payload_geometric_controller(ql = plqd, pl_params = self.pl_params, qd_params = self.quad_params)
         
         if self.single_node:
             for i in range(self.pl_params.nquad):
@@ -311,15 +356,14 @@ class controller_node:
         '''
 
 
-def main(node_id, single_node):
-
-    controller_node(node_id, single_node)
+def main(node_id, single_node, situation):
+    controller_node(node_id, single_node, situation)
 
 
 if __name__ == '__main__':
     if int(sys.argv[2]) == 1:
-        main(int(sys.argv[1]), True)
+        main(int(sys.argv[1]), True, sys.argv[3])
     else:
-        main(int(sys.argv[1]), False)
+        main(int(sys.argv[1]), False, sys.argv[3])
  
         

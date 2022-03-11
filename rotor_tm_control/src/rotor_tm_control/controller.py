@@ -443,8 +443,8 @@ class controller:
 
         return u
 
-    # untested
-    def single_payload_geometric_controller(self, ql, t, qd_params, pl_params):
+    # test passed
+    def single_payload_geometric_controller(self, ql, qd_params, pl_params):
         ## Parameter Initialization
         if not pl_params.sim_start:
             self.icnt = 0
@@ -465,7 +465,7 @@ class controller:
         xixiT_ = xi_ @ np.transpose(xi_)
         xidot_ = -quad_load_rel_vel/quad_load_distance
         xi_asym_ = vec2asym(xi_)
-        w_ = np.cross(xi_, xidot_)
+        w_ = np.cross(xi_, xidot_, axisa=0, axisb=0).T
         Rot_worldtobody = np.transpose(ql["qd_rot"])
 
         ## Payload Position control
@@ -484,29 +484,53 @@ class controller:
 
         ## Cable Direction Control
         # Desired cable direction
-        mu_des_ = (quad_m + pl_m) @ acceleration_des + quad_m @ l @ (np.transpose(xidot_) @ xidot_) @ xi_
+
+        mu_des_ = (quad_m + pl_m) * acceleration_des + quad_m * l * (np.transpose(xidot_) @ xidot_) * xi_
         xi_des_ = -mu_des_ / np.linalg.norm(mu_des_)
         xi_des_dot_ = np.zeros((3, 1), dtype=float)     #  TODO: design q_des_dot_
-        w_des_ = np.cross(xi_des_, xi_des_dot_)
+        w_des_ = np.cross(xi_des_, xi_des_dot_, axisa=0, axisb=0).T
         w_des_dot_ = np.zeros((3, 1), dtype=float)      # TODO: design w_des_dot_
         mu_ = xixiT_ @ mu_des_
 
-        e_xi = np.cross(xi_des_, xi_)
-        e_w = w_ + xi_asym_*xi_asym_*w_des_
-
-        Force = mu_ - quad_m*l*np.cross(xi_, qd_params.Kxi @ e_xi + qd_params.Kw @ e_w+ (np.transpose(xi_) @ w_des_) @ xidot_ + xi_asym_ @ xi_asym_ @ w_des_dot_)
+        e_xi = np.cross(xi_des_, xi_, axisa=0, axisb=0).T
+        e_w = w_ + xi_asym_ @ xi_asym_ @ w_des_
+        Force = mu_ - quad_m*l*np.cross(xi_, qd_params.Kxi @ e_xi + qd_params.Kw @ e_w+ (xi_.T @ w_des_) * xidot_ + xi_asym_ @ xi_asym_ @ w_des_dot_, axisa=0, axisb=0).T
         F = np.transpose(Force) @ np.transpose(Rot_worldtobody) @ e3
 
         ## Attitude Control
         Rot_des = np.zeros((3,3), dtype=float)
         Z_body_in_world = Force/np.linalg.norm(Force)
-        Rot_des[:,2] = Z_body_in_world
-        X_unit = np.vstack(np.cos(yaw_des), np.sin(yaw_des), 0)
-        Y_body_in_world = np.cross(Z_body_in_world, X_unit)
+        Rot_des[:,2:3] = Z_body_in_world
+        Y_unit = np.array([[-np.sin(yaw_des)], [np.cos(yaw_des)], [0]])
+        X_body_in_world = np.cross(Y_unit, Z_body_in_world, axisa=0, axisb=0).T
+        X_body_in_world = X_body_in_world/np.linalg.norm(X_body_in_world)
+        Rot_des[:,0:1] = X_body_in_world
+        Y_body_in_world = np.cross(Z_body_in_world, X_body_in_world, axisa=0, axisb=0).T
         Y_body_in_world = Y_body_in_world/np.linalg.norm(Y_body_in_world)
-        Rot_des[:,1] = Y_body_in_world
-        X_body_in_world = np.cross(Y_body_in_world,Z_body_in_world)
-        Rot_des[:,0] = X_body_in_world
+        Rot_des[:,1:2] = Y_body_in_world
+
+        '''
+        Rot_des = np.zeros((3,3), dtype=float)
+        Z_body_in_world = Force/np.linalg.norm(Force)
+        Rot_des[:,2:3] = Z_body_in_world
+        X_unit = np.array([[np.cos(yaw_des)], [np.sin(yaw_des)], [0]])
+        Y_body_in_world = np.cross(Z_body_in_world, X_unit, axisa=0, axisb=0).T
+        Y_body_in_world = Y_body_in_world/np.linalg.norm(Y_body_in_world)
+        Rot_des[:,1:2] = Y_body_in_world
+        X_body_in_world = np.cross(Y_body_in_world,Z_body_in_world, axisa=0, axisb=0).T
+        Rot_des[:,0:1] = X_body_in_world'''
+
+        '''
+        Rot_des = np.zeros((3,3), dtype=float)
+        Z_body_in_world = Force/np.linalg.norm(Force)
+        Rot_des[:, 2:3] = Z_body_in_world
+        Y_unit = np.array([[-np.sin(yaw_des)], [np.cos(yaw_des)], [0]])
+        X_body_in_world = np.cross(Y_unit, Z_body_in_world, axisa=0, axisb=0).T
+        X_body_in_world = X_body_in_world/np.linalg.norm(X_body_in_world)
+        Rot_des[:,0:1] = X_body_in_world
+        Y_body_in_world = np.cross(Z_body_in_world, X_body_in_world, axisa=0, axisb=0).T
+        Y_body_in_world = Y_body_in_world/np.linalg.norm(Y_body_in_world)
+        Rot_des[:,1:2] = Y_body_in_world'''
 
         # Errors of anlges and angular velocities
         e_Rot = np.transpose(Rot_des) @ np.transpose(Rot_worldtobody) - Rot_worldtobody @ Rot_des
@@ -518,10 +542,9 @@ class controller:
         p_des = 0.0
         q_des = 0.0
         r_des = yawdot_des*Z_body_in_world[2]
-        e_omega = ql["qd_omega"] - Rot_worldtobody @ Rot_des @ np.transpose(np.hstack(p_des, q_des, r_des))
+        e_omega = ql["qd_omega"] - Rot_worldtobody @ Rot_des @ np.array([[p_des], [q_des], [r_des]])
 
         # Moment
         # Missing the angular acceleration term but in general it is neglectable.
-        M = - qd_params.Kpe @ e_angle - qd_params.Kde @ e_omega + np.cross(ql.qd_omega,qd_params.I @ ql["qd_omega"])
-
+        M = - qd_params.Kpe @ e_angle - qd_params.Kde @ e_omega + np.cross(ql["qd_omega"],qd_params.I @ ql["qd_omega"], axisa=0, axisb=0).T
         return F, M
