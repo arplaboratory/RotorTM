@@ -20,8 +20,8 @@ if __name__ == '__main__':
 
   if situation == "multi":
     ###############     3 snapdragon flights with triangular payload using cable mechanisms     ##################
-    uav_params_path = path + '/config/uav_params/snapdragonfly.yaml'
-    payload_params_path = path + '/config/load_params/triangular_payload.yaml'
+    uav_params_path = path + '/config/uav_params/snapdragonfly_sameasMatlab.yaml'
+    payload_params_path = path + '/config/load_params/triangular_payload_sameasMatlab.yaml'
     mechanism_params_path = path + '/config/attach_mechanism/3_robots_cable_mechanism.yaml'
     payload_control_gain_path = path + '/config/control_params/triangular_payload_cooperative_cable_gains.yaml'
     uav_control_gain_path = path + '/config/control_params/dragonfly_control_gains.yaml'

@@ -443,7 +443,7 @@ class controller:
 
         return u
 
-    # test passed
+    # tested
     def single_payload_geometric_controller(self, ql, qd_params, pl_params):
         ## Parameter Initialization
         if not pl_params.sim_start:
