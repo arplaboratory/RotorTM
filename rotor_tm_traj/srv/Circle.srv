@@ -1,0 +1,6 @@
+float32 radius
+float32 T
+float32 duration
+---
+bool success
+string message

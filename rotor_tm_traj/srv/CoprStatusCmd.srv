@@ -1,0 +1,4 @@
+uint8 copr_status
+---
+bool success
+string message

@@ -1,0 +1,4 @@
+float32[4] goal
+---
+bool success
+string message

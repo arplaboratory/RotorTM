@@ -1,0 +1,20 @@
+<launch>
+    <arg name="a" value="0" />
+    <arg name="b" value="1" />
+    <arg name="c" value="2" />
+    <arg name="single_node" value="1" />
+    <node pkg="rotor_tm" type="runsim.py" name="sim" output="screen">
+    </node>
+    <node pkg="rotor_tm_traj" type="traj_node.py" name="traj" output="screen">
+    </node>
+    <node pkg="rotor_tm_control" type="controller_node.py" name="controller" output="screen" args="$(arg a) $(arg single_node)">
+    </node>
+
+    <!--include file="$(find rotor_tm)/launch/rotortm_robot.launch">
+       <arg name="mav_name" value="dragonfly1" />
+    </include-->
+
+<include file="$(find rotor_tm)/launch/rviz.launch">
+ </include>
+
+ </launch>

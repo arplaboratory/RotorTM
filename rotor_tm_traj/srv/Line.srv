@@ -1,0 +1,4 @@
+geometry_msgs/Point[] path 
+---
+bool success
+string message
