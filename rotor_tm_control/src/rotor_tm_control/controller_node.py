@@ -6,6 +6,7 @@ import numpy as np
 import rospkg
 from rotor_tm_control.controller import controller
 
+from std_msgs.msg import Bool 
 from nav_msgs.msg import Odometry 
 from rotor_tm_msgs.msg import PositionCommand,RPMCommand,FMCommand
 from rotor_tm_msgs.msg import CenPL_Command
@@ -28,6 +29,9 @@ class controller_node:
         self.qd = {}
         self.FM_pub = []
         self.des_odom_pub = []
+
+        self.last_odom_time_received = 0.0 
+        self.last_des_traj_time_received = 0.0 
 
         # get an instance of RosPack with the default search paths
         rospack = rospkg.RosPack()
@@ -114,27 +118,28 @@ class controller_node:
 
             print("Using 3 controller nodes")
             ## create a node called 'controller_node'
-            node_name = 'controller_'+str(self.node_id+1)
-            print(node_name)
-            rospy.init_node(node_name)
+            #node_name = 'controller_'+str(self.node_id+1)
+            #print(node_name)
+            #rospy.init_node(node_name)
             node_id += 1
             # TODO: make this to ROS parameters
             mav_name = '/dragonfly'
 
             # init ROS Subscribers
-            rospy.Subscriber('/payload/des_traj', PositionCommand, self.desired_traj_callback)
-            rospy.Subscriber('/payload/odom', Odometry, self.pl_odom_callback)
+            rospy.Subscriber('/payload/des_traj', PositionCommand, self.desired_traj_callback, queue_size=1, tcp_nodelay=True)
+            rospy.Subscriber('/payload/odom', Odometry, self.pl_odom_callback, queue_size=1,tcp_nodelay=True)
 
             for uav_id in range(self.pl_params.nquad):
                 mav_odom = mav_name + str(uav_id+1) + '/odom'
                 self.qd[uav_id] = {}
-                rospy.Subscriber(mav_odom, Odometry, self.qd_odom_callback, uav_id)
+                rospy.Subscriber(mav_odom, Odometry, self.qd_odom_callback, uav_id, queue_size=1,tcp_nodelay=True)
                 
             # init ROS Publishers
             FM_message_name = mav_name + str(self.node_id+1) + "/fm_cmd"
             des_odom_name = mav_name + str(self.node_id+1) + "/des_odom"
             self.cen_pl_cmd_pub = rospy.Publisher(node_name + "/payload/cen_pl_cmd", CenPL_Command, queue_size = 10)
-            self.FM_pub.append(rospy.Publisher(node_name +  FM_message_name, FMCommand, queue_size=10))
+            self.FM_pub.append(rospy.Publisher(node_name +  FM_message_name, FMCommand, queue_size=1, tcp_nodelay=True))
+            self.status_pub = rospy.Publisher(node_name + "/heartbeat", Bool, queue_size = 10)
             # self.des_odom_pub.append(rospy.Publisher(des_odom_name, Odometry, queue_size=10))
 
             """for i in range(self.pl_params.nquad):
@@ -143,22 +148,29 @@ class controller_node:
                 self.FM_pub.append(rospy.Publisher(node_name +  FM_message_name, FMCommand, queue_size=10))
                 # self.des_odom_pub.append(rospy.Publisher(des_odom_name, Odometry, queue_size=10))"""
 
-            rospy.spin()
+            rate = rospy.Rate(100)
+            while not rospy.is_shutdown():
+                # Publish if MPC is busy with a current trajectory
+                msg = Bool()
+                msg.data = True 
+                self.status_pub.publish(msg)
+                rate.sleep()
 
+            #rospy.spin()
     
     def assembly_FM_message(self, F_list, M_list, uav_id):
         if self.pl_params.mechanism_type == 'Rigid Link':
             None
         elif self.pl_params.mechanism_type == 'Cable':
+            FM_message = FMCommand()
+            FM_message.header.stamp = rospy.get_rostime()
             if self.pl_params.payload_type == 'Rigid Body':
-                FM_message = FMCommand()
                 FM_message.thrust = F_list[uav_id]
                 FM_message.moments.x = M_list[uav_id][0]
                 FM_message.moments.y = M_list[uav_id][1]
                 FM_message.moments.z = M_list[uav_id][2]
                 return FM_message
             elif self.pl_params.payload_type == 'Point Mass':
-                FM_message = FMCommand()
                 FM_message.thrust = F_list[0,0]
                 FM_message.moments.x = M_list[0,0][0]
                 FM_message.moments.y = M_list[1,0][0]
@@ -167,6 +179,12 @@ class controller_node:
 
     def qd_odom_callback(self, uav_odom, uav_id):
         
+        '''current_callback_time_received = rospy.get_time()
+        if uav_id == 0:
+            current_odom_time_received = rospy.get_time()
+            print("The uav odom callback time gap is", current_odom_time_received - self.last_odom_time_received)
+            self.last_odom_time_received = current_odom_time_received'''
+
         self.qd[uav_id]["pos"] = np.array( [[uav_odom.pose.pose.position.x],
                                          [uav_odom.pose.pose.position.y],
                                          [uav_odom.pose.pose.position.z]])
@@ -200,7 +218,15 @@ class controller_node:
         self.qd[uav_id]["yaw_des"] = 0
         self.qd[uav_id]["yawdot_des"] = 0
 
+        '''if uav_id == 0:
+            current_callback_finish_time_received = rospy.get_time()
+            print("The uav odom callback process used", current_callback_finish_time_received-current_callback_time_received)'''
+
     def pl_odom_callback(self, payload_odom):
+
+        #current_odom_time_received = rospy.get_time()
+        #print("The payload odom callback time gap is", current_odom_time_received - self.last_odom_time_received)
+        #self.last_odom_time_received = current_odom_time_received
 
         self.pl["pos"] = np.array([     [payload_odom.pose.pose.position.x],
                                         [payload_odom.pose.pose.position.y],
@@ -221,6 +247,10 @@ class controller_node:
         self.pl["rot"] = utilslib.QuatToRot(self.pl["quat"])
 
     def desired_traj_callback(self, des_traj):
+        '''current_des_traj_time_received = rospy.get_time()
+        print("The des traj callback time gap is", current_des_traj_time_received - self.last_des_traj_time_received)
+        self.last_des_traj_time_received = current_des_traj_time_received'''
+
         self.pl["pos_des"] = np.array([ [des_traj.position.x],
                                         [des_traj.position.y],
                                         [des_traj.position.z]])
@@ -240,7 +270,10 @@ class controller_node:
         self.pl["omega_des"] = np.array([[0.0, 0.0, 0.0]])
         self.pl["yaw_des"] = 0.0
         self.pl["yawdot_des"] = 0.0
+        #before_des_traj_received = rospy.get_time()
         self.sim_subscriber()
+        #after_des_traj_received = rospy.get_time()
+        #print("The sim subscriber time used", after_des_traj_received - before_des_traj_received)
 
     def controller_setup(self, pl_params):
         rho_vec_list = pl_params.rho_vec_list
@@ -271,6 +304,7 @@ class controller_node:
             self.qd[qn]["xidot"] = qd_xidot[:, qn].reshape((3,1))
             self.qd[qn]["yaw_des"] = 0
             self.qd[qn]["yawdot_des"] = 0
+
             #print("The uav id is", qn)
             #print("and the qd is", self.qd[qn]["xi"])
 
@@ -361,9 +395,14 @@ def main(node_id, single_node, situation):
 
 
 if __name__ == '__main__':
+
+    node_name = 'controller_'+str(int(sys.argv[1])+1)
+    rospy.init_node(node_name)
+    #rospy.init_node("controller")
+
     if int(sys.argv[2]) == 1:
-        main(int(sys.argv[1]), True, sys.argv[3])
+        controller_node(int(sys.argv[1]), True, sys.argv[3])
+        #main(int(sys.argv[1]), True, sys.argv[3])
     else:
-        main(int(sys.argv[1]), False, sys.argv[3])
- 
-        
+        controller_node(int(sys.argv[1]), False, sys.argv[3])
+        #main(int(sys.argv[1]), False, sys.argv[3])

@@ -26,15 +26,12 @@ class traj_node:
 		self.curr_pose = np.append(np.zeros(3),np.array([1,0,0,0]))
 		self.traj_start = False 
 
-		## create a node called 'traj_node'
-		node_name = 'traj_generator'
-		rospy.init_node(node_name)
 
 		## ROS Subscriber 
-		rospy.Subscriber('payload/odom', Odometry, self.odom_callback)
+		rospy.Subscriber('payload/odom', Odometry, self.odom_callback, queue_size=1, tcp_nodelay=True)
 
 		## ROS Publisher
-		self.des_traj_pub = rospy.Publisher('payload/des_traj', PositionCommand, queue_size=10)
+		self.des_traj_pub = rospy.Publisher('payload/des_traj', PositionCommand, queue_size=1, tcp_nodelay=True)
 
         ## ROS Server
 		server = []
@@ -43,8 +40,6 @@ class traj_node:
 		server.append(rospy.Service(node_name + '/Min_Derivative_Line', Line, self.min_derivative_line_traj_cb))
 
 		print("Trajectory Generator Initialization Finished")
-
-		rospy.spin()
 	
 	def circle_traj_cb(self, req):
 		## call circular traj services
@@ -84,12 +79,11 @@ class traj_node:
 		self.traj_start = True
 
 	def odom_callback(self, data):
-		t = rospy.get_time()
-		now = rospy.get_rostime()
 
 		self.curr_state = np.array([data.pose.pose.position.x,data.pose.pose.position.y,data.pose.pose.position.z,\
 									data.pose.pose.orientation.w, data.pose.pose.orientation.x,data.pose.pose.orientation.y,data.pose.pose.orientation.z])
 
+	def send_des_traj(self,t):
 		if self.traj_start:
 			if (self.traj_type == 1):
 				self.current_traj.circle(t-self.time_reference)
@@ -99,6 +93,7 @@ class traj_node:
 				self.current_traj.min_snap_traj_generator(t-self.time_reference)
 			
 			# Publish the command
+			now = rospy.get_rostime()
 			message = PositionCommand()
 			message.header.stamp.secs = now.secs
 			message.header.stamp.nsecs = now.nsecs
@@ -127,5 +122,15 @@ def main():
 	traj_node()
 
 if __name__ == '__main__':
-	main()
+	## create a node called 'traj_node'
+	node_name = 'traj_generator'
+	rospy.init_node(node_name)
+	rate = rospy.Rate(100)
+	traj_node = traj_node()
+	while not rospy.is_shutdown():
+		t = rospy.get_time()
+		traj_node.send_des_traj(t)
+		rate.sleep()
+
+
         

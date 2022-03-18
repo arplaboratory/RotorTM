@@ -27,6 +27,7 @@ class simulation_base():
       self.uav_dim_num = 13
       self.mav_name = 'dragonfly'
       self.sim_start = False
+      self.last_odom_time_received = 0.0
 
       if self.nquad != 1:
         if self.pl_params.id == "Cable":
@@ -64,12 +65,6 @@ class simulation_base():
             # s                 - 13 x 1, state vector = [xL, yL, zL, xLd, yLd, zLd, qw, qx, qy, qz, pL, qL, rL]
             # take_in/output    - 26 x 1, state vector(dot-elementwise) = [ xL,     yL,     zL,     
             #                                                               xLd,    yLd,    zLd,
-            #                                                               qLw,    qLx,    qLy,
-            #                                                               qLz,    pL,     qL,     rL,
-            #                                                               xQ,     yQ,     zQ,     
-            #                                                               xQd,    yQd,    zQd,
-            #                                                               qw,     qx,     qy,     qz,     
-            #                                                               pQuad,  qQuad,  rQuad]
                                                         # Name      Element Location
             x = np.array([0.0,  0.0,    0.0,            # pl pos    3
                           0.0,  0.0,    0.0,            # pl vel    6
@@ -130,20 +125,20 @@ class simulation_base():
 
       # ROS Publisher 
       self.system_publisher = rospy.Publisher('system/marker',MarkerArray,queue_size=10)
-      self.payload_odom_publisher = rospy.Publisher('payload/odom',Odometry,queue_size=10)
+      self.payload_odom_publisher = rospy.Publisher('payload/odom',Odometry,queue_size=1, tcp_nodelay=True)
       self.robot_odom_publisher = []
       self.attach_publisher = []
       for i in range(self.nquad):
-          self.robot_odom_publisher.append(rospy.Publisher(self.mav_name + str(i+1) + '/odom',Odometry,queue_size=10))
-          self.attach_publisher.append(rospy.Publisher(self.mav_name + str(i+1) + '/attach',Odometry,queue_size=10))
+          self.robot_odom_publisher.append(rospy.Publisher(self.mav_name + str(i+1) + '/odom',Odometry, queue_size=1, tcp_nodelay=True))
+          self.attach_publisher.append(rospy.Publisher(self.mav_name + str(i+1) + '/attach',Odometry, queue_size=1, tcp_nodelay=True))
            
       # ROS Subscriber 
       self.robot_command_subscriber = []
       for uav_id in range(self.nquad):
           mav_name = self.mav_name + str(uav_id+1)
           controller_name = "/controller_" + str(uav_id+1)
-          self.robot_command_subscriber.append(rospy.Subscriber(controller_name + '/' + mav_name + '/rpm_cmd',RPMCommand,self.rpm_command_callback,uav_id))
-          self.robot_command_subscriber.append(rospy.Subscriber(controller_name + '/' + mav_name + '/fm_cmd',FMCommand,self.fm_command_callback,uav_id))
+          self.robot_command_subscriber.append(rospy.Subscriber(controller_name + '/' + mav_name + '/rpm_cmd',RPMCommand,self.rpm_command_callback,uav_id,queue_size=1, tcp_nodelay=True))
+          self.robot_command_subscriber.append(rospy.Subscriber(controller_name + '/' + mav_name + '/fm_cmd',FMCommand,self.fm_command_callback,uav_id,queue_size=1, tcp_nodelay=True))
     
       # Visualization Init
       self.cable_marker_scale = 0.01 * np.ones(3)
@@ -167,8 +162,9 @@ class simulation_base():
             if self.nquad == 1:
                 sol = scipy.integrate.solve_ivp(self.hybrid_ptmass_pl_transportationEOM, t_span, x, method= 'RK45', t_eval=t_span)
             else:    
-                sol = scipy.integrate.solve_ivp(self.hybrid_cooperative_rigidbody_pl_transportationEOM, t_span, x, method='RK45', t_eval=t_span)
+                sol = scipy.integrate.solve_ivp(self.hybrid_cooperative_rigidbody_pl_transportationEOM, t_span, x, method='RK23', t_eval=t_span)
         end = time.time()
+        print(end-start)
         x = sol.y[:,1]
 
         # The simulation must first run on the quadrotors
@@ -353,6 +349,10 @@ class simulation_base():
                 uav_odom.twist.twist.angular.y = uav_state[11]
                 uav_odom.twist.twist.angular.z = uav_state[12]
                 self.robot_odom_publisher[uav_id].publish(uav_odom)
+                #current_odom_time_received = rospy.get_time()
+                #print("The current uav id is", uav_id)
+                #print("The uav_odom publish time gap is", current_odom_time_received - self.last_odom_time_received)
+                #self.last_odom_time_received = current_odom_time_received
 
                 # Publish UAV attach odometry
                 attach_odom = Odometry()
