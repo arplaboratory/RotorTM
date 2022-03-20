@@ -164,7 +164,6 @@ class simulation_base():
             else:    
                 sol = scipy.integrate.solve_ivp(self.hybrid_cooperative_rigidbody_pl_transportationEOM, t_span, x, method='RK23', t_eval=t_span)
         end = time.time()
-        print(end-start)
         x = sol.y[:,1]
 
         # The simulation must first run on the quadrotors
