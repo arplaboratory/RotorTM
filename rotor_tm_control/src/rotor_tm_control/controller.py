@@ -466,7 +466,8 @@ class controller:
         xidot_ = -quad_load_rel_vel/quad_load_distance
         xi_asym_ = vec2asym(xi_)
         w_ = np.cross(xi_, xidot_, axisa=0, axisb=0).T
-        Rot_worldtobody = np.transpose(ql["qd_rot"])
+        # Rot_worldtobody = np.transpose(ql["qd_rot"])
+        Rot_worldtobody = ql["qd_rot"]
 
         ## Payload Position control
         #jerk_des = ql.jerk_des;
@@ -498,7 +499,7 @@ class controller:
         F = np.transpose(Force) @ np.transpose(Rot_worldtobody) @ e3
 
         ## Attitude Control
-        Rot_des = np.zeros((3,3), dtype=float)
+        '''Rot_des = np.zeros((3,3), dtype=float)
         Z_body_in_world = Force/np.linalg.norm(Force)
         Rot_des[:,2:3] = Z_body_in_world
         Y_unit = np.array([[-np.sin(yaw_des)], [np.cos(yaw_des)], [0]])
@@ -507,9 +508,9 @@ class controller:
         Rot_des[:,0:1] = X_body_in_world
         Y_body_in_world = np.cross(Z_body_in_world, X_body_in_world, axisa=0, axisb=0).T
         Y_body_in_world = Y_body_in_world/np.linalg.norm(Y_body_in_world)
-        Rot_des[:,1:2] = Y_body_in_world
+        Rot_des[:,1:2] = Y_body_in_world'''
 
-        '''
+        
         Rot_des = np.zeros((3,3), dtype=float)
         Z_body_in_world = Force/np.linalg.norm(Force)
         Rot_des[:,2:3] = Z_body_in_world
@@ -518,7 +519,7 @@ class controller:
         Y_body_in_world = Y_body_in_world/np.linalg.norm(Y_body_in_world)
         Rot_des[:,1:2] = Y_body_in_world
         X_body_in_world = np.cross(Y_body_in_world,Z_body_in_world, axisa=0, axisb=0).T
-        Rot_des[:,0:1] = X_body_in_world'''
+        Rot_des[:,0:1] = X_body_in_world
 
         '''
         Rot_des = np.zeros((3,3), dtype=float)

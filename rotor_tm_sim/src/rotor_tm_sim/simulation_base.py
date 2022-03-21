@@ -93,7 +93,7 @@ class simulation_base():
 
             robot_trust_moment = self.rigid_links_cooperative_payload_controller_init(qd_init, self.pl_params)
             u = self.pl_params.A @ robot_trust_moment
-            self.uav_F  = u[0] * qd_init["rot"][:,2].reshape((3,1)) + 0.001
+            self.uav_F  = u[0] * qd_init["rot"][:,2].reshape((3,1))
             self.uav_M = u[1:4]
 
       else:
