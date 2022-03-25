@@ -1,5 +1,5 @@
 # Define the type of the connection
-type: "Rigid Link" 
+mechanism_type: "Rigid Link" 
 
 # Define the total number of robots
 num_of_robots: 5

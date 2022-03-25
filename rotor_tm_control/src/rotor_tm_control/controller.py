@@ -385,9 +385,8 @@ class controller:
         drpy = np.array([0,0,0,0])
         return F, M, trpy, drpy
 
-    # untested
     def rigid_links_cooperative_payload_controller(self, ql, params):
-        if not params["sim_start"]:
+        if not params.sim_start:
             self.icnt = 0
         self.icnt = self.icnt + 1
 
@@ -409,39 +408,51 @@ class controller:
         ep = ql["pos_des"]-ql["pos"]
         # Velocity error
         ed = ql["vel_des"]-ql["vel"]
-
+        ep = ep.reshape((3,1))
+        ed = ed.reshape((3,1))
         # Desired acceleration This equation drives the errors of trajectory to zero.
         acceleration_des = ql["acc_des"] + params.Kp @ ep + params.Kd @ ed
 
         # Net force F=kx*ex kv*ex_dot + mge3 +mxdes_ddot
         Force = m*g*e3  + m*acceleration_des
+
         tau = np.transpose(Force) @ Rot @ e3
 
         Rot_des = np.zeros((3,3), dtype=float)
         Z_body_in_world = Force/np.linalg.norm(Force)
-        Rot_des[:,2] = Z_body_in_world
-        X_unit = np.vstack(np.cos(yaw_des), np.sin(yaw_des), 0)
-        Y_body_in_world = np.cross(Z_body_in_world,X_unit)
+        Rot_des[:,2:3] = Z_body_in_world
+        X_unit = np.array([[np.cos(yaw_des)], [np.sin(yaw_des)], [0]])
+        Y_body_in_world = np.cross(Z_body_in_world,X_unit, axisa=0, axisb=0).T
         Y_body_in_world = Y_body_in_world/np.linalg.norm(Y_body_in_world)
-        Rot_des[:,1] = Y_body_in_world
-        X_body_in_world = np.cross(Y_body_in_world,Z_body_in_world)
-        Rot_des[:,0] = X_body_in_world
+        Rot_des[:,1:2] = Y_body_in_world
+        X_body_in_world = np.cross(Y_body_in_world,Z_body_in_world, axisa=0, axisb=0).T
+        Rot_des[:,0:1] = X_body_in_world
 
         ## Attitude Control
 
         # Errors of anlges and angular velocities
+
         e_Rot = np.transpose(Rot_des) @ Rot - np.transpose(Rot) @ Rot_des
         e_angle = vee(e_Rot)/2
-        e_omega = omega - np.transpose(Rot) @ Rot_des @ np.transpose(omega_des)
+        e_omega = omega.reshape((3,1)) - np.transpose(Rot) @ Rot_des @ omega_des.reshape((3, 1))
 
         # Net moment
         # Missing the angular acceleration term but in general it is neglectable.
-        M = - params.Kpe @ e_angle - params.Kde @ e_omega + np.cross(omega, params.struct_I @ omega)
-
+        test = params.struct_I @ omega
+        M = - params.Kpe @ e_angle - params.Kde @ e_omega + np.cross(omega, params.struct_I @ omega, axisa=0, axisb=0).reshape((3,1))
         ## Quadrotor Thrust and Moment Distribution
-        u = params["thrust_moment_distribution_mat"] @ np.vstack(tau. M)
-
-        return u
+        u = params.thrust_moment_distribution_mat @ np.vstack((tau, M))
+        u = params.A @ u
+        uav_F_arr  = u[0] * ql["rot"][:,2].reshape((3,1))
+        uav_M_arr = u[1:4]
+        # convert u into uav_F and uav_M
+        uav_F = {}
+        uav_F[0] = uav_F_arr
+        uav_M = {}
+        uav_M[0] = uav_M_arr
+        print("uav_F", uav_F, "\n")
+        print("uav_M", uav_M, "\n")
+        return uav_F, uav_M
 
     # tested
     def single_payload_geometric_controller(self, ql, qd_params, pl_params):

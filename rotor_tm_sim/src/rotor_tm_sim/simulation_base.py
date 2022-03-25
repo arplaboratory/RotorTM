@@ -32,7 +32,8 @@ class simulation_base():
       if self.nquad != 1:
         if self.pl_params.id == "Cable":
             self.uav_F = np.matmul(self.pl_params.pseudo_inv_P, np.array([0,0,self.pl_params.mass * self.pl_params.grav,0,0,0])) + np.kron([1]*self.nquad, [0,0,self.uav_params.mass * self.pl_params.grav]) 
-            self.uav_F = self.uav_F.reshape(3,self.nquad)[:,2]
+            # self.uav_F = self.uav_F.reshape(3,self.nquad)[:,2]
+            self.uav_F = self.uav_F.reshape(self.nquad, 3)[:,2]
             self.uav_M = np.zeros((3,self.nquad))
             self.cable_is_slack = np.zeros(self.nquad)
 
@@ -146,10 +147,16 @@ class simulation_base():
       self.uav_marker_scale = 0.5 * np.ones(3)
       self.uav_marker_color = np.array([1.0,0.0,0.0,1.0])
       self.uav_mesh = self.uav_params.mesh_path
-      self.payload_marker_scale = np.ones(3)
+      if self.nquad == 1:
+        self.payload_marker_scale = np.array([0.1,0.1,0.1])
+      else:
+        self.payload_marker_scale = np.ones(3)
       self.payload_marker_color = np.array([1.0,0.745,0.812,0.941])
       self.payload_mesh = self.pl_params.mesh_path
-      self.payload_marker_msg = rosutilslib.init_marker_msg(Marker(),10,0,self.worldframe,self.payload_marker_scale,self.payload_marker_color,self.payload_mesh)
+      if self.nquad == 1:
+        self.payload_marker_msg = rosutilslib.init_marker_msg(Marker(),2,0,self.worldframe,self.payload_marker_scale,self.payload_marker_color,self.payload_mesh)
+      else:
+        self.payload_marker_msg = rosutilslib.init_marker_msg(Marker(),10,0,self.worldframe,self.payload_marker_scale,self.payload_marker_color,self.payload_mesh)
 
       while not rospy.is_shutdown():
         # Without event
@@ -953,7 +960,15 @@ class simulation_base():
 
   def fm_command_callback(self,fm_command,uav_id):
         if self.pl_params.mechanism_type == 'Rigid Link':
-            None
+            self.uav_F[0,0] = fm_command.rlink_thrust.x
+            self.uav_F[1,0] = fm_command.rlink_thrust.x
+            self.uav_F[2,0] = fm_command.rlink_thrust.x
+
+            self.uav_M[0,0] = fm_command.moments.x
+            self.uav_M[1,0] = fm_command.moments.y
+            self.uav_M[2,0] = fm_command.moments.z
+            print("self.uav_F", self.uav_F)
+            print("self.uav_M", self.uav_M)
         elif self.pl_params.mechanism_type == 'Cable':
             if self.pl_params.payload_type == 'Rigid Body':
                 self.uav_F[uav_id] = fm_command.thrust

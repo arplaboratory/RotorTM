@@ -45,6 +45,20 @@ class controller_node:
             mechanism_params_path = path + '/config/attach_mechanism/3_robots_cable_mechanism.yaml'
             payload_control_gain_path = path + '/config/control_params/triangular_payload_cooperative_cable_gains.yaml'
             uav_control_gain_path = path + '/config/control_params/dragonfly_control_gains.yaml'
+        elif situation == "multi_4":
+            ###############     4 snapdragon flights with fedex box payload using cable mechanisms     ##################
+            uav_params_path = path + '/config/uav_params/snapdragonfly_sameasMatlab.yaml'
+            payload_params_path = path + '/config/load_params/fedex_box_payload.yaml'
+            mechanism_params_path = path + '/config/attach_mechanism/4_robots_cable_mechanism.yaml'
+            payload_control_gain_path = path + '/config/control_params/triangular_payload_cooperative_cable_gains.yaml'
+            uav_control_gain_path = path + '/config/control_params/dragonfly_control_gains.yaml'
+        elif situation == "multi_6":
+            ###############     6 snapdragon flights with fedex box payload using cable mechanisms     ##################
+            uav_params_path = path + '/config/uav_params/snapdragonfly.yaml'
+            payload_params_path = path + '/config/load_params/fedex_box_payload.yaml'
+            mechanism_params_path = path + '/config/attach_mechanism/6_robots_cable_mechanism.yaml'
+            payload_control_gain_path = path + '/config/control_params/triangular_payload_cooperative_cable_gains.yaml'
+            uav_control_gain_path = path + '/config/control_params/dragonfly_control_gains.yaml'
         elif situation == "ptmass":
             ###############     1 snapdragon flights with point-mass payload using cable mechanisms     ##################
             uav_params_path = path + '/config/uav_params/snapdragonfly.yaml'
@@ -160,7 +174,19 @@ class controller_node:
     
     def assembly_FM_message(self, F_list, M_list, uav_id):
         if self.pl_params.mechanism_type == 'Rigid Link':
-            None
+            FM_message = FMCommand()
+            '''FM_message.thrust = F_list[uav_id]
+            FM_message.moments.x = M_list[uav_id][0]
+            FM_message.moments.y = M_list[uav_id][1]
+            FM_message.moments.z = M_list[uav_id][2]'''
+
+            FM_message.rlink_thrust.x = F_list[0][0]
+            FM_message.rlink_thrust.y = F_list[0][1]
+            FM_message.rlink_thrust.z = F_list[0][2]
+            FM_message.moments.x = M_list[0][0]
+            FM_message.moments.y = M_list[0][1] 
+            FM_message.moments.z = M_list[0][2]
+            return FM_message
         elif self.pl_params.mechanism_type == 'Cable':
             FM_message = FMCommand()
             FM_message.header.stamp = rospy.get_rostime()
@@ -327,12 +353,34 @@ class controller_node:
         plqd["omega_des"] = self.pl["omega_des"]
         return plqd
 
+    # this is the assembly function for rlink (output the input for rlink controller)
+    def assembly_qd(self):
+        qd_state = {}
+        # init uav_F and uav_M
+        qd_state["pos"] = self.pl["pos"]
+        qd_state["vel"] = self.pl["vel"]
+        qd_state["quat"] = self.pl["quat"]
+        qd_state["omega"] = self.pl["omega"]
+        qd_state["rot"] = utilslib.QuatToRot(qd_state["quat"])
+
+        qd_state["pos_des"] = self.pl["pos_des"]
+        qd_state["vel_des"] = self.pl["vel_des"]
+        qd_state["acc_des"] = self.pl["acc_des"] 
+        qd_state["jrk_des"] = self.pl["jrk_des"]
+        qd_state["qd_yaw_des"] = 0.0
+        qd_state["qd_yawdot_des"] = 0.0
+        qd_state["quat_des"] = self.pl["quat_des"]
+        qd_state["omega_des"] = self.pl["omega_des"]
+        return qd_state
+
     def sim_subscriber(self):
         #print("#########################")
         #print("publishing controls...")
         #self.controller_setup(self.pl_params)
         if self.pl_params.mechanism_type == 'Rigid Link':
-            None
+            ql = self.assembly_qd()
+            F_list, M_list = self.controller.rigid_links_cooperative_payload_controller(ql, self.pl_params)
+            print(F_list)
         elif self.pl_params.mechanism_type == 'Cable':
             if self.pl_params.payload_type == 'Rigid Body':
                 mu, att_acc, F_list, M_list, quat_list, rot_list = self.controller.cooperative_suspended_payload_controller(self.pl, self.qd, self.pl_params, self.quad_params)

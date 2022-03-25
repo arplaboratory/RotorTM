@@ -1,0 +1,15 @@
+# Define the type of the connection
+mechanism_type: "Cable" 
+
+# Define the total number of robots
+num_of_robots: 4
+
+# Define where the cable is attached at
+rho: 
+  - {x: 0.3048, y: -0.3048, z: 0.2286}
+  - {x: 0.3048, y: 0.3048,  z: 0.2286}
+  - {x: -0.3048, y: 0.3048,  z: 0.2286}
+  - {x: -0.3048, y: -0.3048,  z: 0.2286}
+
+# Define the cable length
+cable_length: [0.5,0.5,0.5,0.5]
