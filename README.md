@@ -45,6 +45,7 @@ The RotorTM package is dependent on `Python 3.8` and `ROS Noetic/Melodic`. Pleas
 $ pip install numpy==1.22.1
 $ pip install scipy==1.8.0
 $ pip install cvxopt==1.2.7
+$ pip install PyQt5
 ```
 
 
