@@ -399,7 +399,7 @@ class controller:
 
         e3 = np.array([[0],[0],[1]])
 
-        Rot = ql["rot"]
+        Rot = ql["rot"].T
         omega = ql["omega"]
 
         ## Position control
@@ -417,7 +417,8 @@ class controller:
         Force = m*g*e3  + m*acceleration_des
 
         tau = np.transpose(Force) @ Rot @ e3
-
+        
+        ## Attitude Control
         Rot_des = np.zeros((3,3), dtype=float)
         Z_body_in_world = Force/np.linalg.norm(Force)
         Rot_des[:,2:3] = Z_body_in_world
@@ -427,31 +428,25 @@ class controller:
         Rot_des[:,1:2] = Y_body_in_world
         X_body_in_world = np.cross(Y_body_in_world,Z_body_in_world, axisa=0, axisb=0).T
         Rot_des[:,0:1] = X_body_in_world
-
-        ## Attitude Control
-
+        
         # Errors of anlges and angular velocities
-
         e_Rot = np.transpose(Rot_des) @ Rot - np.transpose(Rot) @ Rot_des
         e_angle = vee(e_Rot)/2
         e_omega = omega.reshape((3,1)) - np.transpose(Rot) @ Rot_des @ omega_des.reshape((3, 1))
 
         # Net moment
         # Missing the angular acceleration term but in general it is neglectable.
-        test = params.struct_I @ omega
         M = - params.Kpe @ e_angle - params.Kde @ e_omega + np.cross(omega, params.struct_I @ omega, axisa=0, axisb=0).reshape((3,1))
         ## Quadrotor Thrust and Moment Distribution
         u = params.thrust_moment_distribution_mat @ np.vstack((tau, M))
         u = params.A @ u
-        uav_F_arr  = u[0] * ql["rot"][:,2].reshape((3,1))
+        uav_F_arr  = u[0] * Rot[:,2].reshape((3,1))
         uav_M_arr = u[1:4]
         # convert u into uav_F and uav_M
         uav_F = {}
         uav_F[0] = uav_F_arr
         uav_M = {}
         uav_M[0] = uav_M_arr
-        print("uav_F", uav_F, "\n")
-        print("uav_M", uav_M, "\n")
         return uav_F, uav_M
 
     # tested
@@ -509,19 +504,7 @@ class controller:
         Force = mu_ - quad_m*l*np.cross(xi_, qd_params.Kxi @ e_xi + qd_params.Kw @ e_w+ (xi_.T @ w_des_) * xidot_ + xi_asym_ @ xi_asym_ @ w_des_dot_, axisa=0, axisb=0).T
         F = np.transpose(Force) @ np.transpose(Rot_worldtobody) @ e3
 
-        ## Attitude Control
-        '''Rot_des = np.zeros((3,3), dtype=float)
-        Z_body_in_world = Force/np.linalg.norm(Force)
-        Rot_des[:,2:3] = Z_body_in_world
-        Y_unit = np.array([[-np.sin(yaw_des)], [np.cos(yaw_des)], [0]])
-        X_body_in_world = np.cross(Y_unit, Z_body_in_world, axisa=0, axisb=0).T
-        X_body_in_world = X_body_in_world/np.linalg.norm(X_body_in_world)
-        Rot_des[:,0:1] = X_body_in_world
-        Y_body_in_world = np.cross(Z_body_in_world, X_body_in_world, axisa=0, axisb=0).T
-        Y_body_in_world = Y_body_in_world/np.linalg.norm(Y_body_in_world)
-        Rot_des[:,1:2] = Y_body_in_world'''
-
-        
+        ## Attitude Control        
         Rot_des = np.zeros((3,3), dtype=float)
         Z_body_in_world = Force/np.linalg.norm(Force)
         Rot_des[:,2:3] = Z_body_in_world
@@ -531,18 +514,6 @@ class controller:
         Rot_des[:,1:2] = Y_body_in_world
         X_body_in_world = np.cross(Y_body_in_world,Z_body_in_world, axisa=0, axisb=0).T
         Rot_des[:,0:1] = X_body_in_world
-
-        '''
-        Rot_des = np.zeros((3,3), dtype=float)
-        Z_body_in_world = Force/np.linalg.norm(Force)
-        Rot_des[:, 2:3] = Z_body_in_world
-        Y_unit = np.array([[-np.sin(yaw_des)], [np.cos(yaw_des)], [0]])
-        X_body_in_world = np.cross(Y_unit, Z_body_in_world, axisa=0, axisb=0).T
-        X_body_in_world = X_body_in_world/np.linalg.norm(X_body_in_world)
-        Rot_des[:,0:1] = X_body_in_world
-        Y_body_in_world = np.cross(Z_body_in_world, X_body_in_world, axisa=0, axisb=0).T
-        Y_body_in_world = Y_body_in_world/np.linalg.norm(Y_body_in_world)
-        Rot_des[:,1:2] = Y_body_in_world'''
 
         # Errors of anlges and angular velocities
         e_Rot = np.transpose(Rot_des) @ np.transpose(Rot_worldtobody) - Rot_worldtobody @ Rot_des

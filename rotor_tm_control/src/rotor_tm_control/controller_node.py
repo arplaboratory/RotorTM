@@ -380,7 +380,7 @@ class controller_node:
         if self.pl_params.mechanism_type == 'Rigid Link':
             ql = self.assembly_qd()
             F_list, M_list = self.controller.rigid_links_cooperative_payload_controller(ql, self.pl_params)
-            print(F_list)
+            # print(F_list)
         elif self.pl_params.mechanism_type == 'Cable':
             if self.pl_params.payload_type == 'Rigid Body':
                 mu, att_acc, F_list, M_list, quat_list, rot_list = self.controller.cooperative_suspended_payload_controller(self.pl, self.qd, self.pl_params, self.quad_params)

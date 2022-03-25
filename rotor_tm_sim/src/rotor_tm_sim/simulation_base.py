@@ -55,12 +55,6 @@ class simulation_base():
             # weight = self.pl_params.struct_mass * self.uav_params.grav
             self.cable_is_slack = np.zeros(self.nquad)
             # TODO how to deal with rho_vec_list (currently hardcode from rigid_links_mechanism.yaml
-            '''self.rho_vec_list = np.array([  [-0.0940, -0.267, 0.0097],
-                                            [ 0.3683,  0.000, 0.0097],
-                                            [-0.0940,  0.267, 0.0097]]).T'''
-            '''self.rho_vec_list = np.array([  [-0.1540, -0.267, 0.01125],
-                                            [ 0.3683,  0.000, 0.01125],
-                                            [-0.1540,  0.267, 0.01125]]).T'''
             self.cable_len_list = np.zeros((self.nquad, 1), dtype=float)
             # x = (26, 1) state init
             # s                 - 13 x 1, state vector = [xL, yL, zL, xLd, yLd, zLd, qw, qx, qy, qz, pL, qL, rL]
@@ -212,9 +206,9 @@ class simulation_base():
 
         if self.pl_params.mechanism_type == 'Rigid Link':
             self.load_pos = x[0:3].reshape((3,1)) + payload_rotmat @ self.pl_params.rho_load
-            payload_odom.pose.pose.position.x = -self.load_pos[0]
-            payload_odom.pose.pose.position.y = -self.load_pos[1]
-            payload_odom.pose.pose.position.z = -self.load_pos[2]
+            payload_odom.pose.pose.position.x = self.load_pos[0]
+            payload_odom.pose.pose.position.y = self.load_pos[1]
+            payload_odom.pose.pose.position.z = self.load_pos[2]
         else:
             payload_odom.pose.pose.position.x    = x[0]
             payload_odom.pose.pose.position.y    = x[1]
@@ -236,43 +230,6 @@ class simulation_base():
         cable_point_list = np.zeros((2*self.nquad,3))
         for uav_id in range(self.nquad):
             if self.pl_params.mechanism_type == 'Rigid Link':
-                '''uav_state = x[0:13]
-                attach_pos = uav_state[0:3] + np.matmul(payload_rotmat, self.pl_params.rho_robot[:,uav_id])
-                uav_state[0:3] = attach_pos
-                # Publish UAV odometry
-                uav_odom = Odometry()
-                uav_odom.header.stamp = current_time
-                uav_odom.header.frame_id = self.worldframe 
-                uav_odom.pose.pose.position.x = uav_state[0]
-                uav_odom.pose.pose.position.y = uav_state[1]
-                uav_odom.pose.pose.position.z = uav_state[2]
-                uav_odom.twist.twist.linear.x = uav_state[3]
-                uav_odom.twist.twist.linear.y = uav_state[4]
-                uav_odom.twist.twist.linear.z = uav_state[5]
-                uav_odom.pose.pose.orientation.w = uav_state[6]
-                uav_odom.pose.pose.orientation.x = uav_state[7]
-                uav_odom.pose.pose.orientation.y = uav_state[8]
-                uav_odom.pose.pose.orientation.z = uav_state[9]
-                uav_odom.twist.twist.angular.x = uav_state[10]
-                uav_odom.twist.twist.angular.y = uav_state[11]
-                uav_odom.twist.twist.angular.z = uav_state[12]
-                self.robot_odom_publisher[uav_id].publish(uav_odom)
-
-                # Publish UAV attach odometry
-                attach_odom = Odometry()
-                attach_odom.header.stamp = current_time
-                attach_odom.header.frame_id = self.worldframe 
-                # TODO: continue here publish the attach odom. 
-                # attach_pos = x[0:3] + np.matmul(payload_rotmat, self.rho_vec_list[:,uav_id])
-                # attach_vel = x[3:6] + np.matmul(payload_rotmat, np.cross(sol.y[:,0][10:13], self.rho_vec_list[:,uav_id]))
-                attach_odom.pose.pose.position.x = attach_pos[0]
-                attach_odom.pose.pose.position.y = attach_pos[1]
-                attach_odom.pose.pose.position.z = attach_pos[2]
-                attach_odom.twist.twist.linear.x = attach_vel[0]
-                attach_odom.twist.twist.linear.y = attach_vel[1]
-                attach_odom.twist.twist.linear.z = attach_vel[2]
-                self.attach_publisher[uav_id].publish(attach_odom)'''
-
                 uav_state = x[13:26]
                 attach_pos = self.load_pos.reshape((3,)) + np.matmul(payload_rotmat, (self.pl_params.rho_robot[:,uav_id]+np.array([0.028,0,0.032])))
                 # attach_pos = x[0:3] + np.matmul(payload_rotmat, self.pl_params.rho_robot[:,uav_id])
@@ -918,7 +875,7 @@ class simulation_base():
       # Payload Acceleration
       # combine robot's forces
       accL = F/self.pl_params.struct_mass - self.pl_params.grav*np.array([[0],[0],[1]])
-
+      # print(accL)
       # Assemble sdot
       # original          - 13 x 1, state vector = [xL,   yL,     zL, 
       #                                             xLd,  yLd,    zLd, 
@@ -935,9 +892,9 @@ class simulation_base():
       sdotLoad = np.zeros((26,1), dtype=float)
 
       sdotLoad[0:3,0] = s["vel"]
-      sdotLoad[3,0] = accL[0]
-      sdotLoad[4,0] = accL[1]
-      sdotLoad[5,0] = accL[2]
+      sdotLoad[3,0] = accL[0, 0]
+      sdotLoad[4,0] = accL[1, 0]
+      sdotLoad[5,0] = accL[2, 0]
 
       sdotLoad[6,0] = qLdot[0]
       sdotLoad[7,0] = qLdot[1]
@@ -961,14 +918,14 @@ class simulation_base():
   def fm_command_callback(self,fm_command,uav_id):
         if self.pl_params.mechanism_type == 'Rigid Link':
             self.uav_F[0,0] = fm_command.rlink_thrust.x
-            self.uav_F[1,0] = fm_command.rlink_thrust.x
-            self.uav_F[2,0] = fm_command.rlink_thrust.x
+            self.uav_F[1,0] = fm_command.rlink_thrust.y
+            self.uav_F[2,0] = fm_command.rlink_thrust.z
 
             self.uav_M[0,0] = fm_command.moments.x
             self.uav_M[1,0] = fm_command.moments.y
             self.uav_M[2,0] = fm_command.moments.z
-            print("self.uav_F", self.uav_F)
-            print("self.uav_M", self.uav_M)
+            #print("self.uav_F", self.uav_F)
+            #print("self.uav_M", self.uav_M)
         elif self.pl_params.mechanism_type == 'Cable':
             if self.pl_params.payload_type == 'Rigid Body':
                 self.uav_F[uav_id] = fm_command.thrust
@@ -980,6 +937,3 @@ class simulation_base():
                 self.uav_M[0,0] = fm_command.moments.x
                 self.uav_M[1,0] = fm_command.moments.y
                 self.uav_M[2,0] = fm_command.moments.z
-      
-
-
