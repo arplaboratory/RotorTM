@@ -9,7 +9,19 @@ from nav_msgs.msg import Odometry
 from rotor_tm_msgs.msg import RPMCommand, FMCommand 
 from rotor_tm_utils import utilslib, rosutilslib
 from rotor_tm_utils.vee import vee
+from rotor_tm_utils.utilslib import vecnorm
 import time
+
+
+def ptmassslackToTaut(t, x):
+    value = np.linalg.norm(x[0:3] - x[13:16]) - ptmassslackToTaut.cable_length
+    # print("I'm in evnet ", value)
+    return value
+
+def ptmasstautToSlack(t, x):
+    value = np.linalg.norm(x[0:3] - x[13:16]) - ptmasstautToSlack.cable_length + 0.001
+    return value
+
 
 class simulation_base():
   def __init__(self,pl_params,uav_params):
@@ -112,7 +124,7 @@ class simulation_base():
                       0.0,  0.0,    0.0,            # pl vel    6
                       1.0,  0.0,    0.0,    0.0,    # pl quat   10
                       0.0,  0.0,    0.0,            # pl omega  13
-                      0.0,  0.0,    0.5,            # qd pos    16
+                      0.0,  0.0,    0.0,            # qd pos    16
                       0.0,  0.0,    0.0,            # qd vel    19 
                       1.0,  0.0,    0.0,    0.0,    # qd quat   23
                       0.0,  0.0,    0.0])           # qd omega  26
@@ -158,14 +170,44 @@ class simulation_base():
         # With event
         start = time.time()
         if self.pl_params.id == "Rigid Link":
+            ## this is rigid link sim
             sol = scipy.integrate.solve_ivp(self.rigid_links_cooperative_rigidbody_pl_EOM, t_span, x, method= 'RK45', t_eval=t_span)
         else:
             if self.nquad == 1:
-                sol = scipy.integrate.solve_ivp(self.hybrid_ptmass_pl_transportationEOM, t_span, x, method= 'RK45', t_eval=t_span)
+                ## this is point mass sim
+                ## inelastic collision
+                pl_pos = x[0:3]
+                pl_vel = x[3:6]
+                robot_pos = x[13:16]
+                robot_vel = x[16:19]
+                cable_norm_vel = np.transpose(pl_pos - robot_pos) @ (pl_vel - robot_vel)
+                if cable_norm_vel > 1e-6 and not self.cable_is_slack:
+                    v1, v2 = self.ptmass_inelastic_cable_collision(x[0:6], x[13:19], self.pl_params.mass, self.uav_params.mass)
+                    x[3:6] = v1
+                    x[16:19] = v2
+                
+                ## set up event
+                ptmasstautToSlack.terminal = True
+                ptmassslackToTaut.terminal = True
+                ptmasstautToSlack.direction = -1
+                ptmassslackToTaut.direction = 1
+                ptmassslackToTaut.cable_length = self.pl_params.cable_length
+                ptmasstautToSlack.cable_length = self.pl_params.cable_length
+
+                if self.cable_is_slack:
+                    print("Cable is slack")
+                    sol = scipy.integrate.solve_ivp(self.hybrid_ptmass_pl_transportationEOM, t_span, x, method= 'RK45', t_eval=t_span, events=ptmassslackToTaut)
+                else:
+                    print("Cable is taut")
+                    sol = scipy.integrate.solve_ivp(self.hybrid_ptmass_pl_transportationEOM, t_span, x, method= 'RK45', t_eval=t_span, events=ptmasstautToSlack)
             else:    
                 sol = scipy.integrate.solve_ivp(self.hybrid_cooperative_rigidbody_pl_transportationEOM, t_span, x, method='RK23', t_eval=t_span)
         end = time.time()
-        x = sol.y[:,1]
+        # print(sol.y)
+        x = sol.y[:,-1]
+        # print(x)
+        # print(np.linalg.norm(x[0:3] - x[13:16]), (self.pl_params.cable_length - 1e-1))
+        self.cable_is_slack = self.isslack(x[0:3], x[13:16], self.pl_params.cable_length)
 
         # The simulation must first run on the quadrotors
         # Then the simulation simulates the dynamics of the payload
@@ -345,6 +387,19 @@ class simulation_base():
         self.system_publisher.publish(system_marker)
 
         rate.sleep()    
+
+
+  def istaut(self, robot_pos, attach_pos, cable_length):
+      if (np.linalg.norm(robot_pos - attach_pos) > (cable_length - 1e-1)):
+        return np.array([1.0])
+      else:
+        return np.array([0.0])
+
+  def isslack(self, robot_pos, attach_pos, cable_length):
+      if (np.linalg.norm(robot_pos - attach_pos) > (cable_length - 1e-1)):
+        return np.array([0.0])
+      else:
+        return np.array([1.0])
 
 ####################################################################################
 ##################                    hybrid                    ####################
@@ -655,7 +710,7 @@ class simulation_base():
 
   def slack_ptmass_payload_quadEOM_readonly(self, t, plqd, F, M):
       # Assign params and states
-      print("I'm in slack ptmass eom")
+      # print("I'm in slack ptmass eom")
       mQ  =   self.uav_params.mass
       e3  =   np.array([[0.0],[0.0],[1.0]])
       g   =   self.uav_params.grav * e3
@@ -675,16 +730,53 @@ class simulation_base():
       # Solving for Quadrotor Angular Velocity
       K_quat = 2.0 # this enforces the magnitude 1 constraint for the quaternion
       quaterror = 1 - np.linalg.norm(qd_quat)
-
       qdot = -1/2*np.array([[0, -p, -q, -r],
                             [p,  0, -r,  q],
                             [q,  r,  0, -p],
-                            [r, -q,  p,  0]]) @ qd_quat + K_quat * quaterror * qd_quat
+                            [r, -q,  p,  0]]) @ qd_quat.reshape((qd_quat.shape[0], 1)) + K_quat * quaterror * qd_quat.reshape((qd_quat.shape[0], 1))
+      '''qdot = -1/2*np.array([[0, -p, -q, -r],
+                            [p,  0, -r,  q],
+                            [q,  r,  0, -p],
+                            [r, -q,  p,  0]]) @ qd_quat + K_quat * quaterror * qd_quat'''
 
       # Solving for Quadrotor Angular Acceleration
       pqrdot   = self.uav_params.invI @ (M - np.reshape(np.cross(qd_omega, self.uav_params.I @ qd_omega, axisa=0, axisb=0), (3,1)))
       
       # Assemble sdot
+      '''print()
+      print(plqd["vel"].reshape(3, 1))
+      print(plqd["vel"].reshape(3, 1).shape)
+      print(g)
+      print(g.shape)
+      print(plqd["qd_vel"].reshape(3, 1))
+      print(plqd["qd_vel"].reshape(3, 1).shape)
+      print(accQ)
+      print(accQ.shape)
+      print(qdot)
+      print(qdot.shape)
+      print(pqrdot)
+      print(pqrdot.shape)
+      print()'''
+      sdot = np.zeros((26,1), dtype=float)
+      sdot[0:3] = plqd["vel"].reshape(3, 1)
+      sdot[3:6] = -g
+      sdot[13:16] = plqd["qd_vel"].reshape(3, 1)
+      sdot[16:19] = accQ
+      sdot[19:23] = qdot
+      sdot[23:26] = pqrdot
+      sdot = sdot[:,0]
+      '''
+      Moved from taut ptmass
+      sdot = np.zeros((26,1), dtype=float)
+      sdot[0:3] = plqd["vel"].reshape(3, 1)
+      sdot[3:6] = accL
+      sdot[13:16] = plqd["qd_vel"].reshape(3, 1)
+      sdot[16:19] = accQ
+      sdot[19:23] = qdot
+      sdot[23:26] = pqrdot
+      sdot = sdot[:,0]'''
+      '''
+      Previously working
       sdot = np.zeros((26,1), dtype=float)
       sdot[0:3, 0] = plqd["vel"]
       sdot[3:6] = -g
@@ -692,8 +784,7 @@ class simulation_base():
       sdot[16:19, 0:1] = accQ
       sdot[19:23, 0] = qdot
       sdot[23:26] = pqrdot
-      sdot = sdot[:,0]
-
+      sdot = sdot[:,0]'''
       return sdot
 
   def taut_ptmass_payload_quadEOM_readonly(self, t, plqd, F, M):
@@ -756,6 +847,29 @@ class simulation_base():
       sdot = sdot[:,0]
 
       return sdot
+
+  def ptmass_inelastic_cable_collision(self, x1, x2, m1, m2): # perfectly inelastic collision of ptmass and the drone along the cable direction
+      obj1_pos = x1[0:3]
+      obj1_pos = obj1_pos.reshape((3, 1))
+      obj2_pos = x2[0:3]
+      obj2_pos = obj2_pos.reshape((3, 1))
+      obj1_vel = x1[3:6]
+      obj2_pos = obj2_pos.reshape((3, 1))
+      obj2_vel = x2[3:6]
+      obj2_pos = obj2_pos.reshape((3, 1))
+
+      cable_direction = (obj2_pos - obj1_pos) / np.linalg.norm(obj2_pos - obj1_pos)
+      cable_direction = cable_direction.reshape((3, 1))
+      cable_direction_projmat = cable_direction @ cable_direction.T
+      v1_proj = cable_direction_projmat @ obj1_vel
+      v2_proj = cable_direction_projmat @ obj2_vel
+      
+      v = (m1 * v1_proj + m2 * v2_proj)/(m1+m2)
+      
+      v1 = v + obj1_vel - v1_proj
+      v2 = v + obj2_vel - v2_proj
+
+      return v1, v2
 
 
 ####################################################################################
