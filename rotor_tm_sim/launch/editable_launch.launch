@@ -1,13 +1,69 @@
 <launch>
 <!-- edit below this line -->
-    <arg name="uav_params_path" value = "$(find rotor_tm_config)/config/uav_params/snapdragonfly_sameasMatlab.yaml"/>
-    <arg name="payload_params_path" value = "$(find rotor_tm_config)/config/load_params/triangular_payload_sameasMatlab.yaml"/>
-    <arg name="mechanism_params_path" value = "$(find rotor_tm_config)/config/attach_mechanism/3_robots_cable_mechanism.yaml"/>
-    <arg name="payload_control_gain_path" value = "$(find rotor_tm_config)/config/control_params/triangular_payload_cooperative_cable_gains.yaml"/>
-    <arg name="uav_control_gain_path" value = "$(find rotor_tm_config)/config/control_params/dragonfly_control_gains.yaml"/>
-    <!-- Here is the number of controller-->
-    <arg name="number_of_robots" value="3"/>
+    <arg name="uav_params_path"             default = "$(find rotor_tm_config)/config/uav_params/snapdragonfly_sameasMatlab.yaml"/>
+    <arg name="payload_params_path"         default = "$(find rotor_tm_config)/config/load_params/triangular_payload_sameasMatlab.yaml"/>
+    <arg name="mechanism_params_path"       default = "$(find rotor_tm_config)/config/attach_mechanism/3_robots_cable_mechanism.yaml"/>
+    <arg name="payload_control_gain_path"   default = "$(find rotor_tm_config)/config/control_params/triangular_payload_cooperative_cable_gains.yaml"/>
+    <arg name="uav_control_gain_path"       default = "$(find rotor_tm_config)/config/control_params/dragonfly_control_gains.yaml"/>
+    <arg name="number_of_robots"            default="3"/>
 <!-- edit above this line -->
+
+<!--Lists of provided scenarios-->
+
+<!--
+    3 snapdragon flights with triangular payload using cable mechanisms
+    <arg name="uav_params_path"             default = "$(find rotor_tm_config)/config/uav_params/snapdragonfly_sameasMatlab.yaml"/>
+    <arg name="payload_params_path"         default = "$(find rotor_tm_config)/config/load_params/triangular_payload_sameasMatlab.yaml"/>
+    <arg name="mechanism_params_path"       default = "$(find rotor_tm_config)/config/attach_mechanism/3_robots_cable_mechanism.yaml"/>
+    <arg name="payload_control_gain_path"   default = "$(find rotor_tm_config)/config/control_params/triangular_payload_cooperative_cable_gains.yaml"/>
+    <arg name="uav_control_gain_path"       default = "$(find rotor_tm_config)/config/control_params/dragonfly_control_gains.yaml"/>
+    <arg name="number_of_robots"            default="3"/>
+-->
+
+
+<!--
+    4 snapdragon flights with fedex box payload using cable mechanisms
+    <arg name="uav_params_path"             default = "$(find rotor_tm_config)/config/uav_params/snapdragonfly.yaml"/>
+    <arg name="payload_params_path"         default = "$(find rotor_tm_config)/config/load_params/fedex_box_payload.yaml"/>
+    <arg name="mechanism_params_path"       default = "$(find rotor_tm_config)/config/attach_mechanism/4_robots_cable_mechanism.yaml"/>
+    <arg name="payload_control_gain_path"   default = "$(find rotor_tm_config)/config/control_params/triangular_payload_cooperative_cable_gains.yaml"/>
+    <arg name="uav_control_gain_path"       default = "$(find rotor_tm_config)/config/control_params/dragonfly_control_gains.yaml"/>
+    <arg name="number_of_robots"            default="4"/>
+-->
+
+
+<!--
+    6 snapdragon flights with fedex box payload using cable mechanisms
+    <arg name="uav_params_path"             default = "$(find rotor_tm_config)/config/uav_params/snapdragonfly.yaml"/>
+    <arg name="payload_params_path"         default = "$(find rotor_tm_config)/config/load_params/fedex_box_payload.yaml"/>
+    <arg name="mechanism_params_path"       default = "$(find rotor_tm_config)/config/attach_mechanism/6_robots_cable_mechanism.yaml"/>
+    <arg name="payload_control_gain_path"   default = "$(find rotor_tm_config)/config/control_params/triangular_payload_cooperative_cable_gains.yaml"/>
+    <arg name="uav_control_gain_path"       default = "$(find rotor_tm_config)/config/control_params/dragonfly_control_gains.yaml"/>
+    <arg name="number_of_robots"            default="6"/>
+-->
+
+
+<!--
+    1 snapdragon flights with point-mass payload using cable mechanisms
+    <arg name="uav_params_path"             default = "$(find rotor_tm_config)/config/uav_params/snapdragonfly.yaml"/>
+    <arg name="payload_params_path"         default = "$(find rotor_tm_config)/config/load_params/pointmass_payload.yaml"/>
+    <arg name="mechanism_params_path"       default = "$(find rotor_tm_config)/config/attach_mechanism/ptmass_cable_mechanism.yaml"/>
+    <arg name="payload_control_gain_path"   default = "$(find rotor_tm_config)/config/control_params/pointmass_cable_gains.yaml"/>
+    <arg name="uav_control_gain_path"       default = "$(find rotor_tm_config)/config/control_params/dragonfly_control_gains.yaml"/>
+    <arg name="number_of_robots"            default="1"/>
+-->
+
+
+<!--
+    3 snapdragon flights with triangular payload using rigid link mechanisms
+    <arg name="uav_params_path"             default = "$(find rotor_tm_config)/config/uav_params/snapdragonfly.yaml"/>
+    <arg name="payload_params_path"         default = "$(find rotor_tm_config)/config/load_params/triangular_payload_sameasMatlab.yaml"/>
+    <arg name="mechanism_params_path"       default = "$(find rotor_tm_config)/config/attach_mechanism/rigid_links_mechanism.yaml"/>
+    <arg name="payload_control_gain_path"   default = "$(find rotor_tm_config)/config/control_params/triangular_payload_cooperative_rigidlink_gains.yaml"/>
+    <arg name="uav_control_gain_path"       default = "$(find rotor_tm_config)/config/control_params/dragonfly_control_gains.yaml"/>
+    <arg name="number_of_robots"            default="3"/>
+-->
+
 
 
     <!-- Start simulation and trajectory nodes-->
@@ -19,17 +75,13 @@
     <!-- recursively launch controller -->
     <arg name="nr" default="$(eval number_of_robots + 1)"/>
     <include file="$(find rotor_tm)/launch/controller_launcher.launch" if="$(eval arg('nr') - 1 > 0)">
-
-<!-- edit below this line -->
-        <arg name="uav_params_path" value = "$(find rotor_tm_config)/config/uav_params/snapdragonfly_sameasMatlab.yaml"/>
-        <arg name="payload_params_path" value = "$(find rotor_tm_config)/config/load_params/triangular_payload_sameasMatlab.yaml"/>
-        <arg name="mechanism_params_path" value = "$(find rotor_tm_config)/config/attach_mechanism/3_robots_cable_mechanism.yaml"/>
-        <arg name="payload_control_gain_path" value = "$(find rotor_tm_config)/config/control_params/triangular_payload_cooperative_cable_gains.yaml"/>
-        <arg name="uav_control_gain_path" value = "$(find rotor_tm_config)/config/control_params/dragonfly_control_gains.yaml"/>
-        <arg name="number_of_robots" value="3"/>
-<!-- edit above this line -->
-
-        <arg name="nr" value="$(eval arg('nr') - 1)"/>
+        <arg name="uav_params_path"             value = "$(arg uav_params_path)"/>
+        <arg name="payload_params_path"         value = "$(arg payload_params_path)"/>
+        <arg name="mechanism_params_path"       value = "$(arg mechanism_params_path)"/>
+        <arg name="payload_control_gain_path"   value = "$(arg payload_control_gain_path)"/>
+        <arg name="uav_control_gain_path"       value = "$(arg uav_control_gain_path)"/>
+        <arg name="number_of_robots"            value="$(arg number_of_robots)"/>
+        <arg name="nr"                          value="$(eval arg('nr') - 1)"/>
     </include>
 
     <include file="$(find rotor_tm)/launch/rviz.launch">
