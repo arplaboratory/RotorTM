@@ -12,7 +12,18 @@ import simulation_base
 import rospkg
 
 if __name__ == '__main__':
-  # get an instance of RosPack with the default search paths
+  payload_params_path = sys.argv[1]
+  uav_params_path = sys.argv[2]
+  mechanism_params_path = sys.argv[3]
+  payload_control_gain_path = sys.argv[4]
+  uav_control_gain_path = sys.argv[5]
+  '''print("payload_params_path \n", payload_params_path, "\n")
+  print("uav_params_path  \n", uav_params_path, "\n")
+  print("mechanism_params_path  \n", mechanism_params_path, "\n")
+  print("payload_control_gain_path  \n", payload_control_gain_path, "\n")
+  print("uav_control_gain_path  \n", uav_control_gain_path, "\n")'''
+
+  '''# get an instance of RosPack with the default search paths
   rospack = rospkg.RosPack()
   # get the file path for rotor_tm_config
   path = rospack.get_path('rotor_tm_config')
@@ -52,9 +63,7 @@ if __name__ == '__main__':
     payload_params_path = path + '/config/load_params/triangular_payload_sameasMatlab.yaml'
     mechanism_params_path = path + '/config/attach_mechanism/rigid_links_mechanism.yaml'
     payload_control_gain_path = path + '/config/control_params/triangular_payload_cooperative_rigidlink_gains.yaml'
-    uav_control_gain_path = path + '/config/control_params/dragonfly_control_gains.yaml'
-
-
+    uav_control_gain_path = path + '/config/control_params/dragonfly_control_gains.yaml' '''
 
   read_params_funcs = read_params.read_params()
   pl_params, quad_params = read_params_funcs.system_setup(payload_params_path,uav_params_path,mechanism_params_path,payload_control_gain_path, uav_control_gain_path)

@@ -22,7 +22,7 @@ from rotor_tm_traj.srv import Circle,Line
 
 class controller_node:
 
-    def __init__(self, node_id, single_node = True, situation="multi"):
+    def __init__(self, node_id, single_node, payload_params_path, uav_params_path, mechanism_params_path, payload_control_gain_path, uav_control_gain_path):
         self.node_id = node_id
         self.single_node = single_node
         self.pl = {}
@@ -33,7 +33,8 @@ class controller_node:
         self.last_odom_time_received = 0.0 
         self.last_des_traj_time_received = 0.0 
 
-        # get an instance of RosPack with the default search paths
+
+        '''# get an instance of RosPack with the default search paths
         rospack = rospkg.RosPack()
 
         # get the file path for rotor_tm_config
@@ -72,7 +73,7 @@ class controller_node:
             payload_params_path = path + '/config/load_params/triangular_payload_sameasMatlab.yaml'
             mechanism_params_path = path + '/config/attach_mechanism/rigid_links_mechanism.yaml'
             payload_control_gain_path = path + '/config/control_params/triangular_payload_cooperative_rigidlink_gains.yaml'
-            uav_control_gain_path = path + '/config/control_params/dragonfly_control_gains.yaml'
+            uav_control_gain_path = path + '/config/control_params/dragonfly_control_gains.yaml' '''
 
         self.controller = controller()
         
@@ -438,19 +439,25 @@ class controller_node:
         '''
 
 
-def main(node_id, single_node, situation):
-    controller_node(node_id, single_node, situation)
-
+'''def main(node_id, single_node, payload_params_path, uav_params_path, mechanism_params_path, payload_control_gain_path, uav_control_gain_path):
+    controller_node(node_id, single_node, payload_params_path, uav_params_path, mechanism_params_path, payload_control_gain_path, uav_control_gain_path)
+'''
 
 if __name__ == '__main__':
+    payload_params_path = sys.argv[3]
+    uav_params_path = sys.argv[4]
+    mechanism_params_path = sys.argv[5]
+    payload_control_gain_path = sys.argv[6]
+    uav_control_gain_path = sys.argv[7]
 
     node_name = 'controller_'+str(int(sys.argv[1])+1)
+    print(node_name)
     rospy.init_node(node_name)
     #rospy.init_node("controller")
 
     if int(sys.argv[2]) == 1:
-        controller_node(int(sys.argv[1]), True, sys.argv[3])
+        controller_node(int(sys.argv[1]), True, payload_params_path, uav_params_path, mechanism_params_path, payload_control_gain_path, uav_control_gain_path)
         #main(int(sys.argv[1]), True, sys.argv[3])
     else:
-        controller_node(int(sys.argv[1]), False, sys.argv[3])
+        controller_node(int(sys.argv[1]), False, payload_params_path, uav_params_path, mechanism_params_path, payload_control_gain_path, uav_control_gain_path)
         #main(int(sys.argv[1]), False, sys.argv[3])

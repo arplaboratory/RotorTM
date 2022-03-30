@@ -19,7 +19,7 @@ def ptmassslackToTaut(t, x):
     return value
 
 def ptmasstautToSlack(t, x):
-    value = np.linalg.norm(x[0:3] - x[13:16]) - ptmasstautToSlack.cable_length + 0.001
+    value = np.linalg.norm(x[0:3] - x[13:16]) - ptmasstautToSlack.cable_length + 0.000001
     return value
 
 
@@ -120,7 +120,7 @@ class simulation_base():
         
         # x = (26, 1) state init
                                                     # Name      Element Location
-        x = np.array([0.0,  0.0,    0.0,            # pl pos    3
+        x = np.array([0.0,  0.0,    0.3,            # pl pos    3
                       0.0,  0.0,    0.0,            # pl vel    6
                       1.0,  0.0,    0.0,    0.0,    # pl quat   10
                       0.0,  0.0,    0.0,            # pl omega  13
@@ -200,6 +200,8 @@ class simulation_base():
                 else:
                     print("Cable is taut")
                     sol = scipy.integrate.solve_ivp(self.hybrid_ptmass_pl_transportationEOM, t_span, x, method= 'RK45', t_eval=t_span, events=ptmasstautToSlack)
+                x = sol.y[:,-1]
+                self.cable_is_slack = self.isslack(x[0:3], x[13:16], self.pl_params.cable_length)
             else:    
                 sol = scipy.integrate.solve_ivp(self.hybrid_cooperative_rigidbody_pl_transportationEOM, t_span, x, method='RK23', t_eval=t_span)
         end = time.time()
@@ -207,7 +209,7 @@ class simulation_base():
         x = sol.y[:,-1]
         # print(x)
         # print(np.linalg.norm(x[0:3] - x[13:16]), (self.pl_params.cable_length - 1e-1))
-        self.cable_is_slack = self.isslack(x[0:3], x[13:16], self.pl_params.cable_length)
+        
 
         # The simulation must first run on the quadrotors
         # Then the simulation simulates the dynamics of the payload
