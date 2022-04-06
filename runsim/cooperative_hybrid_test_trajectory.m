@@ -19,6 +19,7 @@ payloadframe = 'payload';
 cable_pub = rospublisher("/cable/marker","visualization_msgs/Marker","DataFormat","struct");
 cable_marker_scale = 0.01*ones(3);
 cable_marker_color = [1.0,0.5,0.5,0.5];
+
 cable_marker_msg = init_marker_msg(cable_pub,5,0,worldframe,cable_marker_scale,cable_marker_color);
 
 for i = 1:nquad
@@ -156,7 +157,7 @@ for iter = 1:max_iter
     % State Integration
     slack_condition = cable_is_slack;
     option = odeset('Events',@(t,x)cooperativeGuard(t,x,pl_params,slack_condition));
-    [tsave, xsave, fsave] = ode45(@(t,s)dynamicshandle(t,s,pl_params), timeint, x, option);
+    [tsave, xsave, fsave] = ode45(@(t,s)dynamicshandle(t,s,pl_params), timeint, x, option); % timeint: 0.05 second / x: initial states /option: check if certain conditions are met
     x = xsave(end, :)';
     
     % Check if the cable is slack
@@ -188,32 +189,33 @@ for iter = 1:max_iter
         cable_point_list = [cable_point_list,attach_qn,quad_and_cable_state(1:3)];
     end
     
-    path_msg.points(iter).x = payload_state(1);
-    path_msg.points(iter).y = payload_state(2);
-    path_msg.points(iter).z = payload_state(3);
+    path_msg.Points(iter).X = payload_state(1);
+    path_msg.Points(iter).Y = payload_state(2);
+    path_msg.Points(iter).Z = payload_state(3);
     path_time = rostime('now');
-    path_msg.header.stamp.sec = uint32(path_time.Sec);
-    path_msg.header.stamp.nsec = uint32(path_time.Nsec);
+    path_msg.Header.Stamp.Sec = uint32(path_time.Sec);
+    path_msg.Header.Stamp.Nsec = uint32(path_time.Nsec);
     send(path_pub, path_msg);
-    des_path_msg.points(iter).x = desired_state.pos_des(1);
-    des_path_msg.points(iter).y = desired_state.pos_des(2);
-    des_path_msg.points(iter).z = desired_state.pos_des(3);
-    des_path_msg.header.stamp.sec = uint32(path_time.Sec);
-    des_path_msg.header.stamp.nsec = uint32(path_time.Nsec);
+    des_path_msg.Points(iter).X = desired_state.pos_des(1);
+    des_path_msg.Points(iter).Y = desired_state.pos_des(2);
+    des_path_msg.Points(iter).Z = desired_state.pos_des(3);
+    des_path_msg.Header.Stamp.Sec = uint32(path_time.Sec);
+    des_path_msg.Header.Stamp.Nsec = uint32(path_time.Nsec);
     send(des_path_pub, des_path_msg);
     
     % Update quadrotor visualization
+
     for qn=1:nquad
-        system_marker.markers(qn) = update_marker_msg(quadrotor_marker_msg{qn},quad_state{qn}(1:3),RotToQuat(QuatToRot(quad_state{qn}(7:10))'),qn);
+        system_marker.Markers(qn)= update_marker_msg(quadrotor_marker_msg{qn},quad_state{qn}(1:3),RotToQuat(QuatToRot(quad_state{qn}(7:10))'),qn);
     end
     
     % Update cable visualization
-    system_marker.markers(nquad+1) = update_line_list_msg(cable_marker_msg,cable_point_list,nquad+1);
+     system_marker.Markers(nquad+1) = update_line_list_msg(cable_marker_msg,cable_point_list,nquad+1);
     
     % Update payload visualization
-    system_marker.markers(nquad+2) = update_marker_msg(payload_marker_msg,payload_state(1:3),RotToQuat(payload_rot),0);
-    
-    send(system_pub, system_marker);
+     system_marker.Markers(nquad+2) = update_marker_msg(payload_marker_msg,payload_state(1:3),RotToQuat(payload_rot),0);
+
+     send(system_pub, system_marker);
     
     % Update simulation time
     time = time + tsave(end) - tsave(1);

@@ -14,8 +14,8 @@ function marker_msg = init_marker_msg(pubhandle,type, action, frame_id, scale, c
 
 marker_msg = rosmessage(pubhandle);
 time = rostime("now");
-marker_msg.header.stamp.sec = time.Sec;
-marker_msg.header.stamp.nsec = time.Nsec;
+marker_msg.Header.Stamp.Sec = time.Sec;
+marker_msg.Header.Stamp.Nsec = time.Nsec;
 
 switch nargin
     
@@ -32,22 +32,22 @@ switch nargin
         
     case 7
         
-        marker_msg.mesh_resource = mesh_resource;
+        marker_msg.MeshResource = mesh_resource;
         
     otherwise
         error("There is not enough inputs. At least 4 arguments are required.")
         
 end
 
-marker_msg.header.frame_id = frame_id;
-marker_msg.type = int32(type);
-marker_msg.action = int32(action);
-marker_msg.scale.x = scale(1);
-marker_msg.scale.y = scale(2);
-marker_msg.scale.z = scale(3);
-marker_msg.color.a = single(color(1)); % Don't forget to set the alpha!
-marker_msg.color.r = single(color(2));
-marker_msg.color.g = single(color(3));
-marker_msg.color.b = single(color(4));
+marker_msg.Header.FrameId = frame_id;
+marker_msg.Type = int32(type);
+marker_msg.Action = int32(action);
+marker_msg.Scale.X = scale(1);
+marker_msg.Scale.Y = scale(2);
+marker_msg.Scale.Z = scale(3);
+marker_msg.Color.A = single(color(1)); % Don't forget to set the alpha!
+marker_msg.Color.R = single(color(2));
+marker_msg.Color.G = single(color(3));
+marker_msg.Color.B = single(color(4));
 
 end

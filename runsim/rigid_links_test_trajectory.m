@@ -29,7 +29,7 @@ for i = 1:nquad
     robot_marker_pub{i} = rospublisher("/quadrotor"+num2str(i)+"/marker","visualization_msgs/Marker","DataFormat","struct");
     quadrotor_marker_scale = 0.5*ones(3);
     quadrotor_marker_color = [1.0,0.0,0.0,1.0];
-    quadrotor_mesh = 'package://aerial_manipulation_sim/mesh/hummingbird.mesh';
+    quadrotor_mesh = 'package://RotorTM/mesh/hummingbird.mesh';
     quadrotor_marker_msg{i} = init_marker_msg(robot_marker_pub{i} ,10,0,worldframe,quadrotor_marker_scale,quadrotor_marker_color,quadrotor_mesh);
 end
 
@@ -58,7 +58,7 @@ if nquad == 1
 else
     controlhandle = @rigid_links_cooperative_payload_controller;
     dynamicshandle = @(t,s) rigid_links_cooperative_rigidbody_pl_EOM(t, s, nquad, controlhandle, trajhandle, quad_params, pl_params);
-    payload_mesh = 'package://aerial_manipulation_sim/mesh/triangular_payload.STL';
+    payload_mesh = 'package://RotorTM/mesh/triangular_payload.STL';
     payload_marker_msg = init_marker_msg(pl_odom_pub,10,0,worldframe,payload_marker_scale,payload_marker_color,payload_mesh);
 end
 
@@ -133,11 +133,11 @@ for iter = 1:max_iter
     
     % Update quadrotor visualization
     for qn=1:nquad
-        system_marker.markers(qn) = update_marker_msg(quadrotor_marker_msg{qn},robot_pos(:,qn),RotToQuat(Rot),qn);
+        system_marker.Markers(qn) = update_marker_msg(quadrotor_marker_msg{qn},robot_pos(:,qn),RotToQuat(Rot),qn);
     end
     
     % Update payload visualization msg
-    system_marker.markers(nquad+1) = update_marker_msg(payload_marker_msg,load_pos,RotToQuat(Rot));
+    system_marker.Markers(nquad+1) = update_marker_msg(payload_marker_msg,load_pos,RotToQuat(Rot));
     
     send(system_pub, system_marker);
     
@@ -152,18 +152,18 @@ for iter = 1:max_iter
             end
     end
     
-    path_msg.points(iter).x = x(1);
-    path_msg.points(iter).y = x(2);
-    path_msg.points(iter).z = x(3);
+    path_msg.Points(iter).X = x(1);
+    path_msg.Points(iter).Y = x(2);
+    path_msg.Points(iter).Z = x(3);
     path_time = rostime('now');
-    path_msg.header.stamp.sec = uint32(path_time.Sec);
-    path_msg.header.stamp.nsec = uint32(path_time.Nsec);
+    path_msg.Header.Stamp.Sec = uint32(path_time.Sec);
+    path_msg.Header.Stamp.Nsec = uint32(path_time.Nsec);
     send(path_pub, path_msg);
-    des_path_msg.points(iter).x = desired_state.pos_des(1);
-    des_path_msg.points(iter).y = desired_state.pos_des(2);
-    des_path_msg.points(iter).z = desired_state.pos_des(3);
-    des_path_msg.header.stamp.sec = uint32(path_time.Sec);
-    des_path_msg.header.stamp.nsec = uint32(path_time.Nsec);
+    des_path_msg.Points(iter).X = desired_state.pos_des(1);
+    des_path_msg.Points(iter).Y = desired_state.pos_des(2);
+    des_path_msg.Points(iter).Z = desired_state.pos_des(3);
+    des_path_msg.Header.Stamp.Sec = uint32(path_time.Sec);
+    des_path_msg.Header.Stamp.Nsec = uint32(path_time.Nsec);
     send(des_path_pub, des_path_msg);
     
     % Update simulation time
