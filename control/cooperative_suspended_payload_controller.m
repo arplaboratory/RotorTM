@@ -1,4 +1,4 @@
-function [qd_F,qd_M] = cooperative_payload_geometric_controller(ql, qd, pl_params, qd_params)
+function [qd_F,qd_M] = cooperative_suspended_payload_controller(ql, qd, pl_params, qd_params)
 % CONTROLLER quadrotor controller
 % The current states are:
 % qd{qn}.pos, qd{qn}.vel, qd{qn}.euler = [roll;pitch;yaw], qd{qn}.omega

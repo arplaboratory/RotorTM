@@ -13,14 +13,14 @@ map = load_map('maps/map0.txt', 0.1, 1.0, 0.25);
 
 payload_start = {[0.0 0.0 0.0 1.0 0.0 0.0 0.0]'};
 %payload_start = {[0.3 * sin(pi/6) 0 1.0-0.3*cos(pi/6) 1.0 0.0 0.0 0.0]'};
-payload_stop = {[0.0 0.0 0.5 1.0 0.0 0.0 0.0]'};
+payload_stop = {[0.0 0.0 0.0 1.0 0.0 0.0 0.0]'};
 % payload_stop = {[2.0 0.0 1.0 1.0 0.0 0.0 0.0]'};
 robot_start = {[0.0  0.0 0.5]}; %map3
 
 a = 0.06;
 c = 0.0097;
-%robot_team_start = {[-0.1540+a -0.267 1.5+c],[0.3083+a 0.0 1.5+c],[-0.1540+a 0.267 1.5+c]}; %3 robots cable mechanism
-robot_team_start = {[0.3048 -0.3048 0.7286],[0.3048 0.3048 0.7286],[-0.3048 0.3048 0.7286],[-0.3048 -0.3048 0.7286],[0.3048 0 0.7286],[-0.3048 0 0.7286]}; %3 robots cable mechanism
+robot_team_start = {[-0.1540+a -0.267 1.5+c],[0.3083+a 0.0 1.5+c],[-0.1540+a 0.267 1.5+c]}; %3 robots cable mechanism
+%robot_team_start = {[0.3048 -0.3048 0.7286],[0.3048 0.3048 0.7286],[-0.3048 0.3048 0.7286],[-0.3048 -0.3048 0.7286],[0.3048 0 0.7286],[-0.3048 0 0.7286]}; %3 robots cable mechanism
 
 % robot_team_start = {[-0.1540+a -0.267 1.0+c],[0.3083+a 0.0 1.0+c],[-0.1540+a 0.267 1.0+c]};
 %start = {[-0.1540 -0.267 0.5],[0.3083 0.0 0.5],[-0.1540 0.267 0.5]};
@@ -45,21 +45,14 @@ robot_team_start = {[0.3048 -0.3048 0.7286],[0.3048 0.3048 0.7286],[-0.3048 0.30
 %     1.75 0.25 0.875;
 %     2.0 0.0 1.0];%TODO:: fix the bug here, there is discontinuous path at the end;
 
-payload_path = [0.0 0.0 0.0;
-    0.5 -0.5 0.25;
-    1.0 0.0 0.5;
-    1.5 -0.5 0.75;
-    2.0 0.0 1.0];
+% payload_path = [0.0 0.0 0.0;
+%     0.5 -0.5 0.25;
+%     1.0 0.0 0.5;
+%     1.5 -0.5 0.75;
+%     2.0 0.0 1.0];
 
-%;
-% payload_path = [0.0 0.0 0.5;
-%                 0.0 0.0 0.5];%;
-
-%3.0 0.0 5.0;
-%1.0 0.5 0.0;
-%1.5 -0.5 0.0;
-%2.0 0.5 0.0;
-%2.5 -0.5 0.0];
+payload_path = {[0.0 0.0 0.5;
+                0.0 0.0 0.5]};%;
 
 %% Trajectory Generation Initilization
 init_traj_script;
@@ -72,7 +65,7 @@ payload_controller_params_path = 'config/control_params/triangular_payload_coope
 quad_params = read_uav_params(uav_params_path);
 quad_params = read_control_gains_params(quad_controller_params_path,quad_params);
 
-mechanism_params_path = 'config/attach_mechanism/6_robots_cable_mechanism.yaml';
+mechanism_params_path = 'config/attach_mechanism/3_robots_cable_mechanism.yaml';
 pl_params = robot_team_setup(payload_params_path,uav_params_path,mechanism_params_path);
 pl_params = read_control_gains_params(payload_controller_params_path,pl_params);
 
@@ -88,7 +81,7 @@ pt_params = robot_team_setup(payload_params_path,uav_params_path,mechanism_param
 pt_params = read_control_gains_params(payload_controller_params_path,pt_params);
 
 %% Run trajectory
-[data{1}, data_des{1}, time{1}] = hybrid_test_trajectory(robot_start, payload_start{1}, payload_stop, true, trajhandle,pt_params,quad_params); % with visualization
-%[data{2}, data_des{2}, time{2}] = cooperative_hybrid_test_trajectory(robot_team_start, payload_start{1}, payload_stop{1}, map, path, true, trajhandle,pl_params,quad_params); % with visualization
+%[data{1}, data_des{1}, time{1}] = hybrid_test_trajectory(robot_start, payload_start{1}, payload_stop, true, trajhandle,pt_params,quad_params); % with visualization
+[data{2}, data_des{2}, time{2}] = cooperative_hybrid_test_trajectory(robot_team_start, payload_start{1}, payload_stop{1}, true, trajhandle,pl_params,quad_params); % with visualization
 %[data{3}, data_des{3}, time{3}] = rigid_links_test_trajectory(robot_team_start, payload_start{1}, payload_stop{1}, map, path, true, trajhandle, rigid_pl_params, quad_params); % with visualization
 

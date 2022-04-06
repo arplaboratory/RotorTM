@@ -1,9 +1,7 @@
-function [ desired_state ] = trajectory_generator(t, qn, map, path)
-% TRAJECTORY_GENERATOR: Turn a Dijkstra or A* path into a trajectory
-%
+function [ state_struct] = line_quintic_traj_generator(t, state_struct, map, path)
 % NOTE: This function would be called with variable number of input
 % arguments. In init_script, it will be called with arguments
-% trajectory_generator([], [], map, path) and later, in test_trajectory,
+% line_quintic_traj_generator([], [], map, path) and later, in test_trajectory,
 % it will be called with only t and qn as arguments, so your code should
 % be able to handle that. This can be done by checking the number of
 % arguments to the function using the "nargin" variable, check the
@@ -15,7 +13,8 @@ function [ desired_state ] = trajectory_generator(t, qn, map, path)
 % desired_state: Contains all the information that is passed to the
 % controller, as in phase 2
 % It is suggested to use "persistent" variables to store map and path
-% during the initialization call of trajectory_generator, e.g.
+% during the initialization call of line_quintic_traj_generator, e.g.
+
 persistent mapquad
 persistent pathall
 persistent coefficient
@@ -25,23 +24,23 @@ persistent timesegment
 
 
 if nargin ~= 2
-    
-    mapquad = map;
-    pathall = path;
-    pathqn = pathall{1};
-    ttotal = 10;
-    
-    xy_res = map.resolution(1);
-    basicdata  = map.basicdata;
-    [rowbasicdata ~] = size(basicdata);
-    if rowbasicdata >= 2
-        block = basicdata(2:rowbasicdata,:);
-    else
-        block = [];
-    end
-    
-    finalpath = simplify_path(pathqn,block,mapquad);
-    
+      finalpath = path{1};
+%     mapquad = map;
+%     pathall = path;
+%     pathqn = pathall{1};
+%     ttotal = 10;
+%     
+%     xy_res = map.resolution(1);
+%     basicdata  = map.basicdata;
+%     [rowbasicdata ~] = size(basicdata);
+%     if rowbasicdata >= 2
+%         block = basicdata(2:rowbasicdata,:);
+%     else
+%         block = [];
+%     end
+%     
+%     finalpath = simplify_path(pathqn,block,mapquad);
+%     
     %----------------------------------------------------------------------    
     %If use quintic function, then the order of the system should be three.
     %This means the number of the freedom of the system is 6m where m is the
@@ -103,8 +102,7 @@ elseif nargin == 2
     
     [lengthtime widthtime] = size(timepoint);
     length = lengthtime - 1;
-    desired_state.yaw = 0;
-    desired_state.yawdot = 0;
+
     for i = 1 : length
         if t >= timepoint(i) && t < timepoint(i+1)&& timesegment(i,2) == 0
             currenttstart = timepoint(i);
@@ -121,9 +119,16 @@ elseif nargin == 2
             state(3,:) = [0 0 0];
         end
     end
-    desired_state.pos = state(1,:)';
-    desired_state.vel = state(2,:)';
-    desired_state.acc = state(3,:)';
+    
+    state_struct.pos_des = state(1,:)';
+    state_struct.vel_des = state(2,:)';
+    state_struct.acc_des = state(3,:)';
+    state_struct.jrk_des = [0 0 0]';    
+    state_struct.qd_yaw_des = 0;
+    state_struct.qd_yawdot_des = 0;
+    state_struct.quat_des = [1,0,0,0];
+    state_struct.omega_des = [0,0,0];
+
 end
 
 

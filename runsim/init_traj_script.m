@@ -1,29 +1,13 @@
-%% Trajectory Initialization scripts
-
-% trajectory_generator([], [], map, path);
-% basicdata  = map.basicdata;
-% [rowbasicdata ~] = size(basicdata);`
-% if rowbasicdata >= 2
-%     block = basicdata(2:rowbasicdata,:);
-% else
-%     block = [];
-% end
-%finalpath = simplify_path(path{1},block,map);
-%finalpath = simplify_path_with_ellipsoid_cor(path{1},ellipsoid_corridor)
-
-
-%simplify_path_with_ellipsoid_cor(path{1},ellipsoid_corridor)
-
 %% Initialize circle trajectory
-radius = 1.0;
-period = 6.0;
-duration = 6.0;
-[~,payload_stop] = circle([], [], payload_start{1}(1:3),radius,period,duration);
-trajhandle = @circle;
+% radius = 1.0;
+% period = 6.0;
+% duration = 6.0;
+% [~,payload_stop] = circle([], [], payload_start{1}(1:3),radius,period,duration);
+% trajhandle = @circle;
 
-%% Initialize jump trajectory
-% jump([], [],payload_start{1},payload_stop{1});
-% trajhandle = @jump;
+%% Initialize line trajectory
+line_quintic_traj_generator([], [],map, payload_path);
+trajhandle = @line_quintic_traj_generator;
 
 %% Initialize Minimum kth derivative trajectory
 % [pathlength, ~] = size(payload_path);
