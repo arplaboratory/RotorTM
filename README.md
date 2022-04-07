@@ -32,7 +32,7 @@ Maintainer: Guanrui Li, lguanrui@nyu.edu<br />**
 |`Initial Condition`|Initial conditions for robots and payload|
 
 ## Dependencies and Installation
-The RotorTM package is dependent on MATLAB(>version 2020), MATLAB ROS Toolbox and ROS. 
+The RotorTM package is dependent on MATLAB(>version 2020), MATLAB ROS Toolbox, MATLAB Optimization Tookbox, and ROS. 
 ```
 $ cd /path/to/your/workspace
 $ git clone https://github.com/arplaboratory/RotorTM.git
