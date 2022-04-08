@@ -12,7 +12,7 @@ If you have any questions regarding the repo or how to use the simulator please 
 
 **Developer: Guanrui Li, Xinyang Liu<br />
 Affiliation: [NYU ARPL](https://wp.nyu.edu/arpl/)<br />
-Maintainer: Guanrui Li (lguanrui@nyu.edu), Xinyang Liu (thomas.xinyang.liu@nyu.edu)<br />**
+Maintainer: Guanrui Li (lguanrui@nyu.edu), Xinyang Liu (liuxy@nyu.edu)<br />**
 
 ## ROS Organization
 The ROS Organization is shown in the figure below. 
