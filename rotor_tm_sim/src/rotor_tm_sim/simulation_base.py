@@ -82,139 +82,6 @@ def cooperativeGuard(t, x, nquad, slack_condition, rho_vec_list, cable_length, i
     # direction = [ones(num_of_slack_cable,1); -ones(num_of_taut_cable,1)];   # Positive direction only 
     return value[id]
 
-'''def cooperativeGuard1(t, x):
-    # slackToTaut function event function for the integration
-    #
-    # INPUTS:
-    # t             - 1 x 1, time
-    # x             - (13 + 13*nquad) x 1,
-    #                 state vector = [xL, yL, zL, xLd, yLd, zLd, 
-    #                                 qLw, qLx, qLy, qLz, pL, qL, rL, 
-    #                                 [xQ, yQ, zQ, xQd, yQd, zQd]_i, i = 1,...,nquad
-    #                                 [qw, qx, qy, qz, pQ, qQ, rQ]_i, i = 1,...,nquad
-    # nquad         - number of quads
-    # cable_length  - The cable's length
-
-    # OUTPUTS:
-    # value         - (attach points - robot distance) - cable_length
-    # isterminal    - boolean flag representing stop the integration
-    # direction     - approaching direction of the value 
-
-    # find the idx of the cables that are slack
-    idx = np.arange(1, cooperativeGuard1.pl_params.nquad+1)
-    slack_cable_idx = idx[cooperativeGuard1.slack_condition == 1]
-    taut_cable_idx = idx[cooperativeGuard1.slack_condition == 0]
-
-    # The rotation matrix of the payload
-    RotL = np.transpose(utilslib.QuatToRot(x[6:10]))
-
-    # The attach points' positions correspond to the slack cables. 
-    attach_pts = x[0:3].reshape((3,1)) + RotL @ cooperativeGuard1.pl_params.rho_vec_list
-
-    # The quadrotor positions correspond to the slack cables. 
-    slack_quad_pos_idx = 13*slack_cable_idx + np.array([[0],[1],[2]])
-    taut_quad_pos_idx = 13*taut_cable_idx + np.array([[0],[1],[2]])
-
-    # Set up the condition to terminate the integration.
-    # Detect cable-robot distance = 0
-    left = np.linalg.norm(x[slack_quad_pos_idx] - attach_pts[:,slack_cable_idx - 1],2,0)-cooperativeGuard1.pl_params.cable_length[slack_cable_idx - 1]
-    right = np.linalg.norm(x[taut_quad_pos_idx] - attach_pts[:,taut_cable_idx - 1],2,0)-cooperativeGuard1.pl_params.cable_length[taut_cable_idx - 1] + 0.0001
-    value = np.transpose(np.hstack((left, right)))
-    # isterminal = ones(pl_params.nquad,1);   # Stop the integration
-    # direction = [ones(num_of_slack_cable,1); -ones(num_of_taut_cable,1)];   # Positive direction only 
-    return value[0]
-
-def cooperativeGuard2(t, x):
-    # slackToTaut function event function for the integration
-    #
-    # INPUTS:
-    # t             - 1 x 1, time
-    # x             - (13 + 13*nquad) x 1,
-    #                 state vector = [xL, yL, zL, xLd, yLd, zLd, 
-    #                                 qLw, qLx, qLy, qLz, pL, qL, rL, 
-    #                                 [xQ, yQ, zQ, xQd, yQd, zQd]_i, i = 1,...,nquad
-    #                                 [qw, qx, qy, qz, pQ, qQ, rQ]_i, i = 1,...,nquad
-    # nquad         - number of quads
-    # cable_length  - The cable's length
-
-    # OUTPUTS:
-    # value         - (attach points - robot distance) - cable_length
-    # isterminal    - boolean flag representing stop the integration
-    # direction     - approaching direction of the value 
-
-    # find the idx of the cables that are slack
-    idx = np.arange(1, cooperativeGuard2.pl_params.nquad+1)
-    slack_cable_idx = idx[cooperativeGuard2.slack_condition == 1]
-    taut_cable_idx = idx[cooperativeGuard2.slack_condition == 0]
-    num_of_slack_cable = np.max(slack_cable_idx.shape)
-    num_of_taut_cable = np.max(taut_cable_idx.shape)
-
-    # The rotation matrix of the payload
-    RotL = np.transpose(utilslib.QuatToRot(x[6:10]))
-
-    # The attach points' positions correspond to the slack cables. 
-    attach_pts = x[0:3].reshape((3,1)) + RotL @ cooperativeGuard2.pl_params.rho_vec_list
-
-    # The quadrotor positions correspond to the slack cables. 
-    slack_quad_pos_idx = 13*slack_cable_idx + np.array([[0],[1],[2]])
-    taut_quad_pos_idx = 13*taut_cable_idx + np.array([[0],[1],[2]])
-
-    # Set up the condition to terminate the integration.
-    # Detect cable-robot distance = 0
-    left = np.linalg.norm(x[slack_quad_pos_idx] - attach_pts[:,slack_cable_idx - 1],2,0)-cooperativeGuard2.pl_params.cable_length[slack_cable_idx - 1]
-    right = np.linalg.norm(x[taut_quad_pos_idx] - attach_pts[:,taut_cable_idx - 1],2,0)-cooperativeGuard2.pl_params.cable_length[taut_cable_idx - 1] + 0.0001
-    value = np.transpose(np.hstack((left, right)))
-    # isterminal = ones(pl_params.nquad,1);   # Stop the integration
-    # direction = [ones(num_of_slack_cable,1); -ones(num_of_taut_cable,1)];   # Positive direction only 
-    return value[1]
-
-def cooperativeGuard3(t, x):
-    # slackToTaut function event function for the integration
-    #
-    # INPUTS:
-    # t             - 1 x 1, time
-    # x             - (13 + 13*nquad) x 1,
-    #                 state vector = [xL, yL, zL, xLd, yLd, zLd, 
-    #                                 qLw, qLx, qLy, qLz, pL, qL, rL, 
-    #                                 [xQ, yQ, zQ, xQd, yQd, zQd]_i, i = 1,...,nquad
-    #                                 [qw, qx, qy, qz, pQ, qQ, rQ]_i, i = 1,...,nquad
-    # nquad         - number of quads
-    # cable_length  - The cable's length
-
-    # OUTPUTS:
-    # value         - (attach points - robot distance) - cable_length
-    # isterminal    - boolean flag representing stop the integration
-    # direction     - approaching direction of the value 
-
-    # find the idx of the cables that are slack
-    idx = np.arange(1, cooperativeGuard3.pl_params.nquad+1)
-    slack_cable_idx = idx[cooperativeGuard3.slack_condition == 1]
-    taut_cable_idx = idx[cooperativeGuard3.slack_condition == 0]
-    num_of_slack_cable = np.max(slack_cable_idx.shape)
-    num_of_taut_cable = np.max(taut_cable_idx.shape)
-
-    # The rotation matrix of the payload
-    RotL = np.transpose(utilslib.QuatToRot(x[6:10]))
-    RotL = RotL.T
-
-    # The attach points' positions correspond to the slack cables. 
-    attach_pts = x[0:3].reshape((3,1)) + RotL @ cooperativeGuard3.pl_params.rho_vec_list
-
-    # The quadrotor positions correspond to the slack cables. 
-    slack_quad_pos_idx = 13*slack_cable_idx + np.array([[0],[1],[2]])
-    taut_quad_pos_idx = 13*taut_cable_idx + np.array([[0],[1],[2]])
-
-    # Set up the condition to terminate the integration.
-    # Detect cable-robot distance = 0
-    left = np.linalg.norm(x[slack_quad_pos_idx] - attach_pts[:,slack_cable_idx - 1],2,0)-cooperativeGuard3.pl_params.cable_length[slack_cable_idx - 1]
-    right = np.linalg.norm(x[taut_quad_pos_idx] - attach_pts[:,taut_cable_idx - 1],2,0)-cooperativeGuard3.pl_params.cable_length[taut_cable_idx - 1] + 0.0001
-    value = np.transpose(np.hstack((left, right)))
-    # isterminal = ones(pl_params.nquad,1);   # Stop the integration
-    # direction = [ones(num_of_slack_cable,1); -ones(num_of_taut_cable,1)];   # Positive direction only 
-    # print("guard value line 173", value)
-    return value[2]
-
-'''
 class simulation_base():
   def __init__(self,pl_params,uav_params):
       rospy.init_node('simulation')
@@ -444,89 +311,11 @@ class simulation_base():
                     fcn.slack_condition = slack_condition
                     fcn.i = id
                     id = id + 1
-                    # def cooperativeGuard(t, x, nquad, slack_condition, rho_vec_list, cable_length, id):
-
-
-                '''#####################################################################################################################
-                cooperativeGuard1.terminal = True
-                if num_of_slack_cable == 0:
-                    cooperativeGuard1.direction = -1.0
-                elif num_of_taut_cable == 0:
-                    cooperativeGuard1.direction = 1.0
-                else:
-                    cooperativeGuard1.direction = np.vstack((np.ones((num_of_slack_cable,1)), -np.ones((num_of_taut_cable,1))))[0]
-                cooperativeGuard1.pl_params = self.pl_params
-                cooperativeGuard1.slack_condition = slack_condition
-                #####################################################################################################################
-                cooperativeGuard2.terminal = True
-                if num_of_slack_cable == 0:
-                    cooperativeGuard2.direction = -1.0
-                elif num_of_taut_cable == 0:
-                    cooperativeGuard2.direction = 1.0
-                else:
-                    cooperativeGuard2.direction = np.vstack((np.ones((num_of_slack_cable,1)), -np.ones((num_of_taut_cable,1))))[1]
-                cooperativeGuard2.pl_params = self.pl_params
-                cooperativeGuard2.slack_condition = slack_condition
-                #####################################################################################################################
-                cooperativeGuard3.terminal = True
-                if num_of_slack_cable == 0:
-                    cooperativeGuard3.direction = -1.0
-                elif num_of_taut_cable == 0:
-                    cooperativeGuard3.direction = 1.0
-                else:
-                    cooperativeGuard3.direction = np.vstack((np.ones((num_of_slack_cable,1)), -np.ones((num_of_taut_cable,1))))[2]
-                cooperativeGuard3.pl_params = self.pl_params
-                cooperativeGuard3.slack_condition = slack_condition'''
-
-                '''
-                if self.cable_is_slack:
-                    print("Cable is slack")
-                    sol = scipy.integrate.solve_ivp(self.hybrid_ptmass_pl_transportationEOM, t_span, x, method= 'RK45', t_eval=t_span, events=ptmassslackToTaut)
-                else:
-                    print("Cable is taut")
-                    sol = scipy.integrate.solve_ivp(self.hybrid_ptmass_pl_transportationEOM, t_span, x, method= 'RK45', t_eval=t_span, events=ptmasstautToSlack)'''
-
-                # sol = scipy.integrate.solve_ivp(self.hybrid_cooperative_rigidbody_pl_transportationEOM, t_span, x, method='RK23', t_eval=t_span, events=[cooperativeGuard1, cooperativeGuard2, cooperativeGuard3])
-                # sol = scipy.integrate.solve_ivp(self.hybrid_cooperative_rigidbody_pl_transportationEOM, t_span, x, method='RK23', t_eval=t_span)
                 sol = scipy.integrate.solve_ivp(self.hybrid_cooperative_rigidbody_pl_transportationEOM, t_span, x, method='RK23', t_eval=t_span, events=GuardEvents)
                 self.cable_is_slack = self.isslack_multi(x[0:3].reshape((3,1))+ np.transpose(utilslib.QuatToRot(x[6:10])) @ self.pl_params.rho_vec_list, x[13*np.arange(1, self.nquad+1)+np.array([[0],[1],[2]])],self.pl_params.cable_length)
                 # print("self.cable_is_slack line 427", self.cable_is_slack)
         end = time.time()
-        # print(sol.y)
         x = sol.y[:,-1]
-        # print(x)
-        # print(np.linalg.norm(x[0:3] - x[13:16]), (self.pl_params.cable_length - 1e-1))
-        
-
-        # The simulation must first run on the quadrotors
-        # Then the simulation simulates the dynamics of the payload
-        # If this is the first iteration in the simulation,
-        # initialize the plots of the quads
-        # The integration stops when the distance between robot and payload
-        # equals to the cable length
-        '''
-        inelastic_collision_flag = check_inelastic_collision_idx(x,pl_params)
- 
-        while np.any(inelastic_collision_flag):
- 
-            print('collide!\n' % ())
-            before_collide_inelastic_collision_flag = inelastic_collision_flag
-            x = rigidbody_quad_inelastic_cable_collision(x,pl_params,quad_params,inelastic_collision_flag)
-            print('after collide!\n' % ())
-            after_collide_inelastic_collision_flag = check_inelastic_collision_idx(x,pl_params)
-            if np.any((after_collide_inelastic_collision_flag - before_collide_inelastic_collision_flag) > 0):
-                inelastic_collision_flag = np.logical_or(after_collide_inelastic_collision_flag,before_collide_inelastic_collision_flag)
-            else:
-                inelastic_collision_flag = after_collide_inelastic_collision_flag
- 
-        # State Integration
-        slack_condition = cable_is_slack
-        option = odeset('Events',lambda t = None,x = None: cooperativeGuard(t,x,pl_params,slack_condition))
-        tsave,xsave = ode45(lambda t = None,s = None: dynamicshandle(t,s,pl_params),timeint,x,option)
-        x = np.transpose(xsave(end(),:))
-        # Check if the cable is slack
-        cable_is_slack = not istaut(x(np.arange(1,3+1)) + np.transpose(QuatToRot(x(np.arange(7,10+1)))) * pl_params.rho_vec_list,x(13 * np.array([np.arange(1,nquad+1)]) + np.array([[1],[2],[3]])),pl_params.cable_length) 
-        '''
         
         # Publish payload odometry
         current_time = rospy.get_rostime()
@@ -968,26 +757,13 @@ class simulation_base():
       robot_pos = x[13*np.arange(1, nquad + 1) + np.array([[0], [1], [2]])]
       robot_vel = x[13*np.arange(1, nquad + 1) + np.array([[3], [4], [5]])]
       xi = (attach_pos - robot_pos) / np.linalg.norm(attach_pos - robot_pos, 2, 0)
-      '''print("state: ", x)
-      print("nquad: ", nquad)
-      print("rho_vec_list", rho_vec_list)
-      print("pl_pos", pl_pos)
-      print("pl_vel: ", pl_vel)
-      print("pl_rot", pl_rot)
-      print("attach_pos", attach_pos)
-      print("attach_vel", attach_vel)
-      print("xi: ", xi)
-      print("robot_pos", robot_pos)
-      print("robot_vel", robot_vel)'''
       
       # check collision condition
       positive_attach_robot_vel = (np.sum(xi * (attach_vel - robot_vel), 0) > 1e-6)
-      # print("positive_attach_robot_vel", positive_attach_robot_vel)
       taut_condition = self.istaut(attach_pos, robot_pos, self.pl_params.cable_length)
       collision_condition = np.empty((taut_condition.shape))
       for i in range(taut_condition.shape[0]):
         collision_condition[i] = positive_attach_robot_vel[i] and taut_condition[i]
-      # print("collision_condition: ", collision_condition)
       return collision_condition
 
   def rigidbody_quad_inelastic_cable_collision(self, x, collision_idx):
@@ -1001,9 +777,6 @@ class simulation_base():
               ntaut_quad += 1
       IL = self.pl_params.I
       mL = self.pl_params.mass
-      # print("IL", IL)
-      # print("mL", mL)
-      # print("self.uav_params.mass", self.uav_params.mass)
       
       rho_vec_idx_bool = np.repeat(collision_idx, 3)
       rho_vec_idx_int = np.zeros(int(np.sum(rho_vec_idx_bool)), dtype=int)
@@ -1012,7 +785,6 @@ class simulation_base():
           if rho_vec_idx_bool[j] == 1:
               rho_vec_idx_int[index] = j
               index = index + 1
-      # print("self.pl_params.rho_vec_asym_mat", print_array(self.pl_params.rho_vec_asym_mat))
       temp_rho_vec_asym_mat = self.pl_params.rho_vec_asym_mat[:, rho_vec_idx_int]
       rho_vec_asym_mat = temp_rho_vec_asym_mat   
       
@@ -1025,10 +797,6 @@ class simulation_base():
       
       temp_rho_vec_list = self.pl_params.rho_vec_list[:, utilslib.toint(collision_idx_int)]
       rho_vec_list = temp_rho_vec_list
-      '''print("utilslib.toint(collision_idx)", utilslib.toint(collision_idx))
-      print("rho_vec_list", rho_vec_list)
-      print("rho_vec_asym_mat", rho_vec_asym_mat)
-      print("rho_vec_idx_int", rho_vec_idx_int)'''
 
       pl_rot = np.transpose(utilslib.QuatToRot(xL[6:10]))
       pl_omg = xL[10:13].reshape(3, 1)
@@ -1038,24 +806,15 @@ class simulation_base():
       robot_state = np.zeros((13, nquad))
       for i in range(nquad):
         robot_state[:, i] = xQs[13*i:13*(i+1), 0]
-      # robot_state = xQs.reshape(13,nquad)
       robot_pos = robot_state[0:3, utilslib.toint(collision_idx_int)]
       robot_vel = robot_state[3:6, utilslib.toint(collision_idx_int)]
       
       # state computation
-      '''print("attach_pos", attach_pos)
-      print("robot_pos", robot_pos)
-      print("np.linalg.norm(attach_pos - robot_pos, 2, 0)", np.linalg.norm(attach_pos - robot_pos, 2, 0))'''
-
       xi = (attach_pos - robot_pos) / np.linalg.norm(attach_pos - robot_pos, 2, 0)
       robot_vel_xi_proj = np.sum(xi * robot_vel, 0)
       xixiT_robot_vel = xi * robot_vel_xi_proj
       xi_vert_robot_vel = robot_vel - xixiT_robot_vel
-      '''print("pl_rot", pl_rot)
-      print("rho_vec_asym_mat", rho_vec_asym_mat)
-      print("xi", xi)'''
       hatrho_rotL_xi = -np.transpose(pl_rot @ rho_vec_asym_mat) @ xi
-      # print(hatrho_rotL_xi)
       hatrho_index = (3 * ntaut_quad + 3) * np.arange(ntaut_quad) + np.array([[0],[1],[2]])
       hatrho_index = hatrho_index % hatrho_rotL_xi.shape[0]
 
@@ -1064,39 +823,21 @@ class simulation_base():
           temp_hatrho_rotL_xi[:, i] = hatrho_rotL_xi[hatrho_index[:, i], i]
 
       hatrho_rotL_xi = temp_hatrho_rotL_xi
-      '''
-      if np.min(hatrho_index.shape) != 0:
-      else:
-        hatrho_rotL_xi = np.empty((hatrho_rotL_xi.shape[0],0))
-      # print("hatrho_rotL_xi", hatrho_rotL_xi)'''
 
       # cal for collision
-      '''print("xi", xi)
-      print("hatrho_rotL_xi", hatrho_rotL_xi)'''
       G1 = np.vstack((xi, -hatrho_rotL_xi))
       G2 = np.transpose(np.vstack((xi, hatrho_rotL_xi)))
       ML_top = np.hstack((mL * np.eye(3), np.zeros((3, 3))))
       ML_bottom = np.hstack((np.zeros((3, 3)), IL))
       ML = np.vstack((ML_top, ML_bottom))
       MQ = self.uav_params.mass * np.eye(ntaut_quad)
-      '''print("ML", ML)
-      print("G1", G1)
-      print("MQ", MQ)
-      print("G2", G2)'''
       M = ML + G1 @ MQ @ G2
-      '''print("mL", mL)
-      print("pl_vel", pl_vel)
-      print("MQ", MQ)
-      print("robot_vel_xi_proj", robot_vel_xi_proj)
-      print("xi @ MQ @ robot_vel_xi_proj.T", xi @ MQ @ robot_vel_xi_proj.T)'''
       right_element = xi @ MQ @ robot_vel_xi_proj.T
       right_element = right_element.reshape((right_element.shape[0],1))
       left_element = -hatrho_rotL_xi @ MQ @ robot_vel_xi_proj.T
       left_element = left_element.reshape((left_element.shape[0], 1))
       
       b = np.vstack((mL*pl_vel+right_element, left_element + IL @ pl_omg))
-      '''print("M", M)
-      print("b", b)'''
       collided_pl_vel_omg,_,_,_ = np.linalg.lstsq(M,b)
       collided_pl_vel = collided_pl_vel_omg[0:3]
       collided_pl_omg = collided_pl_vel_omg[3:6]
@@ -1191,29 +932,11 @@ class simulation_base():
                             [p,  0, -r,  q],
                             [q,  r,  0, -p],
                             [r, -q,  p,  0]]) @ qd_quat.reshape((qd_quat.shape[0], 1)) + K_quat * quaterror * qd_quat.reshape((qd_quat.shape[0], 1))
-      '''qdot = -1/2*np.array([[0, -p, -q, -r],
-                            [p,  0, -r,  q],
-                            [q,  r,  0, -p],
-                            [r, -q,  p,  0]]) @ qd_quat + K_quat * quaterror * qd_quat'''
 
       # Solving for Quadrotor Angular Acceleration
       pqrdot   = self.uav_params.invI @ (M - np.reshape(np.cross(qd_omega, self.uav_params.I @ qd_omega, axisa=0, axisb=0), (3,1)))
       
       # Assemble sdot
-      '''print()
-      print(plqd["vel"].reshape(3, 1))
-      print(plqd["vel"].reshape(3, 1).shape)
-      print(g)
-      print(g.shape)
-      print(plqd["qd_vel"].reshape(3, 1))
-      print(plqd["qd_vel"].reshape(3, 1).shape)
-      print(accQ)
-      print(accQ.shape)
-      print(qdot)
-      print(qdot.shape)
-      print(pqrdot)
-      print(pqrdot.shape)
-      print()'''
       sdot = np.zeros((26,1), dtype=float)
       sdot[0:3] = plqd["vel"].reshape(3, 1)
       sdot[3:6] = -g
@@ -1222,26 +945,6 @@ class simulation_base():
       sdot[19:23] = qdot
       sdot[23:26] = pqrdot
       sdot = sdot[:,0]
-      '''
-      Moved from taut ptmass
-      sdot = np.zeros((26,1), dtype=float)
-      sdot[0:3] = plqd["vel"].reshape(3, 1)
-      sdot[3:6] = accL
-      sdot[13:16] = plqd["qd_vel"].reshape(3, 1)
-      sdot[16:19] = accQ
-      sdot[19:23] = qdot
-      sdot[23:26] = pqrdot
-      sdot = sdot[:,0]'''
-      '''
-      Previously working
-      sdot = np.zeros((26,1), dtype=float)
-      sdot[0:3, 0] = plqd["vel"]
-      sdot[3:6] = -g
-      sdot[13:16, 0] = plqd["qd_vel"]
-      sdot[16:19, 0:1] = accQ
-      sdot[19:23, 0] = qdot
-      sdot[23:26] = pqrdot
-      sdot = sdot[:,0]'''
       return sdot
 
   def taut_ptmass_payload_quadEOM_readonly(self, t, plqd, F, M):
@@ -1279,20 +982,6 @@ class simulation_base():
 
       # Solving for Quadrotor Angular Acceleration
       pqrdot   = self.uav_params.invI @ (M - np.cross(qd_omega, self.uav_params.I @ qd_omega, axisa=0, axisb=0).T.reshape(3, 1))
-      '''   debug print()
-      print(plqd["vel"].reshape(3, 1))
-      print(plqd["vel"].reshape(3, 1).shape)
-      print(accL)
-      print(accL.shape)
-      print(plqd["qd_vel"].reshape(3, 1))
-      print(plqd["qd_vel"].reshape(3, 1).shape)
-      print(accQ)
-      print(accQ.shape)
-      print(qdot)
-      print(qdot.shape)
-      print(pqrdot)
-      print(pqrdot.shape)
-      print()'''
       # Assemble sdot
       sdot = np.zeros((26,1), dtype=float)
       sdot[0:3] = plqd["vel"].reshape(3, 1)
