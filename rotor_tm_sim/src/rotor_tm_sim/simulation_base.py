@@ -40,7 +40,49 @@ def ptmasstautToSlack(t, x):
     value = np.linalg.norm(x[0:3] - x[13:16]) - ptmasstautToSlack.cable_length + 0.000001
     return value
 
-def cooperativeGuard1(t, x):
+def cooperativeGuard(t, x, nquad, slack_condition, rho_vec_list, cable_length, id):
+    # slackToTaut function event function for the integration
+    #
+    # INPUTS:
+    # t             - 1 x 1, time
+    # x             - (13 + 13*nquad) x 1,
+    #                 state vector = [xL, yL, zL, xLd, yLd, zLd, 
+    #                                 qLw, qLx, qLy, qLz, pL, qL, rL, 
+    #                                 [xQ, yQ, zQ, xQd, yQd, zQd]_i, i = 1,...,nquad
+    #                                 [qw, qx, qy, qz, pQ, qQ, rQ]_i, i = 1,...,nquad
+    # nquad         - number of quads
+    # cable_length  - The cable's length
+
+    # OUTPUTS:
+    # value         - (attach points - robot distance) - cable_length
+    # isterminal    - boolean flag representing stop the integration
+    # direction     - approaching direction of the value 
+
+    # find the idx of the cables that are slack
+    idx = np.arange(1, nquad+1)
+    slack_cable_idx = idx[slack_condition == 1]
+    taut_cable_idx = idx[slack_condition == 0]
+
+    # The rotation matrix of the payload
+    RotL = np.transpose(utilslib.QuatToRot(x[6:10]))
+
+    # The attach points' positions correspond to the slack cables. 
+    attach_pts = x[0:3].reshape((3,1)) + RotL @ rho_vec_list
+
+    # The quadrotor positions correspond to the slack cables. 
+    slack_quad_pos_idx = 13*slack_cable_idx + np.array([[0],[1],[2]])
+    taut_quad_pos_idx = 13*taut_cable_idx + np.array([[0],[1],[2]])
+
+    # Set up the condition to terminate the integration.
+    # Detect cable-robot distance = 0
+    left = np.linalg.norm(x[slack_quad_pos_idx] - attach_pts[:,slack_cable_idx - 1],2,0)-cable_length[slack_cable_idx - 1]
+    right = np.linalg.norm(x[taut_quad_pos_idx] - attach_pts[:,taut_cable_idx - 1],2,0)-cable_length[taut_cable_idx - 1] + 0.0001
+    value = np.transpose(np.hstack((left, right)))
+    # isterminal = ones(pl_params.nquad,1);   # Stop the integration
+    # direction = [ones(num_of_slack_cable,1); -ones(num_of_taut_cable,1)];   # Positive direction only 
+    return value[id]
+
+'''def cooperativeGuard1(t, x):
     # slackToTaut function event function for the integration
     #
     # INPUTS:
@@ -172,7 +214,7 @@ def cooperativeGuard3(t, x):
     # print("guard value line 173", value)
     return value[2]
 
-
+'''
 class simulation_base():
   def __init__(self,pl_params,uav_params):
       rospy.init_node('simulation')
@@ -384,7 +426,28 @@ class simulation_base():
                 taut_cable_idx = idx[slack_condition == 0]
                 num_of_slack_cable = np.max(slack_cable_idx.shape)
                 num_of_taut_cable = np.max(taut_cable_idx.shape)
-                #####################################################################################################################
+
+                GuardEvents = []
+                for i in range(self.nquad):
+                    GuardEvents.append(lambda t, x: cooperativeGuard(t, x, GuardEvents[i].pl_params.nquad, GuardEvents[i].slack_condition, GuardEvents[i].pl_params.rho_vec_list, GuardEvents[i].pl_params.cable_length, GuardEvents[i].i))
+                
+                id = 0
+                for fcn in GuardEvents:
+                    fcn.terminal = True
+                    if num_of_slack_cable == 0:
+                        fcn.direction = -1.0
+                    elif num_of_taut_cable == 0:
+                        fcn.direction = 1.0
+                    else:
+                        fcn.direction = np.vstack((np.ones((num_of_slack_cable,1)), -np.ones((num_of_taut_cable,1))))[id]
+                    fcn.pl_params = self.pl_params
+                    fcn.slack_condition = slack_condition
+                    fcn.i = id
+                    id = id + 1
+                    # def cooperativeGuard(t, x, nquad, slack_condition, rho_vec_list, cable_length, id):
+
+
+                '''#####################################################################################################################
                 cooperativeGuard1.terminal = True
                 if num_of_slack_cable == 0:
                     cooperativeGuard1.direction = -1.0
@@ -413,7 +476,7 @@ class simulation_base():
                 else:
                     cooperativeGuard3.direction = np.vstack((np.ones((num_of_slack_cable,1)), -np.ones((num_of_taut_cable,1))))[2]
                 cooperativeGuard3.pl_params = self.pl_params
-                cooperativeGuard3.slack_condition = slack_condition
+                cooperativeGuard3.slack_condition = slack_condition'''
 
                 '''
                 if self.cable_is_slack:
@@ -423,8 +486,9 @@ class simulation_base():
                     print("Cable is taut")
                     sol = scipy.integrate.solve_ivp(self.hybrid_ptmass_pl_transportationEOM, t_span, x, method= 'RK45', t_eval=t_span, events=ptmasstautToSlack)'''
 
-                sol = scipy.integrate.solve_ivp(self.hybrid_cooperative_rigidbody_pl_transportationEOM, t_span, x, method='RK23', t_eval=t_span, events=[cooperativeGuard1, cooperativeGuard2, cooperativeGuard3])
+                # sol = scipy.integrate.solve_ivp(self.hybrid_cooperative_rigidbody_pl_transportationEOM, t_span, x, method='RK23', t_eval=t_span, events=[cooperativeGuard1, cooperativeGuard2, cooperativeGuard3])
                 # sol = scipy.integrate.solve_ivp(self.hybrid_cooperative_rigidbody_pl_transportationEOM, t_span, x, method='RK23', t_eval=t_span)
+                sol = scipy.integrate.solve_ivp(self.hybrid_cooperative_rigidbody_pl_transportationEOM, t_span, x, method='RK23', t_eval=t_span, events=GuardEvents)
                 self.cable_is_slack = self.isslack_multi(x[0:3].reshape((3,1))+ np.transpose(utilslib.QuatToRot(x[6:10])) @ self.pl_params.rho_vec_list, x[13*np.arange(1, self.nquad+1)+np.array([[0],[1],[2]])],self.pl_params.cable_length)
                 # print("self.cable_is_slack line 427", self.cable_is_slack)
         end = time.time()
