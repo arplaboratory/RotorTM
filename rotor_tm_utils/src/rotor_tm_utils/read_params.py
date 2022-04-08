@@ -82,7 +82,7 @@ class read_params:
     quad_params.Kde = uav_control_gains.Kde
     quad_params.Kxi = uav_control_gains.Kxi
     quad_params.Kw = uav_control_gains.Kw
-    rho_vec_asym_mat = np.hstack([utilslib.vec2asym(mechanism_params.rho_vec_list[:,k]) for k in range(0,params.nquad)])
+    params.rho_vec_asym_mat = np.hstack([utilslib.vec2asym(mechanism_params.rho_vec_list[:,k]) for k in range(0,params.nquad)])
     identity_stack_mat = np.hstack([np.eye(3) for k in range(0,params.nquad)])
 
     ## Set up parameters
@@ -94,7 +94,7 @@ class read_params:
         params.cable_length = mechanism_params.cable_length
         if params.payload_type == 'Rigid Body':
           # Geometric parameters matrix for cooperative geometric controller
-          P = np.vstack((identity_stack_mat,rho_vec_asym_mat))
+          P = np.vstack((identity_stack_mat,params.rho_vec_asym_mat))
           params.pseudo_inv_P = np.matmul(P.T, LA.inv(np.matmul(P, P.T)))
           params.P = P
     else:

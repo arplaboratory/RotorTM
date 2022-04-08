@@ -1,3 +1,4 @@
+from types import DynamicClassAttribute
 import numpy as np
 import numpy.linalg as LA
 
@@ -69,14 +70,9 @@ def quat_dot(quat,omg):
 
   return qLdot
 
-def vecnorm(A, p=2, dim=0):
-  # take 2-norm along 0 dimension of A
-  if p==2:
-    if dim==0:
-      result = np.empty((1, A.shape[0]), dtype=float)
-      for i in range(A.shape[1]):
-        result[0, i] = np.linalg.norm(A[:, i])
-    elif dim==1:
-      result = np.empty((A.shape[0], 1), dtype=float)
-      for i in range(A.shape[0]):
-        result[i, 0] = np.linalg.norm(A[i, :])
+def toint(A):
+  B = np.zeros(A.shape, dtype=int)
+  # take an array, converts all elements to integer
+  for i in range(np.max(A.shape)):
+    B[i] = int(A[i])
+  return B
