@@ -31,13 +31,20 @@ hatrho_rotL_xi = hatrho_rotL_xi((3*ntaut_quad+3)*[0:ntaut_quad-1]+[1:3]');
 
 
 %% Calculation For Collision
-G1 = [xi;-hatrho_rotL_xi];
-G2 = [xi;hatrho_rotL_xi]';
+% G1 = [xi;-hatrho_rotL_xi];
+% G2 = [xi;hatrho_rotL_xi]';
+% ML = [mL*eye(3),zeros(3,3);zeros(3,3),IL];
+% MQ = quad_params.mass*eye(ntaut_quad);
+% M = ML + G1*MQ*G2;
+% b = [mL*pl_vel+xi*MQ*robot_vel_xi_proj';
+%      - hatrho_rotL_xi * MQ * robot_vel_xi_proj' + IL * pl_omg];
+
+G1 = [xi;hatrho_rotL_xi];
 ML = [mL*eye(3),zeros(3,3);zeros(3,3),IL];
 MQ = quad_params.mass*eye(ntaut_quad);
-M = ML + G1*MQ*G2;
+M = ML + G1*MQ*G1';
 b = [mL*pl_vel+xi*MQ*robot_vel_xi_proj';
-     - hatrho_rotL_xi * MQ * robot_vel_xi_proj' + IL * pl_omg];
+     hatrho_rotL_xi * MQ * robot_vel_xi_proj' + IL * pl_omg];
 
 collided_pl_vel_omg = M\b;
 collided_pl_vel = collided_pl_vel_omg(1:3);
