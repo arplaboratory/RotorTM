@@ -25,32 +25,19 @@ persistent timesegment
 
 if nargin ~= 2
       finalpath = path{1};
-%     mapquad = map;
-%     pathall = path;
-%     pathqn = pathall{1};
-%     ttotal = 10;
-%     
-%     xy_res = map.resolution(1);
-%     basicdata  = map.basicdata;
-%     [rowbasicdata ~] = size(basicdata);
-%     if rowbasicdata >= 2
-%         block = basicdata(2:rowbasicdata,:);
-%     else
-%         block = [];
-%     end
-%     
-%     finalpath = simplify_path(pathqn,block,mapquad);
-%     
+
     %----------------------------------------------------------------------    
     %If use quintic function, then the order of the system should be three.
     %This means the number of the freedom of the system is 6m where m is the
     %number of the segments of the path. m is equal to the "pathlength" - 1.
     [pathlength ~] = size(finalpath);
     m = pathlength - 1;
+
     %The matrice that describes all the constraints of the system is named as
     %constraints in this file
     constraints = zeros (6*m,6*m);
     conditions = zeros (6*m ,3);
+
     % x    = a0 + a1*t + a2*t^2 + a3*t^3   + a4*t^4     + a5*t^5   ; position
     % x'   = 0  + a1   + 2*a2*t + 3*a3*t^2 + 4*a4*t^3   + 5*a5*t^4 ; velocity
     % x''  = 0  + 0    + 2*a2   + 6*a3*t   + 12*a4*t^2  + 20*a5*t^3; acceleration
