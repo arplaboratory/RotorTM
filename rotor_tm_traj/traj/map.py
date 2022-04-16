@@ -25,7 +25,9 @@ class map:
 			self.block = np.array([[]])
 			self.resolution = np.array([[1, 1, 1]])
 			self.basicdata = np.array([[-10, -10, 0, 10, 10]])
-		elif MapNumber == 1:
+		
+		# add more map as necessary
+		'''elif MapNumber == 1:
 			self.blockflag = np.zeros((4001, 1))
 			self.nodenumber = self.blockflag
 			for i in range(4000):
@@ -35,10 +37,5 @@ class map:
 			self.boundary = np.array([-10, -10, 0, 10, 10])
 			self.block = np.array([])
 			self.resolution = np.array([1, 1, 1])
-			self.basicdata = np.array([-10, -10, 0, 10, 10])
-
-	def load_map_from_file(filename, xy_res, z_res, margin):
-		fid = open(filename)
-		data = np.loadtext(fid, dtype={'names':('col1', 'col2', 'col3', 'col4', 'col5', 'col6', 'col7', 'col8', 'col9', 'col10'), 'formats': ('S4', 'float', 'float', 'float', 'float', 'float', 'float', 'float', 'float', 'float')})
-		rowdata = data[0,0].shape[0]
+			self.basicdata = np.array([-10, -10, 0, 10, 10])'''
 

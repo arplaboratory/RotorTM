@@ -63,14 +63,6 @@ class traj:
 			self.circle_dist = self.omega_des*self.duration
 			self.tf = self.ramp_t * 2 + self.duration
 
-			#final_theta = 2 * self.ramp_dist[0] + self.circle_dist
-			#x_pos = self.Radius * np.cos(final_theta)
-			#y_pos = self.Radius * np.sin(final_theta)
-			#print("The x_pos is", x_pos)
-			#print("The y_pos is", y_pos)
-			#stop_pos_temp = np.append(x_pos, y_pos, axis=0)
-			#stop_pos_temp = np.append(stop_pos_temp, self.start[2], axis=0)
-			#stop = np.add(self.offset_pos, stop_pos_temp)
 		else:
 			if t < self.tf:
 				if t<=self.ramp_t:  # ramping up the circle
@@ -132,18 +124,17 @@ class traj:
 			print("Generating quintic trajectory")
 			self.mapquad = map
 			self.pathall = path
-			pathqn = self.pathall # #### may need modification
+			pathqn = self.pathall
 			ttotal = 10
 
 			xy_res = map.resolution[0]
 			basicdata = map.basicdata
 			rowbasicdata = basicdata.shape[0]
-			if rowbasicdata >= 2: # might need to be changed to 1
+			if rowbasicdata >= 2: 
 				block = basicdata[1:rowbasicdata,:]
 			else:
 				block = np.array([])
 
-			# finalpath = simplify_path(pathqn,block,mapquad)
 			# use pathqn as the final path
 			self.finalpath = pathqn
 
@@ -160,7 +151,7 @@ class traj:
 				distance[i-1, :] = np.linalg.norm(afterward-previous)
 				if distance[i-1,:]<=1:
 					self.timesegment[i-1, 0] = distance[i-1,:]
-					self.timesegment[i-1, 1] = 0 # change back to 1 when done
+					self.timesegment[i-1, 1] = 0
 				else:
 					self.timesegment[i-1, :] = np.sqrt(distance[i-1,:])*2
 					self.timesegment[i-1, 1] = 0

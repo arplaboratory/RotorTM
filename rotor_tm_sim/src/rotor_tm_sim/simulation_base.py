@@ -14,49 +14,36 @@ from rotor_tm_utils.vee import vee
 from rotor_tm_utils import utilslib
 import time
 
-def print_array(nparray):
-    str = "["
-    for i in range(nparray.shape[0]):
-        str += "["
-        for j in range(nparray.shape[1]):
-            if nparray[i, j] == 0:
-                str += "0"
-            else:
-                str += np.format_float_positional(np.around(nparray[i, j], 5))
-            if j + 1 != nparray.shape[1]:
-                str += ","
-        str += "]"
-        if i + 1 != nparray.shape[0]:
-                str += ","
-    str += "]"
-    return str
-
 def ptmassslackToTaut(t, x):
+    # event function for ptmass dynammics to switch from slack to taut, takes in t (time) and state (x)
     value = np.linalg.norm(x[0:3] - x[13:16]) - ptmassslackToTaut.cable_length
-    # print("I'm in evnet ", value)
     return value
 
 def ptmasstautToSlack(t, x):
+    # event function for ptmass dynamics to switch from taut to slack, takes in t (time) and state (x)
     value = np.linalg.norm(x[0:3] - x[13:16]) - ptmasstautToSlack.cable_length + 0.000001
     return value
 
 def cooperativeGuard(t, x, nquad, slack_condition, rho_vec_list, cable_length, id):
-    # slackToTaut function event function for the integration
+    # Event function event function for cooperative dynamics
+    # Each MAV in the simulation will have its own event function
+    # This function will be called under a lambda handle
     #
     # INPUTS:
-    # t             - 1 x 1, time
-    # x             - (13 + 13*nquad) x 1,
-    #                 state vector = [xL, yL, zL, xLd, yLd, zLd, 
+    # t                 - 1 x 1, time
+    # x                 - (13 + 13*nquad) x 1,
+    #                   state vector = [xL, yL, zL, xLd, yLd, zLd, 
     #                                 qLw, qLx, qLy, qLz, pL, qL, rL, 
     #                                 [xQ, yQ, zQ, xQd, yQd, zQd]_i, i = 1,...,nquad
     #                                 [qw, qx, qy, qz, pQ, qQ, rQ]_i, i = 1,...,nquad
-    # nquad         - number of quads
-    # cable_length  - The cable's length
+    # nquad             - number of quads
+    # slack_condition   - a size nquad array, denoting cable condition for each MAV
+    # rho_vec_list      - a nquad by nquad matrix, denoting mounting position for each MAV
+    # cable_length      - The cable's length
+    # id                - a scalar, denoting the current MAV number
 
     # OUTPUTS:
     # value         - (attach points - robot distance) - cable_length
-    # isterminal    - boolean flag representing stop the integration
-    # direction     - approaching direction of the value 
 
     # find the idx of the cables that are slack
     idx = np.arange(1, nquad+1)
@@ -65,7 +52,6 @@ def cooperativeGuard(t, x, nquad, slack_condition, rho_vec_list, cable_length, i
 
     # The rotation matrix of the payload
     RotL = utilslib.QuatToRot(x[6:10])
-    # RotL = RotL.T
 
     # The attach points' positions correspond to the slack cables. 
     attach_pts = x[0:3].reshape((3,1)) + RotL @ rho_vec_list
@@ -79,20 +65,17 @@ def cooperativeGuard(t, x, nquad, slack_condition, rho_vec_list, cable_length, i
     left = np.linalg.norm(x[slack_quad_pos_idx] - attach_pts[:,slack_cable_idx - 1],2,0)-cable_length[slack_cable_idx - 1]
     right = np.linalg.norm(x[taut_quad_pos_idx] - attach_pts[:,taut_cable_idx - 1],2,0)-cable_length[taut_cable_idx - 1] + 0.0001
     value = np.transpose(np.hstack((left, right)))
-    # isterminal = ones(pl_params.nquad,1);   # Stop the integration
-    # direction = [ones(num_of_slack_cable,1); -ones(num_of_taut_cable,1)];   # Positive direction only 
-    # print(value[id])
     return value[id]
 
 class simulation_base():
   def __init__(self,pl_params,uav_params):
       rospy.init_node('simulation')
       self.rate = 100
-      rate = rospy.Rate(self.rate) # 100hz
+      rate = rospy.Rate(self.rate)
       t_span = (0,1/self.rate)
       self.worldframe = "simulator"
 
-      # init parameters
+      ################################## init parameters ################################
       self.pl_params = pl_params
       self.uav_params = uav_params
       self.nquad = self.pl_params.nquad
@@ -102,37 +85,37 @@ class simulation_base():
       self.sim_start = False
       self.last_odom_time_received = 0.0
 
+      # Three scenario:
+      #                 1. Cooperative
+      #                 2. Point mass
+      #                 3. Rigid link
+      # init parameters is done separately for each scenario below
+      # with if-else branch structure
+
       if self.nquad != 1:
+        # First Scenario: Cooperative  
         if self.pl_params.id == "Cable":
+            print("Initalizing Cooperative Scenario")
             self.uav_F = np.matmul(self.pl_params.pseudo_inv_P, np.array([0,0,self.pl_params.mass * self.pl_params.grav,0,0,0])) + np.kron([1]*self.nquad, [0,0,self.uav_params.mass * self.pl_params.grav]) 
-            # self.uav_F = self.uav_F.reshape(3,self.nquad)[:,2]
             self.uav_F = self.uav_F.reshape(self.nquad, 3)[:,2]
             self.uav_M = np.zeros((3,self.nquad))
-            # self.cable_is_slack = np.zeros(self.nquad)
-
             self.rho_vec_list = self.pl_params.rho_vec_list
             self.cable_len_list = np.array(self.pl_params.cable_length)
-
             x = np.zeros(self.pl_dim_num + self.uav_dim_num * self.nquad)
             for i in range(self.nquad+1): 
                 if i > 0:
                     print("initalizing robot ", i)
                     x[i*13:i*13+3] = x[0:3] + self.rho_vec_list[:,i-1] + np.array([0,0,self.cable_len_list[i-1]])
                 x[i*13 + 6] = 1
-            x[2] = 0.5
-            # x[0] = 0.1   
-            # self.cable_is_slack = self.isslack_multi(x[0:3].reshape((3,1))+ np.transpose(utilslib.QuatToRot(x[6:10])) @ self.pl_params.rho_vec_list, x[13*np.arange(1, self.nquad+1)+np.array([[0],[1],[2]])],self.pl_params.cable_length)
             self.cable_is_slack = self.isslack_multi(x[0:3].reshape((3,1))+ utilslib.QuatToRot(x[6:10]) @ self.pl_params.rho_vec_list, x[13*np.arange(1, self.nquad+1)+np.array([[0],[1],[2]])],self.pl_params.cable_length)
+        
+        # Third Scenario: Rigid link
         else: 
-            ## init for rigidlink
-            ## init force to [sum of (quad and payload mass)] * gravity
-            ## init M to [0; 0; 0]
-            ## init calbe to taut
-            print("Initalizing payload-robot rigidlink structure")
-            # weight = self.pl_params.struct_mass * self.uav_params.grav
-            self.cable_is_slack = np.zeros(self.nquad)
+            print("Initalizing Rigidlink Scenario")
+            self.cable_is_slack = np.zeros(self.nquad) # Dummy assignment (no cable for rigid link)
             # TODO how to deal with rho_vec_list (currently hardcode from rigid_links_mechanism.yaml
             self.cable_len_list = np.zeros((self.nquad, 1), dtype=float)
+
             # x = (26, 1) state init
             # s                 - 13 x 1, state vector = [xL, yL, zL, xLd, yLd, zLd, qw, qx, qy, qz, pL, qL, rL]
             # take_in/output    - 26 x 1, state vector(dot-elementwise) = [ xL,     yL,     zL,     
@@ -147,6 +130,7 @@ class simulation_base():
                           1.0,  0.0,    0.0,    0.0,    # qd quat   23
                           0.0,  0.0,    0.0])           # qd omega  26
             qd_init = {}
+
             # init uav_F and uav_M
             qd_init["pos"] = x[0:3]
             qd_init["vel"] = x[3:6]
@@ -167,29 +151,28 @@ class simulation_base():
             u = self.pl_params.A @ robot_trust_moment
             self.uav_F  = u[0] * qd_init["rot"][:,2].reshape((3,1))
             self.uav_M = u[1:4]
-
+      
+      # Second Scenario: Point Mass
       else:
-        ## init for ptmass
+        print("Initalizing Ptmass Scenario")
         ## init force to [sum of (quad and payload mass)] * gravity
-        ## init M to [0; 0; 0]
-        ## init calbe to taut
-        ## init rho_vec_list = [] (empty)
-        ## init cable_len_list = cable_length (read)
-        ## init state x as a (26, 1) state vector with inital position hard code to (0, 0, 0.5)
-        print("Initalizing ptmass robot")
         self.uav_F = np.array([(self.pl_params.mass + self.uav_params.mass) * self.uav_params.grav])
+        ## init M to [0; 0; 0]
         self.uav_M = np.zeros((3,self.nquad), dtype=float)
+        ## init calbe to taut
         self.cable_is_slack = np.zeros(self.nquad)
+        ## init rho_vec_list = [] (empty)
         self.rho_vec_list = self.pl_params.rho_vec_list
+        ## init cable_len_list = cable_length (read)
         self.cable_len_list = np.array(self.pl_params.cable_length)
-        
+        ## init state x as a (26, 1) state vector with inital position hard code to (0, 0, 0.5)
         # x = (26, 1) state init
                                                     # Name      Element Location
-        x = np.array([0.0,  0.0,    0.3,            # pl pos    3
+        x = np.array([0.0,  0.0,    0.0,            # pl pos    3
                       0.0,  0.0,    0.0,            # pl vel    6
                       1.0,  0.0,    0.0,    0.0,    # pl quat   10
                       0.0,  0.0,    0.0,            # pl omega  13
-                      0.0,  0.0,    0.0,            # qd pos    16
+                      0.0,  0.0,    0.5,            # qd pos    16
                       0.0,  0.0,    0.0,            # qd vel    19 
                       1.0,  0.0,    0.0,    0.0,    # qd quat   23
                       0.0,  0.0,    0.0])           # qd omega  26
@@ -227,33 +210,42 @@ class simulation_base():
         self.payload_marker_msg = rosutilslib.init_marker_msg(Marker(),2,0,self.worldframe,self.payload_marker_scale,self.payload_marker_color,self.payload_mesh)
       else:
         self.payload_marker_msg = rosutilslib.init_marker_msg(Marker(),10,0,self.worldframe,self.payload_marker_scale,self.payload_marker_color,self.payload_mesh)
-
-      break_trigger = -1
+    
+    ################################## Simulation Loop ################################
 
       while not rospy.is_shutdown():
-        # Without event
-        # tsave, xsave = scipy.integrate.solve_ivp(rotortm_simulation_base.run(), t_span, x, method='RK45', event = simulation_base.guard())
-        # With event
+
         start = time.time()
+
+        # Three scenario:
+        #                 1. Cooperative
+        #                 2. Point mass
+        #                 3. Rigid link
+        # dynamics solver is built separately for each scenario below
+        # with if-else branch structure
+
+        # Thrid Scenario: Rigid Link 
         if self.pl_params.id == "Rigid Link":
-            ## this is rigid link sim
             sol = scipy.integrate.solve_ivp(self.rigid_links_cooperative_rigidbody_pl_EOM, t_span, x, method= 'RK45', t_eval=t_span)
             x = sol.y[:,-1]
         else:
+        
+        # Second Scenario: Point Mass
             if self.nquad == 1:
-                ## this is point mass sim
-                ## inelastic collision
+                
+                ## first check for inelastic collision
                 pl_pos = x[0:3]
                 pl_vel = x[3:6]
                 robot_pos = x[13:16]
                 robot_vel = x[16:19]
                 cable_norm_vel = np.transpose(pl_pos - robot_pos) @ (pl_vel - robot_vel)
+                ## if collision, compute new velocities and assign to state
                 if cable_norm_vel > 1e-6 and not self.cable_is_slack:
                     v1, v2 = self.ptmass_inelastic_cable_collision(x[0:6], x[13:19], self.pl_params.mass, self.uav_params.mass)
                     x[3:6] = v1
                     x[16:19] = v2
                 
-                ## set up event
+                ## set up event for ivp solver
                 ptmasstautToSlack.terminal = True
                 ptmassslackToTaut.terminal = True
                 ptmasstautToSlack.direction = -1
@@ -261,6 +253,7 @@ class simulation_base():
                 ptmassslackToTaut.cable_length = self.pl_params.cable_length
                 ptmasstautToSlack.cable_length = self.pl_params.cable_length
 
+                ## state integration
                 if self.cable_is_slack:
                     print("Cable is slack")
                     sol = scipy.integrate.solve_ivp(self.hybrid_ptmass_pl_transportationEOM, t_span, x, method= 'RK45', t_eval=t_span, events=ptmassslackToTaut)
@@ -268,6 +261,7 @@ class simulation_base():
                     print("Cable is taut")
                     sol = scipy.integrate.solve_ivp(self.hybrid_ptmass_pl_transportationEOM, t_span, x, method= 'RK45', t_eval=t_span, events=ptmasstautToSlack)
                 
+                ## extract state from solver soltion
                 if (np.all(x==sol.y[:, -1])) and (len(sol.y_events[0]) != 0):
                     x = sol.y_events[0][:]
                     x = x.T
@@ -275,31 +269,30 @@ class simulation_base():
                 else:
                     x = sol.y[:,-1]
                 
+                ## recheck cable slack condition
                 self.cable_is_slack = self.isslack(x[0:3], x[13:16], self.pl_params.cable_length)
+            
+        # Third Scenario: Cooperative 
             else:    
+                ## first, we check for collision
                 inelastic_collision_flag = self.cooperative_check_inelastic(x)
-                # print("inelastic_collision_flag", inelastic_collision_flag)
+                
+                ## make sure velocities are distributed with no new collisions happening 
                 while np.any(inelastic_collision_flag):
                     print("collision!")
                     before_collide_inelastic_collision_flag = inelastic_collision_flag
-                    # print(inelastic_collision_flag)
-                    # print(x)
                     x = self.rigidbody_quad_inelastic_cable_collision(x, inelastic_collision_flag)
                     print("collision finished!")
-                    # print(x)
                     after_collide_inelastic_collision_flag = self.cooperative_check_inelastic(x)
-                    # print("after_collide_inelastic_collision_flag",after_collide_inelastic_collision_flag)
-                    # print("before_collide_inelastic_collision_flag", before_collide_inelastic_collision_flag)
                     if np.any((after_collide_inelastic_collision_flag - before_collide_inelastic_collision_flag)>0):
                         inelastic_collision_flag = after_collide_inelastic_collision_flag + before_collide_inelastic_collision_flag
                         for i in range(inelastic_collision_flag.shape[0]):
                             if inelastic_collision_flag[i] != 0:
                                 inelastic_collision_flag[i] = 1.0
-                        # break
                     else:
                         inelastic_collision_flag = after_collide_inelastic_collision_flag
-                        # break
-
+                
+                ## set up event for ivp solver
                 slack_condition = self.cable_is_slack
                 idx = np.arange(1, self.pl_params.nquad+1)
                 slack_cable_idx = idx[slack_condition == 1]
@@ -322,24 +315,19 @@ class simulation_base():
                     fcn.terminal = True
                     if num_of_slack_cable == 0:
                         fcn.direction = -1.0
-                        #print("slack condition: ", slack_condition)
-                        #print("direction is ", fcn.direction)
                     elif num_of_taut_cable == 0:
                         fcn.direction = 1.0
-                        #print("slack condition: ", slack_condition)
-                        #print("direction is ", fcn.direction)
                     else:
-                        # temp = np.vstack((np.ones((num_of_slack_cable,1)), -np.ones((num_of_taut_cable,1))))
                         fcn.direction = temp[id]
-                        #print("slack condition: ", slack_condition)
-                        #print("temp is ", temp)
-                        #print("direction is ", fcn.direction)
                     fcn.pl_params = self.pl_params
                     fcn.slack_condition = slack_condition
                     fcn.i = id
                     id = id + 1
+
+                ## state integration
                 sol = scipy.integrate.solve_ivp(self.hybrid_cooperative_rigidbody_pl_transportationEOM, t_span, x, method='RK23', t_eval=t_span, events=GuardEvents)
                 
+                ## extract state from solver soltion
                 EventTriggered_bool = sol.status
                 EventTriggered_id = 0
 
@@ -348,23 +336,13 @@ class simulation_base():
                         if len(sol.y_events[i]) != 0: 
                             EventTriggered_id = i
                     if (np.all(x==sol.y[:, -1])):
-                        # print(sol.y_events)
-                        # print("EventTriggered_id", EventTriggered_id)
-                        # x_prev  = x
                         x = sol.y_events[EventTriggered_id][:]
                         x = x.T
                         x = x.reshape((x.shape[0],))
-                        # print("x", x)
-                        # print(x==x_prev)
-                        '''break_trigger = break_trigger + 1
-                        if break_trigger == 6:
-                            # break'''
                 else:
                     x = sol.y[:,-1]
                 
-                # self.cable_is_slack = self.isslack_multi(x[0:3].reshape((3,1))+ np.transpose(utilslib.QuatToRot(x[6:10])) @ self.pl_params.rho_vec_list, x[13*np.arange(1, self.nquad+1)+np.array([[0],[1],[2]])],self.pl_params.cable_length)
                 self.cable_is_slack = self.isslack_multi(x[0:3].reshape((3,1))+ utilslib.QuatToRot(x[6:10]) @ self.pl_params.rho_vec_list, x[13*np.arange(1, self.nquad+1)+np.array([[0],[1],[2]])],self.pl_params.cable_length)
-                print("self.cable_is_slack line 360", self.cable_is_slack)
                 
         end = time.time()
         
@@ -377,6 +355,7 @@ class simulation_base():
         payload_rotmat = utilslib.QuatToRot(sol.y[:,0][6:10])
 
         if self.pl_params.mechanism_type == 'Rigid Link':
+            # for rigid link scenario, the payload position is uav position
             self.load_pos = x[0:3].reshape((3,1)) + payload_rotmat @ self.pl_params.rho_load
             payload_odom.pose.pose.position.x = self.load_pos[0]
             payload_odom.pose.pose.position.y = self.load_pos[1]
@@ -400,23 +379,19 @@ class simulation_base():
 
         system_marker = MarkerArray()
         cable_point_list = np.zeros((2*self.nquad,3))
+
         for uav_id in range(self.nquad):
             if self.pl_params.mechanism_type == 'Rigid Link':
                 uav_state = x[13:26]
                 attach_pos = self.load_pos.reshape((3,)) + np.matmul(payload_rotmat, (self.pl_params.rho_robot[:,uav_id]+np.array([0.028,0,0.032])))
-                # attach_pos = x[0:3] + np.matmul(payload_rotmat, self.pl_params.rho_robot[:,uav_id])
                 uav_state[0:3] = attach_pos
                 attach_vel = uav_state[3:6] + np.matmul(payload_rotmat, np.cross(sol.y[:,0][10:13], self.pl_params.rho_robot[:,uav_id]))
-                #print("old norm is", np.linalg.norm(uav_state[0:3] - attach_pos[0:3]))
                 if not self.cable_is_slack[uav_id]:
                     uav_attach_vector = uav_state[0:3] - attach_pos[0:3]
                     uav_attach_distance = np.linalg.norm(uav_attach_vector)
                     if uav_attach_distance > self.cable_len_list[uav_id]:
                         xi = uav_attach_vector/uav_attach_distance
                         uav_state[0:3] = attach_pos[0:3] + self.cable_len_list[uav_id] * xi
-                        #print(uav_state[0:3])
-                        #print(x[self.pl_dim_num+self.uav_dim_num*uav_id:self.pl_dim_num+self.uav_dim_num*(uav_id+1)])
-                        #print("new norm is", np.linalg.norm(uav_state[0:3] - attach_pos[0:3]))
                     
                 # Publish UAV odometry
                 uav_odom = Odometry()
@@ -441,9 +416,6 @@ class simulation_base():
                 attach_odom = Odometry()
                 attach_odom.header.stamp = current_time
                 attach_odom.header.frame_id = self.worldframe 
-                # TODO: continue here publish the attach odom. 
-                # attach_pos = x[0:3] + np.matmul(payload_rotmat, self.rho_vec_list[:,uav_id])
-                # attach_vel = x[3:6] + np.matmul(payload_rotmat, np.cross(sol.y[:,0][10:13], self.rho_vec_list[:,uav_id]))
                 attach_odom.pose.pose.position.x = attach_pos[0]
                 attach_odom.pose.pose.position.y = attach_pos[1]
                 attach_odom.pose.pose.position.z = attach_pos[2]
@@ -455,16 +427,12 @@ class simulation_base():
                 uav_state = x[self.pl_dim_num+self.uav_dim_num*uav_id:self.pl_dim_num+self.uav_dim_num*(uav_id+1)]
                 attach_pos = x[0:3] + np.matmul(payload_rotmat, self.rho_vec_list[:,uav_id])
                 attach_vel = x[3:6] + np.matmul(payload_rotmat, np.cross(sol.y[:,0][10:13], self.rho_vec_list[:,uav_id]))
-                #print("old norm is", np.linalg.norm(uav_state[0:3] - attach_pos[0:3]))
                 if not self.cable_is_slack[uav_id]:
                     uav_attach_vector = uav_state[0:3] - attach_pos[0:3]
                     uav_attach_distance = np.linalg.norm(uav_attach_vector)
                     if uav_attach_distance > self.cable_len_list[uav_id]:
                         xi = uav_attach_vector/uav_attach_distance
                         uav_state[0:3] = attach_pos[0:3] + self.cable_len_list[uav_id] * xi
-                        #print(uav_state[0:3])
-                        #print(x[self.pl_dim_num+self.uav_dim_num*uav_id:self.pl_dim_num+self.uav_dim_num*(uav_id+1)])
-                        #print("new norm is", np.linalg.norm(uav_state[0:3] - attach_pos[0:3]))
                     
                 # Publish UAV odometry
                 uav_odom = Odometry()
@@ -484,18 +452,11 @@ class simulation_base():
                 uav_odom.twist.twist.angular.y = uav_state[11]
                 uav_odom.twist.twist.angular.z = uav_state[12]
                 self.robot_odom_publisher[uav_id].publish(uav_odom)
-                #current_odom_time_received = rospy.get_time()
-                #print("The current uav id is", uav_id)
-                #print("The uav_odom publish time gap is", current_odom_time_received - self.last_odom_time_received)
-                #self.last_odom_time_received = current_odom_time_received
 
                 # Publish UAV attach odometry
                 attach_odom = Odometry()
                 attach_odom.header.stamp = current_time
                 attach_odom.header.frame_id = self.worldframe 
-                # TODO: continue here publish the attach odom. 
-                # attach_pos = x[0:3] + np.matmul(payload_rotmat, self.rho_vec_list[:,uav_id])
-                # attach_vel = x[3:6] + np.matmul(payload_rotmat, np.cross(sol.y[:,0][10:13], self.rho_vec_list[:,uav_id]))
                 attach_odom.pose.pose.position.x = attach_pos[0]
                 attach_odom.pose.pose.position.y = attach_pos[1]
                 attach_odom.pose.pose.position.z = attach_pos[2]
@@ -519,7 +480,7 @@ class simulation_base():
         rate.sleep()    
 
   def istaut(self, robot_pos, attach_pos, cable_length):
-      # this is only for multi cable case
+      # this is only for multi cable case 
       np.linalg.norm(robot_pos-attach_pos, 2, 0)
       flag = (np.linalg.norm(robot_pos - attach_pos, 2, 0) > (cable_length - 1e-4))
       return flag
@@ -812,8 +773,6 @@ class simulation_base():
       
       # check collision condition
       positive_attach_robot_vel = (np.sum(xi * (attach_vel - robot_vel), 0) > 1e-6)
-      # print("attach_vel", attach_vel)
-      # print("rob_vel", robot_vel)
       taut_condition = self.istaut(attach_pos, robot_pos, self.pl_params.cable_length)
       collision_condition = np.empty((taut_condition.shape))
       for i in range(taut_condition.shape[0]):
@@ -853,7 +812,6 @@ class simulation_base():
       rho_vec_list = temp_rho_vec_list
 
       pl_rot = utilslib.QuatToRot(xL[6:10])
-      # pl_rot = pl_rot.T
       pl_omg = xL[10:13].reshape(3, 1)
       pl_vel = xL[3:6].reshape(3, 1)
 
@@ -880,22 +838,7 @@ class simulation_base():
       hatrho_rotL_xi = temp_hatrho_rotL_xi
 
       # cal for collision
-      '''G1 = np.vstack((xi, -hatrho_rotL_xi))
-      G2 = np.transpose(np.vstack((xi, hatrho_rotL_xi)))
-      ML_top = np.hstack((mL * np.eye(3), np.zeros((3, 3))))
-      ML_bottom = np.hstack((np.zeros((3, 3)), IL))
-      ML = np.vstack((ML_top, ML_bottom))
-      MQ = self.uav_params.mass * np.eye(ntaut_quad)
-      M = ML + G1 @ MQ @ G2
-      right_element = xi @ MQ @ robot_vel_xi_proj.T
-      right_element = right_element.reshape((right_element.shape[0],1))
-      left_element = -hatrho_rotL_xi @ MQ @ robot_vel_xi_proj.T
-      left_element = left_element.reshape((left_element.shape[0], 1))
-      
-      b = np.vstack((mL*pl_vel+right_element, left_element + IL @ pl_omg))'''
-
       G1 = np.vstack((xi, hatrho_rotL_xi))
-      # G2 = np.transpose(np.vstack((xi, hatrho_rotL_xi)))
       ML_top = np.hstack((mL * np.eye(3), np.zeros((3, 3))))
       ML_bottom = np.hstack((np.zeros((3, 3)), IL))
       ML = np.vstack((ML_top, ML_bottom))
@@ -978,7 +921,6 @@ class simulation_base():
 
   def slack_ptmass_payload_quadEOM_readonly(self, t, plqd, F, M):
       # Assign params and states
-      # print("I'm in slack ptmass eom")
       mQ  =   self.uav_params.mass
       e3  =   np.array([[0.0],[0.0],[1.0]])
       g   =   self.uav_params.grav * e3
@@ -1064,7 +1006,8 @@ class simulation_base():
 
       return sdot
 
-  def ptmass_inelastic_cable_collision(self, x1, x2, m1, m2): # perfectly inelastic collision of ptmass and the drone along the cable direction
+  def ptmass_inelastic_cable_collision(self, x1, x2, m1, m2): 
+      # perfectly inelastic collision of ptmass and the drone along the cable direction
       obj1_pos = x1[0:3]
       obj1_pos = obj1_pos.reshape((3, 1))
       obj2_pos = x2[0:3]
@@ -1254,8 +1197,6 @@ class simulation_base():
             self.uav_M[0,0] = fm_command.moments.x
             self.uav_M[1,0] = fm_command.moments.y
             self.uav_M[2,0] = fm_command.moments.z
-            #print("self.uav_F", self.uav_F)
-            #print("self.uav_M", self.uav_M)
         elif self.pl_params.mechanism_type == 'Cable':
             if self.pl_params.payload_type == 'Rigid Body':
                 self.uav_F[uav_id] = fm_command.thrust

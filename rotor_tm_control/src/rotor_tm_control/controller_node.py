@@ -14,11 +14,7 @@ from geometry_msgs.msg import Vector3
 
 from rotor_tm_utils import read_params
 from rotor_tm_utils import utilslib 
-from rotor_tm_utils.QuatToRot import QuatToRot
 from rotor_tm_utils.vec2asym import vec2asym
-from rotor_tm_utils.RotToRPY_ZXY import RotToRPY_ZXY
-
-from rotor_tm_traj.srv import Circle,Line
 
 class controller_node:
 
@@ -29,52 +25,8 @@ class controller_node:
         self.qd = {}
         self.FM_pub = []
         self.des_odom_pub = []
-
         self.last_odom_time_received = 0.0 
         self.last_des_traj_time_received = 0.0 
-
-
-        '''# get an instance of RosPack with the default search paths
-        rospack = rospkg.RosPack()
-
-        # get the file path for rotor_tm_config
-        path = rospack.get_path('rotor_tm_config')
-        if situation == "multi":
-            ###############     3 snapdragon flights with triangular payload using cable mechanisms     ##################
-            uav_params_path = path + '/config/uav_params/snapdragonfly_sameasMatlab.yaml'
-            payload_params_path = path + '/config/load_params/triangular_payload_sameasMatlab.yaml'
-            mechanism_params_path = path + '/config/attach_mechanism/3_robots_cable_mechanism.yaml'
-            payload_control_gain_path = path + '/config/control_params/triangular_payload_cooperative_cable_gains.yaml'
-            uav_control_gain_path = path + '/config/control_params/dragonfly_control_gains.yaml'
-        elif situation == "multi_4":
-            ###############     4 snapdragon flights with fedex box payload using cable mechanisms     ##################
-            uav_params_path = path + '/config/uav_params/snapdragonfly_sameasMatlab.yaml'
-            payload_params_path = path + '/config/load_params/fedex_box_payload.yaml'
-            mechanism_params_path = path + '/config/attach_mechanism/4_robots_cable_mechanism.yaml'
-            payload_control_gain_path = path + '/config/control_params/triangular_payload_cooperative_cable_gains.yaml'
-            uav_control_gain_path = path + '/config/control_params/dragonfly_control_gains.yaml'
-        elif situation == "multi_6":
-            ###############     6 snapdragon flights with fedex box payload using cable mechanisms     ##################
-            uav_params_path = path + '/config/uav_params/snapdragonfly.yaml'
-            payload_params_path = path + '/config/load_params/fedex_box_payload.yaml'
-            mechanism_params_path = path + '/config/attach_mechanism/6_robots_cable_mechanism.yaml'
-            payload_control_gain_path = path + '/config/control_params/triangular_payload_cooperative_cable_gains.yaml'
-            uav_control_gain_path = path + '/config/control_params/dragonfly_control_gains.yaml'
-        elif situation == "ptmass":
-            ###############     1 snapdragon flights with point-mass payload using cable mechanisms     ##################
-            uav_params_path = path + '/config/uav_params/snapdragonfly.yaml'
-            payload_params_path = path + '/config/load_params/pointmass_payload.yaml'
-            mechanism_params_path = path + '/config/attach_mechanism/ptmass_cable_mechanism.yaml'
-            payload_control_gain_path = path + '/config/control_params/pointmass_cable_gains.yaml'
-            uav_control_gain_path = path + '/config/control_params/dragonfly_control_gains.yaml'
-        elif situation == "rigid":
-            #############     3 snapdragon flights with triangular payload using rigid link mechanisms     ################
-            uav_params_path = path + '/config/uav_params/snapdragonfly_sameasMatlab.yaml'
-            payload_params_path = path + '/config/load_params/triangular_payload_sameasMatlab.yaml'
-            mechanism_params_path = path + '/config/attach_mechanism/rigid_links_mechanism.yaml'
-            payload_control_gain_path = path + '/config/control_params/triangular_payload_cooperative_rigidlink_gains.yaml'
-            uav_control_gain_path = path + '/config/control_params/dragonfly_control_gains.yaml' '''
-
         self.controller = controller()
         
         # read yaml files
@@ -86,7 +38,14 @@ class controller_node:
         print("init contoller_node")
         print()
 
+        # the controller node was designed to be launched once or multiple times
+        # if only launched once, (all uavs share the same controller node) 
+        # enters the first if branch
+        # if launched more than once, (each uav uses its own controller node)
+        # enters the second else branch
         if self.single_node:
+            # Currently controllers are launch multiple times, (each uav uses its own controller)
+            # the section below is not in use
             ##
             ## Important Notice:
             ## to make topic name consistant with multi_node case
@@ -121,8 +80,10 @@ class controller_node:
 
             rospy.spin()
         else:
+            # Currently controllers are launch multiple times, (each uav uses its own controller)
+            # the section below is in use
             ##
-            ## the published topics from this single node has the same naming convention
+            ## the published topics from each launched node has the same naming convention
             ## as the single_node case:
             ## controller_#/dragonfly#/fm_cmd
             ## However, controller_x publishes only controller_x/dragonflyx/fm_cmd message
@@ -131,11 +92,7 @@ class controller_node:
             ## Only Publication: controller_1/dragonfly1/fm_cmd message
             ##
 
-            print("Using 3 controller nodes")
-            ## create a node called 'controller_node'
-            #node_name = 'controller_'+str(self.node_id+1)
-            #print(node_name)
-            #rospy.init_node(node_name)
+            print("Using multiple controller nodes")
             node_id += 1
             # TODO: make this to ROS parameters
             mav_name = '/dragonfly'
@@ -155,13 +112,6 @@ class controller_node:
             self.cen_pl_cmd_pub = rospy.Publisher(node_name + "/payload/cen_pl_cmd", CenPL_Command, queue_size = 10)
             self.FM_pub.append(rospy.Publisher(node_name +  FM_message_name, FMCommand, queue_size=1, tcp_nodelay=True))
             self.status_pub = rospy.Publisher(node_name + "/heartbeat", Bool, queue_size = 10)
-            # self.des_odom_pub.append(rospy.Publisher(des_odom_name, Odometry, queue_size=10))
-
-            """for i in range(self.pl_params.nquad):
-                FM_message_name = mav_name + str(i+1) + "/fm_cmd"
-                des_odom_name = mav_name + str(i+1) + "/des_odom"
-                self.FM_pub.append(rospy.Publisher(node_name +  FM_message_name, FMCommand, queue_size=10))
-                # self.des_odom_pub.append(rospy.Publisher(des_odom_name, Odometry, queue_size=10))"""
 
             rate = rospy.Rate(100)
             while not rospy.is_shutdown():
@@ -170,17 +120,11 @@ class controller_node:
                 msg.data = True 
                 self.status_pub.publish(msg)
                 rate.sleep()
-
-            #rospy.spin()
     
+    # this is the assembly function for sending out FM message
     def assembly_FM_message(self, F_list, M_list, uav_id):
         if self.pl_params.mechanism_type == 'Rigid Link':
             FM_message = FMCommand()
-            '''FM_message.thrust = F_list[uav_id]
-            FM_message.moments.x = M_list[uav_id][0]
-            FM_message.moments.y = M_list[uav_id][1]
-            FM_message.moments.z = M_list[uav_id][2]'''
-
             FM_message.rlink_thrust.x = F_list[0][0]
             FM_message.rlink_thrust.y = F_list[0][1]
             FM_message.rlink_thrust.z = F_list[0][2]
@@ -205,13 +149,6 @@ class controller_node:
                 return FM_message
 
     def qd_odom_callback(self, uav_odom, uav_id):
-        
-        '''current_callback_time_received = rospy.get_time()
-        if uav_id == 0:
-            current_odom_time_received = rospy.get_time()
-            print("The uav odom callback time gap is", current_odom_time_received - self.last_odom_time_received)
-            self.last_odom_time_received = current_odom_time_received'''
-
         self.qd[uav_id]["pos"] = np.array( [[uav_odom.pose.pose.position.x],
                                          [uav_odom.pose.pose.position.y],
                                          [uav_odom.pose.pose.position.z]])
@@ -236,7 +173,6 @@ class controller_node:
         robot_attach_vector = self.pl["pos"] + pl_rot @ rho_vec - self.qd[uav_id]["pos"]
         qd_xi = robot_attach_vector / np.linalg.norm(robot_attach_vector) 
         qd_xidot = (self.pl["vel"] + pl_rot @ pl_omega_asym @ rho_vec - self.qd[uav_id]["vel"]) #/ cable_len
-        #print("qd xi of",uav_id, qd_xi)
 
         xi = qd_xi.reshape((3,1))
         self.qd[uav_id]["xi"] = xi
@@ -245,16 +181,7 @@ class controller_node:
         self.qd[uav_id]["yaw_des"] = 0
         self.qd[uav_id]["yawdot_des"] = 0
 
-        '''if uav_id == 0:
-            current_callback_finish_time_received = rospy.get_time()
-            print("The uav odom callback process used", current_callback_finish_time_received-current_callback_time_received)'''
-
     def pl_odom_callback(self, payload_odom):
-
-        #current_odom_time_received = rospy.get_time()
-        #print("The payload odom callback time gap is", current_odom_time_received - self.last_odom_time_received)
-        #self.last_odom_time_received = current_odom_time_received
-
         self.pl["pos"] = np.array([     [payload_odom.pose.pose.position.x],
                                         [payload_odom.pose.pose.position.y],
                                         [payload_odom.pose.pose.position.z]])
@@ -274,10 +201,6 @@ class controller_node:
         self.pl["rot"] = utilslib.QuatToRot(self.pl["quat"])
 
     def desired_traj_callback(self, des_traj):
-        '''current_des_traj_time_received = rospy.get_time()
-        print("The des traj callback time gap is", current_des_traj_time_received - self.last_des_traj_time_received)
-        self.last_des_traj_time_received = current_des_traj_time_received'''
-
         self.pl["pos_des"] = np.array([ [des_traj.position.x],
                                         [des_traj.position.y],
                                         [des_traj.position.z]])
@@ -297,11 +220,9 @@ class controller_node:
         self.pl["omega_des"] = np.array([[0.0, 0.0, 0.0]])
         self.pl["yaw_des"] = 0.0
         self.pl["yawdot_des"] = 0.0
-        #before_des_traj_received = rospy.get_time()
         self.sim_subscriber()
-        #after_des_traj_received = rospy.get_time()
-        #print("The sim subscriber time used", after_des_traj_received - before_des_traj_received)
-
+    
+    # this function prepares input for cooperative (output the input for cooperative controller)
     def controller_setup(self, pl_params):
         rho_vec_list = pl_params.rho_vec_list
         cable_len_list = pl_params.cable_length
@@ -332,9 +253,7 @@ class controller_node:
             self.qd[qn]["yaw_des"] = 0
             self.qd[qn]["yawdot_des"] = 0
 
-            #print("The uav id is", qn)
-            #print("and the qd is", self.qd[qn]["xi"])
-
+    # this is the assembly function for ptmass (output the input for ptmass controller)
     def assembly_plqd(self):
         plqd = {}
         plqd["pos"] = self.pl["pos"]
@@ -374,14 +293,11 @@ class controller_node:
         qd_state["omega_des"] = self.pl["omega_des"]
         return qd_state
 
+    # this function take odometry from simualtion, call respective controller, and publish FM_cmd
     def sim_subscriber(self):
-        #print("#########################")
-        #print("publishing controls...")
-        #self.controller_setup(self.pl_params)
         if self.pl_params.mechanism_type == 'Rigid Link':
             ql = self.assembly_qd()
             F_list, M_list = self.controller.rigid_links_cooperative_payload_controller(ql, self.pl_params)
-            # print(F_list)
         elif self.pl_params.mechanism_type == 'Cable':
             if self.pl_params.payload_type == 'Rigid Body':
                 mu, att_acc, F_list, M_list, quat_list, rot_list = self.controller.cooperative_suspended_payload_controller(self.pl, self.qd, self.pl_params, self.quad_params)
@@ -413,35 +329,9 @@ class controller_node:
             for i in range(self.pl_params.nquad):
                 FM_message = self.assembly_FM_message(F_list, M_list, i)
                 self.FM_pub[i].publish(FM_message)
-                '''des_odom = Odometry()
-                des_odom.pose.pose.position.x = rot_list[i][0,0]
-                des_odom.pose.pose.position.y = rot_list[i][1,0]
-                des_odom.pose.pose.position.z = rot_list[i][2,0]
-                des_odom.pose.pose.orientation.x = quat_list[i][0]
-                des_odom.pose.pose.orientation.y = quat_list[i][1]
-                des_odom.pose.pose.orientation.z = quat_list[i][2]
-                des_odom.pose.pose.orientation.w = quat_list[i][3]
-                self.des_odom_pub[i].publish(des_odom)'''
         else:
             FM_message = self.assembly_FM_message(F_list, M_list, self.node_id)
             self.FM_pub[0].publish(FM_message)
-
-            #RPM_message_name = '/dragonfly' + str(i+1) + "/rpm_cmd"
-            #RPM_pub = rospy.Publisher(RPM_message_name, PositionCommand)
-            #RPM_message = assembly_RPM_message(, i)
-            #RPM_pub.publish(RPM_message)'''
-
-        '''
-        def assembly_RPM_message(self, M_list):
-            RPM_message = RPMCommand()
-
-            return RPM_message
-        '''
-
-
-'''def main(node_id, single_node, payload_params_path, uav_params_path, mechanism_params_path, payload_control_gain_path, uav_control_gain_path):
-    controller_node(node_id, single_node, payload_params_path, uav_params_path, mechanism_params_path, payload_control_gain_path, uav_control_gain_path)
-'''
 
 if __name__ == '__main__':
     payload_params_path = sys.argv[3]

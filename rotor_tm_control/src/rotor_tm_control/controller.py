@@ -1,7 +1,6 @@
 #!/usr/bin/python3
 import numpy as np
 from rotor_tm_utils.vec2asym import vec2asym
-from rotor_tm_utils.QuatToRot import QuatToRot
 import scipy.linalg as LA
 from rotor_tm_utils.vee import vee
 from rotor_tm_utils.RPYtoRot_ZXY import RPYtoRot_ZXY
@@ -47,7 +46,6 @@ class controller:
         u_parallel = mu + m*l*np.linalg.norm(w)**2*xi + np.matmul(m*qd[qn]["xixiT"], qd[qn]["attach_accel"])
         u_perpendicular = -m*l*np.cross(xi, params.Kxi @ e_xi + params.Kw @ e_w + (xi.T @ w_des) * xi_des_dot, axisa=0, axisb=0).T - m*np.cross(xi, np.cross(xi, qd[qn]["attach_accel"], axisa=0, axisb=0).T, axisa=0, axisb=0).T
         Force = u_parallel + u_perpendicular
-        #F = np.dot(Force,np.matmul(rot,e3))
         F = Force.T @ np.matmul(rot,e3)
 
         # Desired Attitude and Angular Velocity
@@ -64,12 +62,6 @@ class controller:
         Y_body_in_world = Y_body_in_world/np.linalg.norm(Y_body_in_world)
         Rot_des[:,1:2] = Y_body_in_world
 
-        #print(Rot_des)
-        #print(X_body_in_world)
-        #print(Y_body_in_world)
-        #print(Z_body_in_world)
-        # p_des = -(m/F)*(jrk_des - (Z_body_in_world'*jrk_des)*Z_body_in_world)'*Y_body_in_world;
-        # q_des = (m/F)*(jrk_des - (Z_body_in_world'*jrk_des)*Z_body_in_world)'*X_body_in_world;
         p_des = np.array([[0.0]])
         q_des = np.array([[0.0]])
         r_des = yawdot_des*Z_body_in_world[2:3, :]
@@ -87,31 +79,18 @@ class controller:
         Rot_des = qd["rot_des"]
         omega_des = qd["omega_des"]
 
-        # errors of angles and angular velocities
-        #e_Rot = np.matmul(np.transpose(Rot_des), Rot) - np.matmul(np.transpose(Rot), Rot_des)
         e_Rot = np.matmul(Rot_des.T, Rot) - np.matmul(Rot.T, Rot_des)
         e_angle = vee(e_Rot)/2
-        '''print("The current rotation is")
-        print(Rot)
-        print("The des rotation is")
-        print(Rot_des)
-        print("The rotation error")
-        print(e_angle)'''
 
         e_omega = qd["omega"] - np.matmul(Rot.T, np.matmul(Rot_des, omega_des))
-        # e_omega = qd["omega"] - np.matmul(np.matmul(np.transpose(Rot), Rot_des), omega_des)
-        # moment
         M = np.cross(qd["omega"], np.matmul(params.I, qd["omega"]), axisa=0, axisb=0).T - np.matmul(params.Kpe, e_angle) - np.matmul(params.Kde, e_omega) 
-        #print("The e_angle", e_angle)
-        #print("The @ multiply", params.Kpe @ e_angle)
-        #print("The matmul multiply", np.matmul(params.Kpe, e_angle))
+
         return M
 
     # test passed
     def cooperative_suspended_payload_controller(self, ql, qd, pl_params, qd_params):
 
         if not pl_params.sim_start:
-            # self.coeff0 = pl_params.coeff0
             self.icnt = 0
         self.icnt = self.icnt + 1
 
@@ -145,7 +124,6 @@ class controller:
         e_Rot = Rot_des.T @ Rot - Rot.T @ Rot_des
         e_angle = np.divide(vee(e_Rot), 2)
         e_omega = ql["omega"] - Rot.T @ Rot_des @ omega_des.T 
-        # e_omega = ql["omega"] - np.matmul(np.matmul(np.transpose(Rot), Rot_des), np.transpose(omega_des))
 
         # Net moment
         # Missing the angular acceleration term but in general it is neglectable.
@@ -384,7 +362,8 @@ class controller:
         trpy = np.array([0,0,0,0])
         drpy = np.array([0,0,0,0])
         return F, M, trpy, drpy
-
+    
+    # test passed
     def rigid_links_cooperative_payload_controller(self, ql, params):
         if not params.sim_start:
             self.icnt = 0
@@ -449,7 +428,7 @@ class controller:
         uav_M[0] = uav_M_arr
         return uav_F, uav_M
 
-    # tested
+    # test passed
     def single_payload_geometric_controller(self, ql, qd_params, pl_params):
         ## Parameter Initialization
         if not pl_params.sim_start:

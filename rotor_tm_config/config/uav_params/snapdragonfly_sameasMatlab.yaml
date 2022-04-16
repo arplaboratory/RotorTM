@@ -1,5 +1,5 @@
 mass: 0.25
-inertia: {Ixx: 0.000601, Ixy: 0.0, Ixz: 0.0, Iyx: 0.0, Iyy: 0.000589, Iyz: 0.0, Izx: 0.0, Izy: 0.0, Izz: 0.001076}
+inertia: {Ixx: 0.000601, Ixy: 0.0, Ixz: 0.0, Iyx: 0.0, Iyy: 0.000589, Iyz: 0.0, Izx: 0.0, Izy: 0.0, Izz: 0.01076}
 arm_length: 0.1075 
 
 max_angle: 80 #degree
