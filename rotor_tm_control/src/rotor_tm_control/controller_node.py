@@ -121,8 +121,21 @@ class controller_node:
                 self.status_pub.publish(msg)
                 rate.sleep()
     
-    # this is the assembly function for sending out FM message
     def assembly_FM_message(self, F_list, M_list, uav_id):
+    # DESCRIPTION:
+    # Assembly function for sending out FM message
+    # The function automatically detects the controller used
+    # and assembly their respective FM_message from controller output
+    # There are three scenarios: (1) Point mass, (2) cooperative cable suspended, and (3) cooperative rigidlink connect
+
+    # INPUTS:
+    # F_list        - Thrust/Force output from controller, type and format vary based on scenarios, check controller OUTPUTS for detail
+    # M_list        - Moment output from controller, type and format vary based on scenarios, check controller OUTPUTS for detail
+    # uav_id        - an integer identifying the id of the current MAV the controller is controlling          
+
+    # OUTPUTS:
+    # FM_message    - a FMCommand type object, accepted by the simulator
+    #                 refer to ~workspace/src/RotorTM/rotor_tm_msgs/msg/FMCommand.msg for detail
         if self.pl_params.mechanism_type == 'Rigid Link':
             FM_message = FMCommand()
             FM_message.rlink_thrust.x = F_list[0][0]
@@ -149,6 +162,16 @@ class controller_node:
                 return FM_message
 
     def qd_odom_callback(self, uav_odom, uav_id):
+    # DESCRIPTION:
+    # Callback function for rospy subscriber to extract MAV odometry
+
+    # INPUTS:
+    # uav_odom      - nav_msgs.msg Odometry type message published by simulation Node (/sim)
+    # uav_id        - an integer used to identify the MAV subscribing
+
+    # OUTPUTS:
+    # self.qd       - update self.qd with current Odometry of the MAV
+
         self.qd[uav_id]["pos"] = np.array( [[uav_odom.pose.pose.position.x],
                                          [uav_odom.pose.pose.position.y],
                                          [uav_odom.pose.pose.position.z]])
@@ -182,6 +205,14 @@ class controller_node:
         self.qd[uav_id]["yawdot_des"] = 0
 
     def pl_odom_callback(self, payload_odom):
+    # DESCRIPTION:
+    # Callback function for rospy subscriber to extract payload odometry
+
+    # INPUTS:
+    # payload_odom  - nav_msgs.msg Odometry type message published by simulation Node (/sim)
+
+    # OUTPUTS:
+    # self.pl       - update self.pl with current Odometry of the payload
         self.pl["pos"] = np.array([     [payload_odom.pose.pose.position.x],
                                         [payload_odom.pose.pose.position.y],
                                         [payload_odom.pose.pose.position.z]])
@@ -201,6 +232,14 @@ class controller_node:
         self.pl["rot"] = utilslib.QuatToRot(self.pl["quat"])
 
     def desired_traj_callback(self, des_traj):
+    # DESCRIPTION:
+    # Callback function for rospy subscriber to extract desired trajectory
+
+    # INPUTS:
+    # des_traj      - rotor_tm_msgs.msg PositionCommand type message published by trajectory Node (/des_traj)
+
+    # OUTPUTS:
+    # self.pl       - update self.pl with the desired trajectory of the payload
         self.pl["pos_des"] = np.array([ [des_traj.position.x],
                                         [des_traj.position.y],
                                         [des_traj.position.z]])
@@ -222,8 +261,35 @@ class controller_node:
         self.pl["yawdot_des"] = 0.0
         self.sim_subscriber()
     
-    # this function prepares input for cooperative (output the input for cooperative controller)
     def controller_setup(self, pl_params):
+    # DESCRIPTION:
+    # Prepares input for cooperative cable suspended payload scenario controller
+       
+    # INPUTS:
+    # pl_params             - a read_params class object containing payload parameters        
+
+    # OUTPUTS:
+    # self.qd(modified)     - self.qd is modified to meet the specification of the INPUT 
+    #                         for cooperative_suspended_payload_controller. Specifically,
+    #                         self.qd is a list of dictionary containing states of all MAV(s)
+    #                         self.qd[0] would give a dictionary of MAV 0's states and related 
+    #                         information. Specifically,
+    #                         Key             Type            Size            Description              
+    #                         'pos'           ndarray         3 by 1          MAV 0's position
+    #                         'vel'           ndarray         3 by 1          MAV 0's velocity
+    #                         'quat'          ndarray         4 by 1          MAV 0's orientation as unit quaternion
+    #                         'omega'         ndarray         3 by 1          MAV 0's angular velocity
+    #                         'rot'           ndarray         3 by 3          MAV 0's rotation as rotation matrix
+    #                         'xi'            ndarray         3 by 1          MAV 0's cable direction as a unit vector
+    #                         'xixiT'         ndarray         3 by 3          xi dot product with xi
+    #                         'xidot'         ndarray         3 by 1          MAV 0's velocity normalized over separation distance
+    #                         'yaw_des'       float           NA              desired payload yaw, set to 0.0 current
+    #                         'yawdot_des'    float           NA              time derivative of desired payload yaw, set to 0.0 currently
+    #                         'mu_des'        ndarray         3 by 1          desired cable tension of the cable suspended under MAV 0
+    #                         'attach_accel'  ndarray         3 by 1          acceleration of the cable attach point
+    #                         'rot_des'       ndarray         3 by 3          desired rotation as a rotation matrix
+    #                         'omega_des'     ndarray         3 by 1          desired payload angular velocity
+    #                                                                         set to [[0., 0., 0.]] currently
         rho_vec_list = pl_params.rho_vec_list
         cable_len_list = pl_params.cable_length
         pl_rot = self.pl["rot"]
@@ -253,8 +319,35 @@ class controller_node:
             self.qd[qn]["yaw_des"] = 0
             self.qd[qn]["yawdot_des"] = 0
 
-    # this is the assembly function for ptmass (output the input for ptmass controller)
     def assembly_plqd(self):
+    # DESCRIPTION:
+    # Prepares input for point mass scenario controller
+    
+    # INPUTS:
+    # /                     - Extract self.pl to assemble the required input for point mass scenario controller      
+
+    # OUTPUTS:
+    # plqd                  - plqd is created from self.pl to meet the specification of the INPUT 
+    #                         for single_payload_geometric_controller. Specifically,
+    #                         plqd is a dictionary containing state of the payload and MAV combined, specifically
+    #                         Key             Type            Size            Description              
+    #                         'pos'           ndarray         3 by 1          payload position
+    #                         'vel'           ndarray         3 by 1          payload velocity
+    #                         'qd_pos'        ndarray         3 by 1          MAV position
+    #                         'qd_vel'        ndarray         3 by 1          MAV velocity
+    #                         'qd_quat'       ndarray         4 by 1          MAV orientation as unit quaternion
+    #                         'qd_omega'      ndarray         3 by 1          MAV angular velocity
+    #                         'qd_rot'        ndarray         3 by 3          MAV orientation as rotation matrix
+    #                         'pos_des'       ndarray         3 by 1          desired payload position
+    #                         'vel_des'       ndarray         3 by 1          desired payload velocity
+    #                         'acc_des'       ndarray         3 by 1          desired payload acceleration
+    #                         'jrk_des'       ndarray         3 by 1          desired payload jerk
+    #                         'quat_des'      ndarray         4 by 1          desired payload orientation as unit quaterion
+    #                                                                         set to [[1.], [0.], [0.], [0.]] currently
+    #                         'omega_des'     ndarray         3 by 1          desired payload angular velocity
+    #                                                                         set to [[0., 0., 0.]] currently
+    #                         'qd_yaw_des'    float           NA              desired MAV yaw, set to 0.0 current
+    #                         'qd_yawdot_des' float           NA              time derivative of desired MAV yaw, set to 0.0 currently
         plqd = {}
         plqd["pos"] = self.pl["pos"]
         plqd["vel"] = self.pl["vel"]
@@ -273,8 +366,33 @@ class controller_node:
         plqd["omega_des"] = self.pl["omega_des"]
         return plqd
 
-    # this is the assembly function for rlink (output the input for rlink controller)
     def assembly_qd(self):
+    # DESCRIPTION:
+    # Prepares input for cooperative rigid link connected payload scenario controller
+    
+    # INPUTS:
+    # /                     - Extract self.pl to assemble the required input for rigid link scenario controller      
+
+    # OUTPUTS:
+    # qd_state              - qd_state is created from self.pl to meet the specification of the INPUT 
+    #                         for rigid_links_cooperative_payload_controller. Specifically,
+    #                         qd_state is a dictionary containing state of the payload, specifically
+    #                         Key             Type            Size            Description              
+    #                         'pos'           ndarray         3 by 1          payload position
+    #                         'vel'           ndarray         3 by 1          payload velocity
+    #                         'quat'          ndarray         4 by 1          payload orientation as unit quaternion
+    #                         'omega'         ndarray         3 by 1          payload angular velocity
+    #                         'rot'           ndarray         3 by 3          payload rotation as rotation matrix
+    #                         'pos_des'       ndarray         3 by 1          desired payload position
+    #                         'vel_des'       ndarray         3 by 1          desired payload velocity
+    #                         'acc_des'       ndarray         3 by 1          desired payload acceleration
+    #                         'jrk_des'       ndarray         3 by 1          desired payload jerk
+    #                         'quat_des'      ndarray         4 by 1          desired payload orientation as unit quaterion
+    #                                                                         set to [[1.], [0.], [0.], [0.]] currently
+    #                         'omega_des'     ndarray         3 by 1          desired payload angular velocity
+    #                                                                         set to [[0., 0., 0.]] currently
+    #                         'qd_yaw_des'    float           NA              desired MAV yaw, set to 0.0 current
+    #                         'qd_yawdot_des' float           NA              time derivative of desired MAV yaw, set to 0.0 currently
         qd_state = {}
         # init uav_F and uav_M
         qd_state["pos"] = self.pl["pos"]
@@ -295,6 +413,17 @@ class controller_node:
 
     # this function take odometry from simualtion, call respective controller, and publish FM_cmd
     def sim_subscriber(self):
+    # DESCRIPTION:
+    # This method takes odometry from simualtion, assemble 
+    # input for the respective controllers using the above methods
+    # and call respective controller. The return values from the controller
+    # are then packaged into a FMCommand type ros message and published under /controller_#
+    
+    # INPUTS:
+    # /                     - Attributes of the controller class are used      
+
+    # OUTPUTS:
+    # /                     - FMCommands are published
         if self.pl_params.mechanism_type == 'Rigid Link':
             ql = self.assembly_qd()
             F_list, M_list = self.controller.rigid_links_cooperative_payload_controller(ql, self.pl_params)
@@ -334,6 +463,7 @@ class controller_node:
             self.FM_pub[0].publish(FM_message)
 
 if __name__ == '__main__':
+    # This section is used to configure the launch file
     payload_params_path = sys.argv[3]
     uav_params_path = sys.argv[4]
     mechanism_params_path = sys.argv[5]
@@ -343,11 +473,8 @@ if __name__ == '__main__':
     node_name = 'controller_'+str(int(sys.argv[1])+1)
     print(node_name)
     rospy.init_node(node_name)
-    #rospy.init_node("controller")
 
     if int(sys.argv[2]) == 1:
         controller_node(int(sys.argv[1]), True, payload_params_path, uav_params_path, mechanism_params_path, payload_control_gain_path, uav_control_gain_path)
-        #main(int(sys.argv[1]), True, sys.argv[3])
     else:
         controller_node(int(sys.argv[1]), False, payload_params_path, uav_params_path, mechanism_params_path, payload_control_gain_path, uav_control_gain_path)
-        #main(int(sys.argv[1]), False, sys.argv[3])
