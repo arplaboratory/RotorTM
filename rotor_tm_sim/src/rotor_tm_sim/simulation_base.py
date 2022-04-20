@@ -15,22 +15,61 @@ from rotor_tm_utils import utilslib
 import time
 
 def ptmassslackToTaut(t, x):
-    # event function for ptmass dynammics to switch from slack to taut, takes in t (time) and state (x)
+    # DESCRIPTION:
+    # event function for point mass scenario dynammics 
+    # if event is reached by ivp solver, it will switch from slack to taut, takes in t (time) and state (x)
+
+    # INPUTS:
+    # t             - time
+    # x             - state of the point mass system. Specifically,
+    #                 x is a 26 by 1 ndarray,
+    #                                                               Name                 Last Element Location (counting from 1) 
+    #                 x = np.array([ppx,  ppy,    ppz,            # payload position    3
+    #                               pvx,  pvy,    pvz,            # payload velocity    6
+    #                                pu,   pi,     pj,     pk,    # payload quat        10
+    #                               pwx,  pwy,    pwz,            # payload omega       13
+    #                               qpx,  qpy,    qpz,            # quad rotor position 16
+    #                               qvx,  qvy,    qvz,            # quad rotor velocity 19 
+    #                                qu,   qi,     qj,     qk,    # quad rotor quat     23
+    #                               qwx,  qwy,    qwz])           # quad rotor omega    26
+
+    # OUTPUTS:
+    # value         - a float that determines taut condition
     value = np.linalg.norm(x[0:3] - x[13:16]) - ptmassslackToTaut.cable_length
     return value
 
 def ptmasstautToSlack(t, x):
-    # event function for ptmass dynamics to switch from taut to slack, takes in t (time) and state (x)
+    # DESCRIPTION:
+    # event function for point mass scenario dynammics 
+    # if event is reached by ivp solver, it will switch from taut to slack, takes in t (time) and state (x)
+
+    # INPUTS:
+    # t             - time
+    # x             - state of the point mass system. Specifically,
+    #                 x is a 26 by 1 ndarray,
+    #                                                               Name                 Last Element Location (counting from 1) 
+    #                 x = np.array([ppx,  ppy,    ppz,            # payload position    3
+    #                               pvx,  pvy,    pvz,            # payload velocity    6
+    #                                pu,   pi,     pj,     pk,    # payload quat        10
+    #                               pwx,  pwy,    pwz,            # payload omega       13
+    #                               qpx,  qpy,    qpz,            # quad rotor position 16
+    #                               qvx,  qvy,    qvz,            # quad rotor velocity 19 
+    #                                qu,   qi,     qj,     qk,    # quad rotor quat     23
+    #                               qwx,  qwy,    qwz])           # quad rotor omega    26
+
+    # OUTPUTS:
+    # value         - a float that determines slack condition
     value = np.linalg.norm(x[0:3] - x[13:16]) - ptmasstautToSlack.cable_length + 0.000001
     return value
 
 def cooperativeGuard(t, x, nquad, slack_condition, rho_vec_list, cable_length, id):
+    # DESCRIPTION:
     # Event function event function for cooperative dynamics
     # Each MAV in the simulation will have its own event function
     # This function will be called under a lambda handle
-    #
+    
     # INPUTS:
-    # t                 - 1 x 1, time
+    # t                 - time
     # x                 - (13 + 13*nquad) x 1,
     #                   state vector = [xL, yL, zL, xLd, yLd, zLd, 
     #                                 qLw, qLx, qLy, qLz, pL, qL, rL, 
@@ -480,19 +519,64 @@ class simulation_base():
         rate.sleep()    
 
   def istaut(self, robot_pos, attach_pos, cable_length):
-      # this is only for multi cable case 
+    # DESCRIPTION:
+    # This method takes in quad rotor position, cable attchment position
+    # and cable and determines if the cable is taut or not.
+    # This method is only used in cooperative suspended payload case
+    
+    # INPUTS:
+    # robot_pos                 - a [3 by (# of robots)] ndarray, the n-th col describes the 3D position
+    #                             of the n-th MAV position 
+    # attach_pos                - a [3 by (# of robots)] ndarray, the n-th col describes the 3D position
+    #                             of the n-th cable attachment position
+    # cable_length              - a (# of robots) sized ndarray (shape of (3,)), the n-th element describes the length
+    #                             of the cable used by the n-th robot
+
+    # OUTPUTS:
+    # flag                      - a (# of robots) sized ndarray (shape of (3,)) with boolean type elements
+    #                             the n-th element describes if the n-th cable is taut
       np.linalg.norm(robot_pos-attach_pos, 2, 0)
       flag = (np.linalg.norm(robot_pos - attach_pos, 2, 0) > (cable_length - 1e-4))
       return flag
 
   def isslack_multi(self, robot_pos, attach_pos, cable_length):
-      # this is only for multi cable case
+    # DESCRIPTION:
+    # This method takes in quad rotor position, cable attchment position
+    # and cable and determines if the cable is slack or not.
+    # This method is only used in cooperative suspended payload case
+    
+    # INPUTS:
+    # robot_pos                 - a [3 by (# of robots)] ndarray, the n-th col describes the 3D position
+    #                             of the n-th MAV position 
+    # attach_pos                - a [3 by (# of robots)] ndarray, the n-th col describes the 3D position
+    #                             of the n-th cable attachment position
+    # cable_length              - a (# of robots) sized ndarray (shape of (3,)), the n-th element describes the length
+    #                             of the cable used by the n-th robot
+
+    # OUTPUTS:
+    # flag                      - a (# of robots) sized ndarray (shape of (3,)) with boolean type elements
+    #                             the n-th element describes if the n-th cable is slack
       print("current cable length: ", np.linalg.norm(robot_pos-attach_pos, 2, 0))
       flag = (np.linalg.norm(robot_pos - attach_pos, 2, 0) <= (cable_length - 1e-4))
       return flag
 
   def isslack(self, robot_pos, attach_pos, cable_length):
-      # this is only for ptmass case
+    # DESCRIPTION:
+    # This method takes in quad rotor position, cable attchment position
+    # and cable and determines if the cable is slack or not.
+    # This method is only used in for point mass case
+    
+    # INPUTS:
+    # robot_pos                 - a [3 by 1] ndarray, describing the 3D position
+    #                             of the MAV position 
+    # attach_pos                - a [3 by 1] ndarray, describing the 3D position
+    #                             of the cable attachment position
+    # cable_length              - a ndarray (shape of (1,)), the n-th element describes the length
+    #                             of the cable used by the n-th robot
+
+    # OUTPUTS:
+    # flag                      - an ndarray (shape of (1,)) with boolean type elements
+    #                             the element describes if the cable is slack
       if (np.linalg.norm(robot_pos - attach_pos) > (cable_length - 1e-4)):
         return np.array([0.0])
       else:
@@ -502,6 +586,7 @@ class simulation_base():
 ##################                    hybrid                    ####################
 ####################################################################################
   def hybrid_cooperative_rigidbody_pl_transportationEOM(self, t, s): 
+      # DESCRIPTION:
       # EOM Wrapper function for solving quadrotor equation of motion
       #	EOM takes in time, state vector
       #	and parameters and output the derivative of the state vector, the
@@ -514,6 +599,8 @@ class simulation_base():
       #                                 qLw, qLx, qLy, qLz, pL, qL, rL,
       #                                 [xQ, yQ, zQ, xQd, yQd, zQd]_i, i = 1,...,nquad
       #                                 [qw, qx, qy, qz, pQuad, qQuad, rQuad]_i, i = 1,...,nquad
+
+      # IMPORTANT ATTRIBUTES USED
       # nquad         - number of quads
       # qn            - quad id (used for multi-robot simulations)
       # plcontrolhdl  - function handle of payload controller
@@ -523,7 +610,6 @@ class simulation_base():
       
       # OUTPUTS:
       # sdot          - 13*(nquad+1) x 1, derivative of state vector s
-      
       if not self.sim_start :
           self.pl_accel = np.zeros(3)
           self.pl_ang_accel = np.zeros(3)
@@ -620,12 +706,10 @@ class simulation_base():
              M = self.uav_M[:,uav_idx]
              sdotQuad = self.taut_quadEOM_readonly(uav_s,F,M,T)
          sdot = np.concatenate((sdot,sdotQuad))
-      #print("The sdot for load is", sdotLoad)
       return sdot
-      
-      #return np.zeros(91)
     
   def rigidbody_payloadEOM_readonly(self, s, F, M, invML, C, D, E): 
+      # DESCRIPTION:
       # rigidbody_payloadEOM_READONLY Solve payload equation of motion
       # payloadEOM_readonly calculate the derivative of the state vector
       
@@ -634,6 +718,12 @@ class simulation_base():
       # s      - 13 x 1, state vector = [xL, yL, zL, xLd, yLd, zLd, qw, qx, qy, qz, pL,qL,rL]
       # F      - 1 x 1, thrust output from controller (only used in simulation)
       # M      - 3 x 1, moments output from controller (only used in simulation)
+      # invML  - 3 x 3, inverse of the ML with payload mass as diagnal elements
+      # C      - 
+      # D      - 
+      # E      - 
+
+      # IMPORTANT ATTRIBUTE USED
       # params - struct, output from crazyflie() and whatever parameters you want to pass in
           
       # OUTPUTS:
@@ -664,7 +754,7 @@ class simulation_base():
       return sdotLoad
 
   def taut_quadEOM_readonly(self, qd, F, M, T): 
-      print("taut")
+      # DESCRIPTION:
       # QUADEOM_READONLY Solve quadrotor equation of motion when the cable is
       # slack.
       # quadEOM_readonly calculate the derivative of the state vector
@@ -672,11 +762,11 @@ class simulation_base():
       # INPUTS:
       # params - struct, parameters you want to pass in
           
-          # OUTPUTS:
+      # OUTPUTS:
       # sdot   - 13 x 1, derivative of state vector s
       
       #************ EQUATIONS OF MOTION ************************
-      
+      print("taut")
       # Assign states
       vel   = qd[3:6]
       quat  = qd[6:10]
@@ -711,7 +801,7 @@ class simulation_base():
       return sdot
     
   def slack_quadEOM_readonly(self, qd, F, M): 
-      print("slack")
+      # DESCRIPTION:
       # QUADEOM_READONLY Solve quadrotor equation of motion when the cable is
       # slack.
       # quadEOM_readonly calculate the derivative of the state vector
@@ -719,13 +809,13 @@ class simulation_base():
       # INPUTS:
       # t      - 1 x 1, time
       # qd     - struct, quadrotor states and inputs
-      # params - struct, parameters you want to pass in
+      # F      - struct, parameters you want to pass in
       
       # OUTPUTS:
       # sdot   - 13 x 1, derivative of state vector s
       
       #************ EQUATIONS OF MOTION ************************
-      
+      print("slack")
       # Assign states
       vel   = qd[3:6]
       quat  = qd[6:10]
