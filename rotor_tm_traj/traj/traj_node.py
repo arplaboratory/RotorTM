@@ -43,6 +43,18 @@ class traj_node:
 		print("Trajectory Generator Initialization Finished")
 	
 	def circle_traj_cb(self, req):
+	# DESCRIPTION
+	# call back function for the circular trajectory service "/Circle"
+	# It first check if (if any) previous trajectory generation has finished
+	# if yes, it will create a circlar traj object that would initialize the trajectory (when called the first time)
+	# 												          output waypoint of the trajectory (for subsequent calls)
+	
+	# INPUT
+	# req		- parameters necessary for create the circular trajectory. 
+	# 			  Check ~/ws/src/rotorTM/rotor_tm_traj/srv/Circle.srv for details
+
+	# OUTPUT
+	# /			- update the attribute self.current_traj to be of circular type
 		if self.traj_start:
 			self.is_finished = self.current_traj.finished
 		## call circular traj services
@@ -57,6 +69,18 @@ class traj_node:
 
 
 	def line_traj_cb(self, req):
+	# DESCRIPTION
+	# call back function for the line trajectory service "/Line"
+	# It first check if (if any) previous trajectory generation has finished
+	# if yes, it will create a line traj object that would initialize the trajectory (when called the first time)
+	# 												       output waypoint of the trajectory (for subsequent calls)
+	
+	# INPUT
+	# req		- parameters necessary for create the line trajectory. 
+	# 			  Check ~/ws/src/rotorTM/rotor_tm_traj/srv/Line.srv for details
+
+	# OUTPUT
+	# /			- update the attribute self.current_traj to be of line type
 		if self.traj_start:
 			self.is_finished = self.current_traj.finished
 		if self.is_finished == False:
@@ -77,6 +101,18 @@ class traj_node:
 
 
 	def min_derivative_line_traj_cb(self, req):
+	# DESCRIPTION
+	# call back function for the trajectory service "/Min_Derivative_Line"
+	# It first check if (if any) previous trajectory generation has finished
+	# if yes, it will create a lineMin_Derivative_Line traj object that would initialize the trajectory (when called the first time)
+	# 												       					  output waypoint of the trajectory (for subsequent calls)
+	
+	# INPUT
+	# req		- parameters necessary for create the lineMin_Derivative_Linse trajectory. 
+	# 			  Check ~/ws/src/rotorTM/rotor_tm_traj/srv/Line.srv for details
+
+	# OUTPUT
+	# /			- update the attribute self.current_traj to be of lineMin_Derivative_Line type
 		if self.traj_start:
 			self.is_finished = self.current_traj.finished
 		if self.is_finished == False:
@@ -97,12 +133,27 @@ class traj_node:
 
 
 	def odom_callback(self, data):
+	# DESCRIPTION
+	# call back function for payload/odom subscriber. Extract current state
+	
+	# INPUT
+	# data		- nav_msgs.msg, Odometry type message. Acquired from odom callback
 
+	# OUTPUT
+	# /			- update the attribute self.current_state
 		self.curr_state = np.array([data.pose.pose.position.x,data.pose.pose.position.y,data.pose.pose.position.z,\
 									data.pose.pose.orientation.w, data.pose.pose.orientation.x,data.pose.pose.orientation.y,data.pose.pose.orientation.z])
 
 	def send_des_traj(self,t):
+	# DESCRIPTION
+	# when called, will spit out a new waypoint for the current trajectory type. 
+	# Must be call after initialization of each type of trajectory
+	
+	# INPUT
+	# t  		- float, current simulation time
 
+	# OUTPUT
+	# /			- publish PositionCommand type message to payload/des_traj
 		if self.traj_start:
 			if (self.current_traj.traj_type != 0):
 				if (self.current_traj.traj_type == 1):
@@ -145,6 +196,8 @@ if __name__ == '__main__':
 	## create a node called 'traj_node'
 	node_name = 'traj_generator'
 	rospy.init_node(node_name)
+
+	# at a constant rate of 75 Hz, compute new trajectory way points
 	rate = rospy.Rate(75)
 	traj_node = traj_node()
 	while not rospy.is_shutdown():

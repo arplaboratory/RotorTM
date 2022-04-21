@@ -1,11 +1,11 @@
 <launch>
 <!-- edit below this line -->
     <arg name="uav_params_path"             default = "$(find rotor_tm_config)/config/uav_params/snapdragonfly.yaml"/>
-    <arg name="payload_params_path"         default = "$(find rotor_tm_config)/config/load_params/triangular_payload_sameasMatlab.yaml"/>
-    <arg name="mechanism_params_path"       default = "$(find rotor_tm_config)/config/attach_mechanism/rigid_links_mechanism.yaml"/>
-    <arg name="payload_control_gain_path"   default = "$(find rotor_tm_config)/config/control_params/triangular_payload_cooperative_rigidlink_gains.yaml"/>
+    <arg name="payload_params_path"         default = "$(find rotor_tm_config)/config/load_params/pointmass_payload.yaml"/>
+    <arg name="mechanism_params_path"       default = "$(find rotor_tm_config)/config/attach_mechanism/ptmass_cable_mechanism.yaml"/>
+    <arg name="payload_control_gain_path"   default = "$(find rotor_tm_config)/config/control_params/pointmass_cable_gains.yaml"/>
     <arg name="uav_control_gain_path"       default = "$(find rotor_tm_config)/config/control_params/dragonfly_control_gains.yaml"/>
-    <arg name="number_of_robots"            default="3"/>
+    <arg name="number_of_robots"            default="1"/>
 <!-- edit above this line -->
 
 <!--Lists of provided scenarios-->
