@@ -1,6 +1,6 @@
 rosservice call /traj_generator/Line "path:
-- x: -0.5
-  y: -0.4
+- x: 0.0
+  y: 0.0
   z: 0.5"
 
 read -n 1 -s

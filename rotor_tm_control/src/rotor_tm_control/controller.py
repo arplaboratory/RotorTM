@@ -519,7 +519,7 @@ class controller:
 
         e3 = np.array([[0],[0],[1]])
 
-        Rot = ql["rot"].T
+        Rot = ql["rot"]
         omega = ql["omega"]
 
         ## Position control
@@ -648,7 +648,7 @@ class controller:
         e_xi = np.cross(xi_des_, xi_, axisa=0, axisb=0).T
         e_w = w_ + xi_asym_ @ xi_asym_ @ w_des_
         Force = mu_ - quad_m*l*np.cross(xi_, qd_params.Kxi @ e_xi + qd_params.Kw @ e_w+ (xi_.T @ w_des_) * xidot_ + xi_asym_ @ xi_asym_ @ w_des_dot_, axisa=0, axisb=0).T
-        F = np.transpose(Force) @ np.transpose(Rot_worldtobody) @ e3
+        F = np.transpose(Force) @ Rot_worldtobody @ e3
 
         # Attitude Control        
         Rot_des = np.zeros((3,3), dtype=float)
@@ -662,13 +662,13 @@ class controller:
         Rot_des[:,0:1] = X_body_in_world
 
         # Errors of anlges and angular velocities
-        e_Rot = np.transpose(Rot_des) @ np.transpose(Rot_worldtobody) - Rot_worldtobody @ Rot_des
+        e_Rot = np.transpose(Rot_des) @ Rot_worldtobody - Rot_worldtobody.T @ Rot_des
         e_angle = vee(e_Rot)/2
 
         p_des = 0.0
         q_des = 0.0
         r_des = yawdot_des*Z_body_in_world[2]
-        e_omega = ql["qd_omega"] - Rot_worldtobody @ Rot_des @ np.array([[p_des], [q_des], [r_des]])
+        e_omega = ql["qd_omega"] - Rot_worldtobody.T @ Rot_des @ np.array([[p_des], [q_des], [r_des]])
 
         # Moment
         # Missing the angular acceleration term but in general it is neglectable.

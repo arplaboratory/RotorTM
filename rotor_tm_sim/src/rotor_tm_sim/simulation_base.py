@@ -962,7 +962,6 @@ class simulation_base():
 ####################################################################################
 ##################                    PTMASS                    ####################
 ####################################################################################
-# partially tested (tested with controller)
   def hybrid_ptmass_pl_transportationEOM(self, t, s):
     # QUADEOM Wrapper function for solving quadrotor equation of motion
     # 	quadEOM takes in time, state vector, and output the derivative of the state vector, the
@@ -997,7 +996,7 @@ class simulation_base():
       plqd["qd_quat"] = s[19:23]
       plqd["qd_omega"] = s[23:26]
       Rot = utilslib.QuatToRot(s[19:23])
-      plqd["qd_rot"] = Rot.T
+      plqd["qd_rot"] = Rot
       quad_load_rel_pos = plqd["qd_pos"]-plqd["pos"]
       quad_load_rel_vel = plqd["qd_vel"]-plqd["vel"]
 
@@ -1029,10 +1028,10 @@ class simulation_base():
       # Solving for Quadrotor Angular Velocity
       K_quat = 2.0 # this enforces the magnitude 1 constraint for the quaternion
       quaterror = 1 - np.linalg.norm(qd_quat)
-      qdot = -1/2*np.array([[0, -p, -q, -r],
-                            [p,  0, -r,  q],
-                            [q,  r,  0, -p],
-                            [r, -q,  p,  0]]) @ qd_quat.reshape((qd_quat.shape[0], 1)) + K_quat * quaterror * qd_quat.reshape((qd_quat.shape[0], 1))
+      qdot =  1/2*np.array([[0, -p, -q, -r],
+                            [p,  0,  r, -q],
+                            [q, -r,  0,  p],
+                            [r,  q, -p,  0]]) @ qd_quat.reshape((qd_quat.shape[0], 1)) + K_quat * quaterror * qd_quat.reshape((qd_quat.shape[0], 1))
 
       # Solving for Quadrotor Angular Acceleration
       pqrdot   = self.uav_params.invI @ (M - np.reshape(np.cross(qd_omega, self.uav_params.I @ qd_omega, axisa=0, axisb=0), (3,1)))
@@ -1076,10 +1075,10 @@ class simulation_base():
       # Solving for Quadrotor Angular Velocity
       K_quat = 2 # this enforces the magnitude 1 constraint for the quaternion
       quaterror = 1 - np.linalg.norm(qd_quat)
-      qdot = -1/2*np.array([[0, -p, -q, -r],
-                            [p,  0, -r,  q],
-                            [q,  r,  0, -p],
-                            [r, -q,  p,  0]]) @ qd_quat.reshape((qd_quat.shape[0], 1)) + K_quat * quaterror * qd_quat.reshape((qd_quat.shape[0], 1))
+      qdot =  1/2*np.array([[0, -p, -q, -r],
+                            [p,  0,  r, -q],
+                            [q, -r,  0,  p],
+                            [r,  q, -p,  0]]) @ qd_quat.reshape((qd_quat.shape[0], 1)) + K_quat * quaterror * qd_quat.reshape((qd_quat.shape[0], 1))
 
       # Solving for Quadrotor Angular Acceleration
       pqrdot   = self.uav_params.invI @ (M - np.cross(qd_omega, self.uav_params.I @ qd_omega, axisa=0, axisb=0).T.reshape(3, 1))
@@ -1123,7 +1122,6 @@ class simulation_base():
 ####################################################################################
 ##################                  Rigidlink                   ####################
 ####################################################################################
-# partially tested (tested without controller)
   def rigid_links_cooperative_rigidbody_pl_EOM(self, t, s):
     # original          - 13 x 1, state vector = [xL,   yL,     zL, 
     #                                             xLd,  yLd,    zLd, 
@@ -1143,7 +1141,7 @@ class simulation_base():
       qd["vel"] = s[3:6]
       qd["quat"] = s[19:23]
       qd["omega"] = s[10:13]
-      qd["rot"] = utilslib.QuatToRot(qd["quat"]).T
+      qd["rot"] = utilslib.QuatToRot(qd["quat"])
 
       result = self.rigidbody_structEOM_readonly(t, qd, self.uav_F, self.uav_M)
       return result
@@ -1224,10 +1222,10 @@ class simulation_base():
       # Payload quaternion first derivative
       K_quat = 2; #this enforces the magnitude 1 constraint for the quaternion
       quaterror = 1 - (qW**2 + qX**2 + qY**2 + qZ**2)
-      qLdot = -1/2*np.array([   [0, -p, -q, -r],
-                                [p,  0, -r,  q],
-                                [q,  r,  0, -p],
-                                [r, -q,  p,  0]]) @ quat + K_quat * quaterror * quat
+      qLdot =  1/2*np.array([   [0, -p, -q, -r],
+                                [p,  0,  r, -q],
+                                [q, -r,  0,  p],
+                                [r,  q, -p,  0]]) @ quat + K_quat * quaterror * quat
 
       # Payload Angular acceleration
       # all uav orientations are the same
