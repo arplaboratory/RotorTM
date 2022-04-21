@@ -26,7 +26,7 @@ class options:
         self.max_vel = 3
         self.max_acc = 10
         self.dim = 3
-        self.cor_wid = 0.5
+        self.cor_wid = 0.2
         self.nc = 10
         self.cor_constraint = False
         self.max_iteration = 300   

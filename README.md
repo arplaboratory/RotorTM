@@ -106,3 +106,13 @@ Here are the parameters to set for generating the circular trajectory:
 
 ### Minimum Derivative Trajectory Generator
 The minimum_derivative trajectory generator will generate a trajectory that goes through a given path. The path will avoid sharp turning and sudden change of directions.
+
+A corridor constraint is also provided for the minimum derivative trajectory generator. The `create_option.py` in `rotor_tm_traj.traj.Optimization` can be modified to activative/deactivate this constaint. The width of the corridor can also be changed. 
+
+To activate corridor constraint, set `self.cor_constraint` to `True`.
+
+To deactivate corridor constraint, set `self.cor_constraint` to `True`.
+
+To set width of the corridor, set `self.cor_wid` to a float.
+
+Currently, the cooridor constraint is deactivated.
