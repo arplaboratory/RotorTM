@@ -1,5 +1,5 @@
 import numpy as np
-# untested
+# tested
 def generate_2pt_corridor_constraint(path, traj_constant):
     # returns A and b
 
