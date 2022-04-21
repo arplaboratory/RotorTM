@@ -1,0 +1,13 @@
+# Define the type of the connection
+type: "Rigid Link" 
+
+# Define the total number of robots
+num_of_robots: 2
+
+# Define where the cable is attached at
+rho: 
+  - {x: 0.0, y: -0.19, z: 0.0115}
+  - {x: 0.0, y: 0.19,  z: 0.0115}
+
+# Define the initial yaw of each UAV
+yaw_list: [0.0,0.0]
