@@ -294,10 +294,10 @@ class simulation_base():
 
                 ## state integration
                 if self.cable_is_slack:
-                    print("Cable is slack")
+                    # print("Cable is slack")
                     sol = scipy.integrate.solve_ivp(self.hybrid_ptmass_pl_transportationEOM, t_span, x, method= 'RK45', t_eval=t_span, events=ptmassslackToTaut)
                 else:
-                    print("Cable is taut")
+                    # print("Cable is taut")
                     sol = scipy.integrate.solve_ivp(self.hybrid_ptmass_pl_transportationEOM, t_span, x, method= 'RK45', t_eval=t_span, events=ptmasstautToSlack)
                 
                 ## extract state from solver soltion
@@ -318,10 +318,10 @@ class simulation_base():
                 
                 ## make sure velocities are distributed with no new collisions happening 
                 while np.any(inelastic_collision_flag):
-                    print("collision!")
+                    # print("collision!")
                     before_collide_inelastic_collision_flag = inelastic_collision_flag
                     x = self.rigidbody_quad_inelastic_cable_collision(x, inelastic_collision_flag)
-                    print("collision finished!")
+                    # print("collision finished!")
                     after_collide_inelastic_collision_flag = self.cooperative_check_inelastic(x)
                     if np.any((after_collide_inelastic_collision_flag - before_collide_inelastic_collision_flag)>0):
                         inelastic_collision_flag = after_collide_inelastic_collision_flag + before_collide_inelastic_collision_flag
@@ -364,7 +364,7 @@ class simulation_base():
                     id = id + 1
 
                 ## state integration
-                sol = scipy.integrate.solve_ivp(self.hybrid_cooperative_rigidbody_pl_transportationEOM, t_span, x, method='RK23', t_eval=t_span, events=GuardEvents)
+                sol = scipy.integrate.solve_ivp(self.hybrid_cooperative_rigidbody_pl_transportationEOM, t_span, x, method='RK45', t_eval=t_span, events=GuardEvents)
                 
                 ## extract state from solver soltion
                 EventTriggered_bool = sol.status
@@ -556,7 +556,6 @@ class simulation_base():
     # OUTPUTS:
     # flag                      - a (# of robots) sized ndarray (shape of (3,)) with boolean type elements
     #                             the n-th element describes if the n-th cable is slack
-      print("current cable length: ", np.linalg.norm(robot_pos-attach_pos, 2, 0))
       flag = (np.linalg.norm(robot_pos - attach_pos, 2, 0) <= (cable_length - 1e-4))
       return flag
 
@@ -766,7 +765,7 @@ class simulation_base():
       # sdot   - 13 x 1, derivative of state vector s
       
       #************ EQUATIONS OF MOTION ************************
-      print("taut")
+      # print("taut")
       # Assign states
       vel   = qd[3:6]
       quat  = qd[6:10]
@@ -815,7 +814,7 @@ class simulation_base():
       # sdot   - 13 x 1, derivative of state vector s
       
       #************ EQUATIONS OF MOTION ************************
-      print("slack")
+      # print("slack")
       # Assign states
       vel   = qd[3:6]
       quat  = qd[6:10]

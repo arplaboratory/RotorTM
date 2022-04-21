@@ -41,11 +41,21 @@ class traj:
 		self.polynomial_coeff = None
 		self.traj_constant = None
 
+		# check if the current traj has finished
+		self.finished = False
+		self.traj_type = 0
+		# 0 is flag for traj is not initialized
+		# 1 is circle
+		# 2 is line
+		# 3 is min_snap
+
 	def circle(self, t, init_pos = None, r = None, period = None, circle_duration = None):
 		# CIRCLE trajectory generator for a circle
-
+		
 		if (np.all(init_pos!=None)) and (r != None) and (period != None) and (circle_duration != None):
 			print('Generating Circular Trajectory ...')
+
+			self.finished = False
 			self.Radius = r
 			self.offset_pos = np.array([init_pos[0]-self.Radius, init_pos[1], init_pos[2]])
 			self.T = period
@@ -62,7 +72,7 @@ class traj:
 			self.ramp_dist = sum(np.multiply(self.ramp_theta_coeff, np.array([[1],[1/2],[1/3],[1/4],[1/5],[1/6]])))
 			self.circle_dist = self.omega_des*self.duration
 			self.tf = self.ramp_t * 2 + self.duration
-
+			self.traj_type = 1
 		else:
 			if t < self.tf:
 				if t<=self.ramp_t:  # ramping up the circle
@@ -108,6 +118,7 @@ class traj:
 				vel = np.array([[0],[0],[0]])
 				acc = np.array([[0],[0],[0]])
 				jrk = np.array([[0],[0],[0]])
+				self.finished = True
 
 			self.state_struct["pos_des"] = pos
 			self.state_struct["vel_des"] = vel
@@ -122,6 +133,8 @@ class traj:
 		# path is a 2D array
 		if (np.any(map!= None) ) and (np.any(path != None)):
 			print("Generating quintic trajectory")
+
+			self.finished = False
 			self.mapquad = map
 			self.pathall = path
 			pathqn = self.pathall
@@ -181,7 +194,7 @@ class traj:
 				inverse = np.linalg.inv(constraints[6*j-6:6*j,0:6])
 				coefficient_temp = np.matmul(inverse,condition[6*j-6:6*j,0:3])
 				self.coefficient[6*j-6:6*j,0:3] = coefficient_temp
-
+			self.traj_type = 2
 		else:
 				lengthtime = self.timepoint.shape[0]
 				length = lengthtime -1 
@@ -199,7 +212,7 @@ class traj:
 						state[0, :] = self.finalpath[lengthtime - 1, :]
 						state[1, :] = np.array([0,0,0])
 						state[2, :] = np.array([0,0,0])
-
+						self.finished = True
 				self.state_struct["pos_des"] = np.transpose(state[0,:])
 				self.state_struct["vel_des"] = np.transpose(state[1,:])
 				self.state_struct["acc_des"] = np.transpose(state[2,:])
@@ -211,6 +224,8 @@ class traj:
 		
 		if (np.any(path!= None) ) and (np.any(options != None)):
 			print("The path is ", path)
+
+			self.finished = False
 			self.pathall = path
 			self.finalpath = path
 			self.traj_constant = options
@@ -225,10 +240,10 @@ class traj:
 			T_seg_c = allocate_time(path,self.traj_constant.max_vel,self.traj_constant.max_acc)
 			print(T_seg_c)
 			self.coefficient, self.timelist = optimize_traj(path, self.traj_constant, T_seg_c, self.traj_constant.cor_constraint)
+			self.traj_type = 3
 
 		else:
 			for i in range(1, self.traj_constant.total_traj_num+1):
-
 				if (self.traj_constant.pt_num == 2) or (i%(self.traj_constant.pt_num-1) == 1):
 					t_start = self.timelist[i-1,0]
 				
@@ -245,6 +260,7 @@ class traj:
 					state[1,:] = np.array([[0,0,0]])
 					state[2,:] = np.array([[0,0,0]])
 					state[3,:] = np.array([[0,0,0]])
+					self.finished = True
 
 			self.state_struct["pos_des"] = np.transpose(state[0,:])
 			self.state_struct["vel_des"] = np.transpose(state[1,:])
