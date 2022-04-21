@@ -6,9 +6,11 @@ num_of_robots: 3
 
 # Define where the cable is attached at
 rho: 
-  - {x: -0.0940, y: -0.267, z: 0.0097}
-  - {x: 0.3683, y: 0.0,    z: 0.0097}
-  - {x: -0.0940, y: 0.267,  z: 0.0097}
+ - {x: -0.0940, y: -0.267, z: 0.0097}
+ - {x: 0.3683, y: 0.0,    z: 0.0097}
+ - {x: -0.0940, y: 0.267,  z: 0.0097}
+
 
 # Define the cable length
-cable_length: [0.5,0.5,0.5]
+cable_length: [1.05,1.05,1.05]
+#cable_length: [0.5,0.5,0.5]
