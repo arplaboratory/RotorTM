@@ -93,6 +93,7 @@ time      = starttime;  % current time
 max_iter  = time_tol / cstep;      % max iteration
 
 pl0 = [loadstart(1:3);0;0;0;loadstart(4:7);0;0;0];
+%pl0 = [0.207048387981896	-0.0157901983215737	0.409290816596278	0.110605619558883	0.00677891241864776	0.171785141630212	0.994454748856423	-0.0156005444554466	0.0988638633593859	-0.0322848573058338	0.0540688006190608	-1.52727698367622	0.0951037841237944]';
 x = pl0;
 xtraj{1} = [];
 ttraj{1} = [];
@@ -109,11 +110,10 @@ for qn = 1:nquad
     x = [x;x0{qn}];
 end
 
-
 % Maximum position error of the quadrotor at goal
-pos_tol  = 0.05; % m
+pos_tol  = 0.001; % m
 % Maximum speed of the quadrotor at goal
-vel_tol  = 0.05; % m/s
+vel_tol  = 0.001; % m/s
 
 % state vector x (13 + 7*nquad + 6*nquad) x 1:
 % x     - [xL, yL, zL, xLd, yLd, zLd,
@@ -219,7 +219,7 @@ for iter = 1:max_iter
     
     % Update simulation time
     time = time + tsave(end) - tsave(1);
-    t = toc
+    t = toc;
     
     % Pause to make real-time
     if (t < cstep)

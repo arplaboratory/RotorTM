@@ -23,7 +23,7 @@ for i = 1:nquad
     robot_marker_pub{i} = rospublisher("/quadrotor"+num2str(i)+"/marker","visualization_msgs/Marker","DataFormat","struct");
     quadrotor_marker_scale = 0.5*ones(3);
     quadrotor_marker_color = [1.0,0.0,0.0,1.0];
-    quadrotor_mesh = quad_params.mesh_path; %TODO: move this to quadrotor params.
+    quadrotor_mesh = quad_params.mesh_path; 
     quadrotor_marker_msg{i} = init_marker_msg(robot_marker_pub{i} ,10,0,worldframe,quadrotor_marker_scale,quadrotor_marker_color,quadrotor_mesh);
 end
 
@@ -106,9 +106,9 @@ ttraj{1} = [];
 xtrajdes{1} = [];
 
 % Maximum position error of the quadrotor at goal
-pos_tol  = 0.05; % m
+pos_tol  = 0.001; % m
 % Maximum speed of the quadrotor at goal
-vel_tol  = 0.05; % m/s
+vel_tol  = 0.001; % m/s
 
 quad_state = x0;
 %pl_dim_num = 13; % rigid body
