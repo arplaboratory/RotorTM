@@ -30,3 +30,7 @@
 *.exe
 *.out
 *.app
+
+# Matlab
+*.asv
+*.mat
