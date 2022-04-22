@@ -133,4 +133,4 @@ To deactivate corridor constraint, set `self.cor_constraint` to `True`.
 
 To set width of the corridor, set `self.cor_wid` to a float.
 
-Currently, the cooridor constraint is deactivated.
+Currently, the corridor constraint is deactivated.
