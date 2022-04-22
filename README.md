@@ -35,7 +35,7 @@ Maintainer: Guanrui Li (lguanrui@nyu.edu), Xinyang Liu (liuxy@nyu.edu)<br />**
 ## ROS Organization
 The ROS Organization is shown in the figure below. 
 ![Screenshot](doc/ros_diagram.png)
-The table below also summarized the publication and subsecption scheme. `#` is used to denote MAV number.
+The table below also summarized the publication and subscription scheme. `#` is used to denote MAV number.
 |Name|Description|Publications|Subscriptions|Services|
 |---|---|---|---|---|
 |`/controller_#`|Control MAV(s) to follow desired trajectory|`/controller_#/dragonfly#/fm_cmd`|`/dragonfly#/odom`
@@ -58,12 +58,11 @@ These files are used to set properties of the MAV(s).
 |`Attach Mechanism Params`|Attach mechanism parameters|
 
 ## Dependencies and Installation
-The RotorTM package is dependent on `Python 3.8` and `ROS Noetic/Melodic`. Please ensure `Python 3.8` as other python version may lead to build and import error. Python packages including `numpy`, `scipy`, and `cvxopt` should be installed with `pip install` (latest version). `PyQt5` is used to implement the GUI, which is included as a site package if `Python 3.8` is install. 
+The RotorTM package is dependent on `Python 3.8` and `ROS Noetic/Melodic`. Please ensure `Python 3.8` as other python versions may lead to build and import errors. Python packages including `numpy`, `scipy`, and `cvxopt` should be installed with `pip install`. 
 ```
 $ pip install numpy==1.22.1
 $ pip install scipy==1.8.0
 $ pip install cvxopt==1.2.7
-$ pip install PyQt5
 ```
 
 
@@ -77,8 +76,17 @@ $ source ~/path/to/your/workspace/devel/setup.bash
 ```
 
 ##  Running
+### Switching Off Hybrid Dynamics
+Before initialization, check PC's system info. If the processor is weaker than Intel® Core™ i7 (or equivalent), it is recommended to initialize the simulation with hybrid dynamics turned off. To turn it off, use command window to set `/hybrid_switch` rosparam to `False` after start `roscore`:
+```
+$ rosparam set /hybrid_switch False
+```
+Now proceed with 'Initialize Simulation' secition below. The hybrid dynamics will be turned off and a lighter integrator will be used. To turn on hybrid dynamics, set `/hybrid_switch` rosparam to `True` and relaunch the simulator.  
+
+By default, hybrid dynamics will be included in the simulator and a heavier integrator will be used to have better accuracy. If user wishes to include hybrid dynamics, this section can be ignored.
+
 ### Initialize Simulation
-Directly call the `.launch`  file using `roslaunch` command:
+Directly call the `.launch`  file using `roslaunch` command after `roscore` is started:
 ```
 $ source ~/path/to/your/workspace/devel/setup.bash
 $ roslaunch rotor_tm editable_launch.launch
@@ -125,7 +133,7 @@ Here are the parameters to set for generating the circular trajectory:
 ### Minimum Derivative Trajectory Generator
 The minimum_derivative trajectory generator will generate a trajectory that goes through a given path. The path will avoid sharp turning and sudden change of directions.
 
-A corridor constraint is also provided for the minimum derivative trajectory generator. The `create_option.py` in `rotor_tm_traj.traj.Optimization` can be modified to activative/deactivate this constaint. The width of the corridor can also be changed. 
+A corridor constraint is also provided for the minimum derivative trajectory generator. The `create_option.py` in `rotor_tm_traj.traj.Optimization` can be modified to activate/deactivate this constraint. The width of the corridor can also be changed. 
 
 To activate corridor constraint, set `self.cor_constraint` to `True`.
 
