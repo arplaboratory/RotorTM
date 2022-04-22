@@ -38,14 +38,14 @@ The ROS Organization is shown in the figure below.
 The table below also summarized the publication and subsecption scheme. `#` is used to denote MAV number.
 |Name|Description|Publications|Subscriptions|Services|
 |---|---|---|---|---|
-|`/controller_#`|Control MAV(s) to follow desired trajectory|/controller_#/dragonfly#/fm_cmd|/dragonfly#/odom
-||||/payload/des_traj|
-||||/payload/odom|
-|`/sim`|Simulate full system dynamics and publish all relevant Odometries for payload and MAV(s)|/dragonfly#/odom|/controller_#/dragonfly#/fm_cmd
-|||/payload/odom|
-|`/traj`|Compute and publish the payload desired trajectory|/payload/des_traj||/traj_generator/Circle
-|||||/traj_generator/Line
-|||||/traj_generator/Min_Derivative_Line
+|`/controller_#`|Control MAV(s) to follow desired trajectory|`/controller_#/dragonfly#/fm_cmd`|`/dragonfly#/odom`
+||||`/payload/des_traj`|
+||||`/payload/odom`|
+|`/sim`|Simulate full system dynamics and publish all relevant Odometries for payload and MAV(s)|`/dragonfly#/odom`|`/controller_#/dragonfly#/fm_cmd`
+|||`/payload/odom`|
+|`/traj`|Compute and publish the payload desired trajectory|`/payload/des_traj`||`/traj_generator/Circle`
+|||||`/traj_generator/Line`
+|||||`/traj_generator/Min_Derivative_Line`
 
 ## Parameters Files
 These files are used to set properties of the MAV(s).
