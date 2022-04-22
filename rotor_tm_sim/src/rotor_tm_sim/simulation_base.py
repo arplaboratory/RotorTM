@@ -7,7 +7,8 @@ import rospy
 import scipy.integrate
 from scipy.spatial.transform import Rotation as rot_math
 from visualization_msgs.msg import MarkerArray, Marker
-from nav_msgs.msg import Odometry 
+from nav_msgs.msg import Odometry, Path
+from geometry_msgs.msg import PoseStamped
 from rotor_tm_msgs.msg import RPMCommand, FMCommand 
 from rotor_tm_utils import utilslib, rosutilslib
 from rotor_tm_utils.vee import vee
@@ -219,6 +220,8 @@ class simulation_base():
       # ROS Publisher 
       self.system_publisher = rospy.Publisher('system/marker',MarkerArray,queue_size=10)
       self.payload_odom_publisher = rospy.Publisher('payload/odom',Odometry,queue_size=1, tcp_nodelay=True)
+      self.payload_path_publisher = rospy.Publisher('payload/path',Path,queue_size=1, tcp_nodelay=True)
+      self.payload_path = Path()
       self.robot_odom_publisher = []
       self.attach_publisher = []
       for i in range(self.nquad):
@@ -413,8 +416,39 @@ class simulation_base():
         payload_odom.twist.twist.angular.x   = x[10]
         payload_odom.twist.twist.angular.y   = x[11]
         payload_odom.twist.twist.angular.z   = x[12]
+
+
         self.payload_odom_publisher.publish(payload_odom)
 
+        # Publish payload path
+        current_time = rospy.get_rostime()
+
+        self.payload_path.header.stamp = current_time
+        self.payload_path.header.frame_id = self.worldframe 
+        payload_rotmat = utilslib.QuatToRot(sol.y[:,0][6:10])
+
+        pl_pose_stamped = PoseStamped()
+        pl_pose_stamped.header.stamp = current_time
+        pl_pose_stamped.header.frame_id = self.worldframe
+
+        if self.pl_params.mechanism_type == 'Rigid Link':
+            # for rigid link scenario, the payload position is uav position
+            self.load_pos = x[0:3].reshape((3,1)) + payload_rotmat @ self.pl_params.rho_load
+            pl_pose_stamped.pose.position.x = self.load_pos[0]
+            pl_pose_stamped.pose.position.y = self.load_pos[1]
+            pl_pose_stamped.pose.position.z = self.load_pos[2]
+        else:
+            pl_pose_stamped.pose.position.x    = x[0]
+            pl_pose_stamped.pose.position.y    = x[1]
+            pl_pose_stamped.pose.position.z    = x[2]
+
+        pl_pose_stamped.pose.orientation.w = x[6]
+        pl_pose_stamped.pose.orientation.x = x[7]
+        pl_pose_stamped.pose.orientation.y = x[8]
+        pl_pose_stamped.pose.orientation.z = x[9]
+
+        self.payload_path.poses.append(pl_pose_stamped)
+        self.payload_path_publisher.publish(self.payload_path)
 
         system_marker = MarkerArray()
         cable_point_list = np.zeros((2*self.nquad,3))
