@@ -2,7 +2,7 @@
 An Aerial Transportation and Manipulation Simulator for Research and Education
 
 ## License
-Please be aware that this code was originally implemented for research purposes and may be subject to changes and any fitness for a particular purpose is disclaimed. To inquire about commercial licenses, please contact Guanrui Li (lguanrui@nyu.edu).
+Please be aware that this code was originally implemented for research purposes and may be subject to changes and any fitness for a particular purpose is disclaimed. To inquire about commercial licenses, please contact Guanrui Li (lguanrui@nyu.edu), Xinyang Liu (liuxy@nyu.edu) and Prof. Giuseppe Loianno (loiannog@nyu.edu).
 ```
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
