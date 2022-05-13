@@ -26,6 +26,7 @@ If you publish a paper with our simulator, please cite our paper:
   url = {https://arxiv.org/abs/2205.05140},
   author = {Li, Guanrui and Liu, Xinyang and Loianno, Giuseppe},
   title = {RotorTM: A Flexible Simulator for Aerial Transportation and Manipulation}}
+```
 
 ## Overview
 #### Description
