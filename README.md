@@ -19,7 +19,7 @@ Please be aware that this code was originally implemented for research purposes 
     
 ```
 ## Citation
-If you publish a paper with our simulator, we hope that you can kindly cite our paper: 
+If you publish a paper with our simulator, please cite our paper: 
 ```
 @article{rotortm2022,
   doi = {10.48550/ARXIV.2205.05140}, 
