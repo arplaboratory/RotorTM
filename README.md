@@ -18,7 +18,14 @@ Please be aware that this code was originally implemented for research purposes 
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
     
 ```
-
+## Citation Bib File
+If you publish a paper with our simulator, we hope that you can kindly cite our paper: 
+@article{rotortm2022,
+  doi = {10.48550/ARXIV.2205.05140}, 
+  url = {https://arxiv.org/abs/2205.05140},
+  author = {Li, Guanrui and Liu, Xinyang and Loianno, Giuseppe},
+  title = {RotorTM: A Flexible Simulator for Aerial Transportation and Manipulation}}
+  
 ## Overview
 #### Description
 RotorTM is an aerial transportation and manipulation simulator of MAVs with different payloads and passive connection mechanisms. It incorporates full system
