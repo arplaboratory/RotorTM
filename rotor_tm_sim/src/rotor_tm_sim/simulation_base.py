@@ -8,7 +8,7 @@ import scipy.integrate
 from scipy.spatial.transform import Rotation as rot_math
 from visualization_msgs.msg import MarkerArray, Marker
 from nav_msgs.msg import Odometry, Path
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseStamped, Wrench
 from rotor_tm_msgs.msg import RPMCommand, FMCommand 
 from rotor_tm_utils import utilslib, rosutilslib
 from rotor_tm_utils.vee import vee
@@ -123,6 +123,8 @@ class simulation_base():
       self.mav_name = 'dragonfly'
       self.sim_start = False
       self.last_odom_time_received = 0.0
+      self.ext_force = np.array([0.0,0.0,0.0])
+      self.ext_torque = np.array([0.0,0.0,0.0])
 
       # Three scenario:
       #                 1. Cooperative
@@ -234,7 +236,7 @@ class simulation_base():
           controller_name = "/controller_" + str(uav_id+1)
           self.robot_command_subscriber.append(rospy.Subscriber(controller_name + '/' + mav_name + '/rpm_cmd',RPMCommand,self.rpm_command_callback,uav_id,queue_size=1, tcp_nodelay=True))
           self.robot_command_subscriber.append(rospy.Subscriber(controller_name + '/' + mav_name + '/fm_cmd',FMCommand,self.fm_command_callback,uav_id,queue_size=1, tcp_nodelay=True))
-    
+      self.payload_ext_wrench = rospy.Subscriber("/payload/so3_control/ext_wrench", Wrench, self.ext_wrench_callback, queue_size=1, tcp_nodelay=True)
       # Visualization Init
       self.cable_marker_scale = 0.01 * np.ones(3)
       self.cable_marker_color = np.array([1.0,0.5,0.5,0.5])
@@ -890,8 +892,8 @@ class simulation_base():
 
               # Sum Net Force, Moment and other corresponding terms
               # for the Payload Dynamics
-              pl_net_F = pl_net_F + attach_qn_force
-              pl_net_M = pl_net_M + attach_qn_moment
+              pl_net_F = pl_net_F + attach_qn_force + self.ext_force
+              pl_net_M = pl_net_M + attach_qn_moment + self.ext_torque
               Ck = self.uav_params.mass * np.matmul(rho_qn_asym, np.matmul(pl_rot.T, xixiT))
               Dk = - np.transpose(Ck)
               Ek = np.matmul(Ck, np.matmul(pl_rot, rho_qn_asym))
@@ -1489,6 +1491,11 @@ class simulation_base():
 
 
 ##################                  Call backs                  ####################
+  
+  def ext_wrench_callback(self, wrench_command):
+      self.ext_force = np.array([wrench_command.force.x, wrench_command.force.y, wrench_command.force.y])
+      self.ext_torque= np.array([wrench_command.torque.x, wrench_command.torque.y, wrench_command.torque.y])
+
   def rpm_command_callback(self,rpm_command,uav_id):
       return
 

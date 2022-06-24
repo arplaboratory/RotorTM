@@ -75,6 +75,9 @@
 
     <!-- Start simulation and trajectory nodes-->
     <node pkg="rotor_tm" type="runsim.py" name="sim" output="screen" args="$(arg payload_params_path) $(arg uav_params_path) $(arg mechanism_params_path) $(arg payload_control_gain_path) $(arg uav_control_gain_path)">
+    <!--<remap from="/controller_3/dragonfly3/fm_cmd" to="/dragonfly3/fm_cmd"/>
+    <remap from="/controller_2/dragonfly2/fm_cmd" to="/dragonfly2/fm_cmd"/>
+    <remap from="/controller_1/dragonfly1/fm_cmd" to="/dragonfly1/fm_cmd"/>-->
     </node>
     <node pkg="rotor_tm_traj" type="traj_node.py" name="traj" output="screen">
     </node>

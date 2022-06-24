@@ -1,0 +1,22 @@
+<launch>
+<!-- edit below this line -->
+    <arg name="uav_params_path"             default = "$(find rotor_tm_config)/config/uav_params/snapdragonfly_sameasMatlab.yaml"/>
+    <arg name="payload_params_path"         default = "$(find rotor_tm_config)/config/load_params/triangular_payload_sameasMatlab.yaml"/>
+    <arg name="mechanism_params_path"       default = "$(find rotor_tm_config)/config/attach_mechanism/3_robots_cable_mechanism.yaml"/>
+    <arg name="payload_control_gain_path"   default = "$(find rotor_tm_config)/config/control_params/triangular_payload_cooperative_cable_gains.yaml"/>
+    <arg name="uav_control_gain_path"       default = "$(find rotor_tm_config)/config/control_params/dragonfly_control_gains.yaml"/>
+    <arg name="number_of_robots"            default = "3"/>
+<!-- edit above this line -->
+
+
+    <!-- Start simulation and trajectory nodes-->
+    <node pkg="rotor_tm" type="runsim.py" name="sim" output="screen" args="$(arg payload_params_path) $(arg uav_params_path) $(arg mechanism_params_path) $(arg payload_control_gain_path) $(arg uav_control_gain_path)">
+    <remap from="/controller_3/dragonfly3/fm_cmd" to="/dragonfly3/fm_cmd"/>
+    <remap from="/controller_2/dragonfly2/fm_cmd" to="/dragonfly2/fm_cmd"/>
+    <remap from="/controller_1/dragonfly1/fm_cmd" to="/dragonfly1/fm_cmd"/>
+    </node>
+
+    <include file="$(find rotor_tm)/launch/rviz.launch">
+    </include>
+
+ </launch>
