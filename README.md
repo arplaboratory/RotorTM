@@ -67,7 +67,7 @@ These files are used to set properties of the MAV(s).
 
 ## Dependencies and Installation
 The RotorTM package is dependent on `Python 3.8` and `ROS Noetic/Melodic`. Please ensure `Python 3.8` as other python versions may lead to build and import errors. Python packages including `numpy`, `scipy`, and `cvxopt` should be installed with `pip install`. 
-```
+```bash
 $ pip install numpy==1.22.1
 $ pip install scipy==1.8.0
 $ pip install cvxopt==1.2.7
@@ -76,7 +76,7 @@ $ pip install cvxopt==1.2.7
 
 After installation of necessary packages, clone the repo and `catkin_make` the ROS workspace. Source the `setup.bash` file inside the devel folder.
 
-```
+```bash
 $ cd /path/to/your/workspace/src
 $ git clone --branch Python/ROS https://github.com/arplaboratory/RotorTM.git
 $ catkin_make
@@ -86,7 +86,7 @@ $ source ~/path/to/your/workspace/devel/setup.bash
 ##  Running
 ### Switching Off Hybrid Dynamics
 Before initialization, check PC's system info. If the processor is weaker than Intel® Core™ i7 (or equivalent), it is recommended to initialize the simulation with hybrid dynamics turned off. To turn it off, use command window to set `/hybrid_switch` rosparam to `False` after start `roscore`:
-```
+```bash
 $ rosparam set /hybrid_switch False
 ```
 Now proceed with 'Initialize Simulation' secition below. The hybrid dynamics will be turned off and a lighter integrator will be used. To turn on hybrid dynamics, set `/hybrid_switch` rosparam to `True` and relaunch the simulator.  
@@ -95,7 +95,7 @@ By default, hybrid dynamics will be included in the simulator and a heavier inte
 
 ### Initialize Simulation
 Directly call the `.launch`  file using `roslaunch` command after `roscore` is started:
-```
+```bash
 $ source ~/path/to/your/workspace/devel/setup.bash
 $ roslaunch rotor_tm editable_launch.launch
 ```
@@ -150,3 +150,33 @@ To deactivate corridor constraint, set `self.cor_constraint` to `True`.
 To set width of the corridor, set `self.cor_wid` to a float.
 
 Currently, the corridor constraint is deactivated.
+
+## What's New?
+### Simulator Only Mode
+In this version, the simulator can be launched without launching any controllers for multi cooperative triangular payload type by calling
+
+```roslaunch rotorTM sim_launcher.launch```
+
+This is helpful when testing controllers other than what's provided.
+### External Wrench on Payload
+A module named 'keyboard2wrench' is added. Launching this module allows user to apply external wrench on the payload with keyboard. Use the following commands to start this module.
+```bash
+$ chmod +x ~/workspace/src/rotorTM/keyboard2wrench/keyboard2wrench.py
+$ rosrun keyboard2wrench keyboard2wrench.py
+```
+To apply a wrench, use the following key:
+```
+1 = +0.025N in x
+2 = +0.025N in y
+3 = +0.025N in z
+4 = +0.01Nm in pitch
+5 = +0.01Nm in row
+6 = +0.01Nm in yaw
+
+q = -0.025N in x
+w = -0.025N in y
+e = -0.025N in z
+r = -0.01Nm in pitch
+t = -0.01Nm in row
+y = -0.01Nm in yaw
+```
