@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <package>
-  <name>keyboard2wrench</name>
+  <name>rotor_tm_keyboard2wrench</name>
   <version>1.0.0</version>
   <description>Generic keyboard to wrench</description>
 
