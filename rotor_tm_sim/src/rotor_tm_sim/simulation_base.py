@@ -230,7 +230,7 @@ class simulation_base():
       for i in range(self.nquad):
           self.robot_odom_publisher.append(rospy.Publisher(self.mav_name + str(i+1) + '/odom',Odometry, queue_size=1, tcp_nodelay=True))
           self.attach_publisher.append(rospy.Publisher(self.mav_name + str(i+1) + '/attach',Odometry, queue_size=1, tcp_nodelay=True))
-          self.Imu_publisher.append(rospy.Publisher(self.mav_name + str(i+1) + '/Imu', Imu, queue_size=1, tcp_nodelay=True))
+          self.Imu_publisher.append(rospy.Publisher(self.mav_name + str(i+1) + '/imu', Imu, queue_size=1, tcp_nodelay=True))
            
       # ROS Subscriber 
       self.robot_command_subscriber = []
@@ -267,7 +267,7 @@ class simulation_base():
       if self.hybrid_flag:
         print("\n############################################################")
         print("HYBRID DYNAMICS IS TURN ON")
-        print("LOW PERFORMANCE PROCESSOR PROCEDE WITH CAUSTION")
+        print("LOW PERFORMANCE PROCESSOR PROCEDE WITH CAUTION")
         print("############################################################\n")
         while not rospy.is_shutdown():
             start = time.time()
@@ -550,7 +550,7 @@ class simulation_base():
                     attach_odom.twist.twist.linear.z = attach_vel[2]
                     self.attach_publisher[uav_id].publish(attach_odom)
 
-                    # Publish UAV Imu
+                    # Publish UAV imu
                     imu_pub = Imu()
                     imu_pub.header.stamp = current_time
                     imu_pub.header.frame_id = self.worldframe
@@ -740,6 +740,23 @@ class simulation_base():
                     attach_odom.twist.twist.linear.y = attach_vel[1]
                     attach_odom.twist.twist.linear.z = attach_vel[2]
                     self.attach_publisher[uav_id].publish(attach_odom)
+
+                    # Publish UAV imu
+                    imu_pub = Imu()
+                    imu_pub.header.stamp = current_time
+                    imu_pub.header.frame_id = self.worldframe
+                    imu_pub.orientation.w = uav_state[6]
+                    imu_pub.orientation.x = uav_state[7]
+                    imu_pub.orientation.y = uav_state[8]
+                    imu_pub.orientation.z = uav_state[9]
+                    imu_pub.angular_velocity.x = uav_state[10]
+                    imu_pub.angular_velocity.y = uav_state[11]
+                    imu_pub.angular_velocity.z = uav_state[12]
+                    imu_pub.linear_acceleration.x = self.imu_accel[0]
+                    imu_pub.linear_acceleration.y = self.imu_accel[1]
+                    imu_pub.linear_acceleration.z = self.imu_accel[2]
+                    self.Imu_publisher[uav_id].publish(imu_pub)
+
                 cable_point_list[2*uav_id,:] = uav_state[0:3]
                 cable_point_list[2*uav_id+1,:] = attach_pos[0:3]
                 uav_marker_msg = rosutilslib.init_marker_msg(Marker(),10,0,self.worldframe,self.uav_marker_scale,self.uav_marker_color,self.uav_mesh)
@@ -1014,7 +1031,7 @@ class simulation_base():
       # Acceleration
       #accel = 1 / self.uav_params.mass * (R * np.array([[0],[0],[F]]) + T * xi - np.array([[0],[0],[params.mass * params.grav]]))
       accel =  (np.matmul(R , np.array([0,0,F]) + T)/self.uav_params.mass - np.array([0,0,self.uav_params.grav]))
-      self.imu_accel = accel
+      self.imu_accel = (np.array([0,0,F]) + T)/self.uav_params.mass
       # quaternion derivative 
       qdot = utilslib.quat_dot(quat,omega)
 
@@ -1062,7 +1079,7 @@ class simulation_base():
 
       # Acceleration
       accel =  np.matmul(R , np.array([0,0,F])/self.uav_params.mass - np.array([0,0,self.uav_params.grav]))
-      self.imu_accel = accel
+      self.imu_accel = np.array([0,0,F])/self.uav_params.mass
       # Angular velocity
       qdot = utilslib.quat_dot(quat,omega)
 
