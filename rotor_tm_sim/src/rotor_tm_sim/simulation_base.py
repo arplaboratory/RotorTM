@@ -128,6 +128,7 @@ class simulation_base():
       self.ext_force = np.array([0.0,0.0,0.0])
       self.ext_torque = np.array([0.0,0.0,0.0])
       self.imu_accel = np.array([0.0,0.0,0.0])
+      self.variance = 0.01 # vio variance for ukf
       # Three scenario:
       #                 1. Cooperative
       #                 2. Point mass
@@ -539,6 +540,18 @@ class simulation_base():
                     uav_odom.twist.twist.angular.x = uav_state[10]
                     uav_odom.twist.twist.angular.y = uav_state[11]
                     uav_odom.twist.twist.angular.z = uav_state[12]
+                    uav_odom.pose.covariance = [self.variance, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                                    0.0, self.variance, 0.0, 0.0, 0.0, 0.0,
+                                                    0.0, 0.0, self.variance, 0.0, 0.0, 0.0,
+                                                    0.0, 0.0, 0.0, self.variance, 0.0, 0.0,
+                                                    0.0, 0.0, 0.0, 0.0, self.variance, 0.0,
+                                                    0.0, 0.0, 0.0, 0.0, 0.0, self.variance]
+                    uav_odom.twist.covariance = [self.variance, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                                    0.0, self.variance, 0.0, 0.0, 0.0, 0.0,
+                                                    0.0, 0.0, self.variance, 0.0, 0.0, 0.0,
+                                                    0.0, 0.0, 0.0, self.variance, 0.0, 0.0,
+                                                    0.0, 0.0, 0.0, 0.0, self.variance, 0.0,
+                                                    0.0, 0.0, 0.0, 0.0, 0.0, self.variance]
                     self.robot_odom_publisher[uav_id].publish(uav_odom)
 
                     # Publish UAV vio odometry
@@ -569,18 +582,18 @@ class simulation_base():
                     uav_vio_odom.twist.twist.angular.y = vio_angular_velocity[1]
                     uav_vio_odom.twist.twist.angular.z = vio_angular_velocity[2]
                     
-                    uav_vio_odom.pose.covariance = [0.01, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                                    0.0, 0.01, 0.0, 0.0, 0.0, 0.0,
-                                                    0.0, 0.0, 0.01, 0.0, 0.0, 0.0,
-                                                    0.0, 0.0, 0.0, 0.01, 0.0, 0.0,
-                                                    0.0, 0.0, 0.0, 0.0, 0.01, 0.0,
-                                                    0.0, 0.0, 0.0, 0.0, 0.0, 0.01]
-                    uav_vio_odom.twist.covariance = [0.01, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                                    0.0, 0.01, 0.0, 0.0, 0.0, 0.0,
-                                                    0.0, 0.0, 0.01, 0.0, 0.0, 0.0,
-                                                    0.0, 0.0, 0.0, 0.01, 0.0, 0.0,
-                                                    0.0, 0.0, 0.0, 0.0, 0.01, 0.0,
-                                                    0.0, 0.0, 0.0, 0.0, 0.0, 0.01]
+                    uav_vio_odom.pose.covariance = [self.variance, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                                    0.0, self.variance, 0.0, 0.0, 0.0, 0.0,
+                                                    0.0, 0.0, self.variance, 0.0, 0.0, 0.0,
+                                                    0.0, 0.0, 0.0, self.variance, 0.0, 0.0,
+                                                    0.0, 0.0, 0.0, 0.0, self.variance, 0.0,
+                                                    0.0, 0.0, 0.0, 0.0, 0.0, self.variance]
+                    uav_vio_odom.twist.covariance = [self.variance, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                                    0.0, self.variance, 0.0, 0.0, 0.0, 0.0,
+                                                    0.0, 0.0, self.variance, 0.0, 0.0, 0.0,
+                                                    0.0, 0.0, 0.0, self.variance, 0.0, 0.0,
+                                                    0.0, 0.0, 0.0, 0.0, self.variance, 0.0,
+                                                    0.0, 0.0, 0.0, 0.0, 0.0, self.variance]
 
 
                     self.robot_vio[uav_id].publish(uav_vio_odom)
@@ -778,6 +791,18 @@ class simulation_base():
                     uav_odom.twist.twist.angular.x = uav_state[10]
                     uav_odom.twist.twist.angular.y = uav_state[11]
                     uav_odom.twist.twist.angular.z = uav_state[12]
+                    uav_odom.pose.covariance = [self.variance, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                                    0.0, self.variance, 0.0, 0.0, 0.0, 0.0,
+                                                    0.0, 0.0, self.variance, 0.0, 0.0, 0.0,
+                                                    0.0, 0.0, 0.0, self.variance, 0.0, 0.0,
+                                                    0.0, 0.0, 0.0, 0.0, self.variance, 0.0,
+                                                    0.0, 0.0, 0.0, 0.0, 0.0, self.variance]
+                    uav_odom.twist.covariance = [self.variance, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                                    0.0, self.variance, 0.0, 0.0, 0.0, 0.0,
+                                                    0.0, 0.0, self.variance, 0.0, 0.0, 0.0,
+                                                    0.0, 0.0, 0.0, self.variance, 0.0, 0.0,
+                                                    0.0, 0.0, 0.0, 0.0, self.variance, 0.0,
+                                                    0.0, 0.0, 0.0, 0.0, 0.0, self.variance]
                     self.robot_odom_publisher[uav_id].publish(uav_odom)
 
                     # Publish UAV vio odometry
@@ -808,18 +833,18 @@ class simulation_base():
                     uav_vio_odom.twist.twist.angular.y = vio_angular_velocity[1]
                     uav_vio_odom.twist.twist.angular.z = vio_angular_velocity[2]
                     
-                    uav_vio_odom.pose.covariance = [0.01, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                                    0.0, 0.01, 0.0, 0.0, 0.0, 0.0,
-                                                    0.0, 0.0, 0.01, 0.0, 0.0, 0.0,
-                                                    0.0, 0.0, 0.0, 0.01, 0.0, 0.0,
-                                                    0.0, 0.0, 0.0, 0.0, 0.01, 0.0,
-                                                    0.0, 0.0, 0.0, 0.0, 0.0, 0.01]
-                    uav_vio_odom.twist.covariance = [0.01, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                                    0.0, 0.01, 0.0, 0.0, 0.0, 0.0,
-                                                    0.0, 0.0, 0.01, 0.0, 0.0, 0.0,
-                                                    0.0, 0.0, 0.0, 0.01, 0.0, 0.0,
-                                                    0.0, 0.0, 0.0, 0.0, 0.01, 0.0,
-                                                    0.0, 0.0, 0.0, 0.0, 0.0, 0.01]
+                    uav_vio_odom.pose.covariance = [self.variance, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                                    0.0, self.variance, 0.0, 0.0, 0.0, 0.0,
+                                                    0.0, 0.0, self.variance, 0.0, 0.0, 0.0,
+                                                    0.0, 0.0, 0.0, self.variance, 0.0, 0.0,
+                                                    0.0, 0.0, 0.0, 0.0, self.variance, 0.0,
+                                                    0.0, 0.0, 0.0, 0.0, 0.0, self.variance]
+                    uav_vio_odom.twist.covariance = [self.variance, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                                    0.0, self.variance, 0.0, 0.0, 0.0, 0.0,
+                                                    0.0, 0.0, self.variance, 0.0, 0.0, 0.0,
+                                                    0.0, 0.0, 0.0, self.variance, 0.0, 0.0,
+                                                    0.0, 0.0, 0.0, 0.0, self.variance, 0.0,
+                                                    0.0, 0.0, 0.0, 0.0, 0.0, self.variance]
 
 
                     self.robot_vio[uav_id].publish(uav_vio_odom)
