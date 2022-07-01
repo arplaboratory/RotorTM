@@ -330,7 +330,7 @@ class simulation_base():
                     ## recheck cable slack condition
                     self.cable_is_slack = self.isslack(x[0:3], x[13:16], self.pl_params.cable_length)
                 
-            # Third Scenario: Cooperative 
+            # First Scenario: Cooperative 
                 else:    
                     ## first, we check for collision
                     inelastic_collision_flag = self.cooperative_check_inelastic(x)
