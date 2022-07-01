@@ -434,6 +434,7 @@ class controller_node:
                 cen_pl_command.header.stamp = rospy.get_rostime()
                 cen_pl_command.header.frame_id = "simulator" 
                 cen_pl_command.copr_status = 3
+                average_acc = np.array([0.0,0.0,0.0])
                 for i in range(self.pl_params.nquad):
                     acc_command = Vector3()
                     acc_command.x = att_acc[0,i]
@@ -449,6 +450,13 @@ class controller_node:
                     cen_pl_command.mu.append(mu_command)
                     cen_pl_command.estimated_acc.append(acc_command)
 
+                    average_acc[0] += att_acc[0,i]
+                    average_acc[1] += att_acc[1,i]
+                    average_acc[2] += att_acc[2,i]
+                average_acc = average_acc / 3.0
+                cen_pl_command.pos_cmd.acceleration.x = average_acc[0]
+                cen_pl_command.pos_cmd.acceleration.y = average_acc[1]
+                cen_pl_command.pos_cmd.acceleration.z = average_acc[2]
                 self.cen_pl_cmd_pub.publish(cen_pl_command)
             elif self.pl_params.payload_type == 'Point Mass':
                 plqd = self.assembly_plqd()
