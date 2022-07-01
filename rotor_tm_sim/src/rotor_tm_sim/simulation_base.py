@@ -14,6 +14,7 @@ from rotor_tm_msgs.msg import RPMCommand, FMCommand
 from rotor_tm_utils import utilslib, rosutilslib
 from rotor_tm_utils.vee import vee
 from rotor_tm_utils import utilslib
+from scipy.spatial.transform import Rotation as RotationM
 import time
 
 def ptmassslackToTaut(t, x):
@@ -227,10 +228,12 @@ class simulation_base():
       self.robot_odom_publisher = []
       self.attach_publisher = []
       self.Imu_publisher = []
+      self.robot_vio = []
       for i in range(self.nquad):
           self.robot_odom_publisher.append(rospy.Publisher(self.mav_name + str(i+1) + '/odom',Odometry, queue_size=1, tcp_nodelay=True))
           self.attach_publisher.append(rospy.Publisher(self.mav_name + str(i+1) + '/attach',Odometry, queue_size=1, tcp_nodelay=True))
           self.Imu_publisher.append(rospy.Publisher(self.mav_name + str(i+1) + '/imu', Imu, queue_size=1, tcp_nodelay=True))
+          self.robot_vio.append(rospy.Publisher(self.mav_name + str(i+1) + '/vio',Odometry, queue_size=1, tcp_nodelay=True))
            
       # ROS Subscriber 
       self.robot_command_subscriber = []
@@ -538,6 +541,51 @@ class simulation_base():
                     uav_odom.twist.twist.angular.z = uav_state[12]
                     self.robot_odom_publisher[uav_id].publish(uav_odom)
 
+                    # Publish UAV vio odometry
+                    uav_vio_odom = Odometry()
+                    uav_vio_odom.header.stamp = current_time
+                    uav_vio_odom.header.frame_id = self.worldframe 
+                    uav_vio_odom.pose.pose.position.x = uav_state[0]
+                    uav_vio_odom.pose.pose.position.y = -uav_state[1]
+                    uav_vio_odom.pose.pose.position.z = -uav_state[2]
+                    uav_vio_odom.twist.twist.linear.x = uav_state[3]
+                    uav_vio_odom.twist.twist.linear.y = -uav_state[4]
+                    uav_vio_odom.twist.twist.linear.z = -uav_state[5]
+                    r0 = RotationM.from_quat(uav_state[6:10])
+                    odom_orientation_rmatrix = r0.as_matrix()
+                    flipalongx = np.array([[1,0,0],[0,-1,0],[0,0,-1]])
+                    vio_oritentation_rmatrix =  odom_orientation_rmatrix @ flipalongx
+                    r1 = RotationM.from_matrix(vio_oritentation_rmatrix)
+                    odom_oritentaion_quat = r1.as_quat()
+
+                    uav_vio_odom.pose.pose.orientation.w = odom_oritentaion_quat[3]
+                    uav_vio_odom.pose.pose.orientation.x = odom_oritentaion_quat[0]
+                    uav_vio_odom.pose.pose.orientation.y = odom_oritentaion_quat[1]
+                    uav_vio_odom.pose.pose.orientation.z = odom_oritentaion_quat[2]
+
+                    vio_angular_velocity = flipalongx @ uav_state[10:13]
+
+                    uav_vio_odom.twist.twist.angular.x = vio_angular_velocity[0]
+                    uav_vio_odom.twist.twist.angular.y = vio_angular_velocity[1]
+                    uav_vio_odom.twist.twist.angular.z = vio_angular_velocity[2]
+                    
+                    uav_vio_odom.pose.covariance = [0.01, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                                    0.0, 0.01, 0.0, 0.0, 0.0, 0.0,
+                                                    0.0, 0.0, 0.01, 0.0, 0.0, 0.0,
+                                                    0.0, 0.0, 0.0, 0.01, 0.0, 0.0,
+                                                    0.0, 0.0, 0.0, 0.0, 0.01, 0.0,
+                                                    0.0, 0.0, 0.0, 0.0, 0.0, 0.01]
+                    uav_vio_odom.twist.covariance = [0.01, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                                    0.0, 0.01, 0.0, 0.0, 0.0, 0.0,
+                                                    0.0, 0.0, 0.01, 0.0, 0.0, 0.0,
+                                                    0.0, 0.0, 0.0, 0.01, 0.0, 0.0,
+                                                    0.0, 0.0, 0.0, 0.0, 0.01, 0.0,
+                                                    0.0, 0.0, 0.0, 0.0, 0.0, 0.01]
+
+
+                    self.robot_vio[uav_id].publish(uav_vio_odom)
+
+
                     # Publish UAV attach odometry
                     attach_odom = Odometry()
                     attach_odom.header.stamp = current_time
@@ -554,16 +602,19 @@ class simulation_base():
                     imu_pub = Imu()
                     imu_pub.header.stamp = current_time
                     imu_pub.header.frame_id = self.worldframe
-                    imu_pub.orientation.w = uav_state[6]
-                    imu_pub.orientation.x = uav_state[7]
-                    imu_pub.orientation.y = uav_state[8]
-                    imu_pub.orientation.z = uav_state[9]
+                    imu_pub.orientation.w = odom_oritentaion_quat[3]
+                    imu_pub.orientation.x = odom_oritentaion_quat[0]
+                    imu_pub.orientation.y = odom_oritentaion_quat[1]
+                    imu_pub.orientation.z = odom_oritentaion_quat[2]
                     imu_pub.angular_velocity.x = uav_state[10]
-                    imu_pub.angular_velocity.y = uav_state[11]
-                    imu_pub.angular_velocity.z = uav_state[12]
+                    imu_pub.angular_velocity.y = -uav_state[11]
+                    imu_pub.angular_velocity.z = -uav_state[12]
                     imu_pub.linear_acceleration.x = self.imu_accel[0]
-                    imu_pub.linear_acceleration.y = self.imu_accel[1]
-                    imu_pub.linear_acceleration.z = self.imu_accel[2]
+                    imu_pub.linear_acceleration.y = -self.imu_accel[1]
+                    imu_pub.linear_acceleration.z = -self.imu_accel[2]
+                    imu_pub.orientation_covariance = [0.1, 0.0, 0.0, 0.0, 0.1, 0.0, 0.0, 0.0, 0.1]
+                    imu_pub.angular_velocity_covariance = [0.1, 0.0, 0.0, 0.0, 0.1, 0.0, 0.0, 0.0, 0.1]
+                    imu_pub.linear_acceleration_covariance = [0.1, 0.0, 0.0, 0.0, 0.1, 0.0, 0.0, 0.0, 0.1]
                     self.Imu_publisher[uav_id].publish(imu_pub)
 
                 cable_point_list[2*uav_id,:] = uav_state[0:3]
@@ -729,6 +780,51 @@ class simulation_base():
                     uav_odom.twist.twist.angular.z = uav_state[12]
                     self.robot_odom_publisher[uav_id].publish(uav_odom)
 
+                    # Publish UAV vio odometry
+                    uav_vio_odom = Odometry()
+                    uav_vio_odom.header.stamp = current_time
+                    uav_vio_odom.header.frame_id = self.worldframe 
+                    uav_vio_odom.pose.pose.position.x = uav_state[0]
+                    uav_vio_odom.pose.pose.position.y = -uav_state[1]
+                    uav_vio_odom.pose.pose.position.z = -uav_state[2]
+                    uav_vio_odom.twist.twist.linear.x = uav_state[3]
+                    uav_vio_odom.twist.twist.linear.y = -uav_state[4]
+                    uav_vio_odom.twist.twist.linear.z = -uav_state[5]
+                    r0 = RotationM.from_quat(uav_state[6:10])
+                    odom_orientation_rmatrix = r0.as_matrix()
+                    flipalongx = np.array([[1,0,0],[0,-1,0],[0,0,-1]])
+                    vio_oritentation_rmatrix =  odom_orientation_rmatrix @ flipalongx
+                    r1 = RotationM.from_matrix(vio_oritentation_rmatrix)
+                    odom_oritentaion_quat = r1.as_quat()
+
+                    uav_vio_odom.pose.pose.orientation.w = odom_oritentaion_quat[3]
+                    uav_vio_odom.pose.pose.orientation.x = odom_oritentaion_quat[0]
+                    uav_vio_odom.pose.pose.orientation.y = odom_oritentaion_quat[1]
+                    uav_vio_odom.pose.pose.orientation.z = odom_oritentaion_quat[2]
+
+                    vio_angular_velocity = flipalongx @ uav_state[10:13]
+
+                    uav_vio_odom.twist.twist.angular.x = vio_angular_velocity[0]
+                    uav_vio_odom.twist.twist.angular.y = vio_angular_velocity[1]
+                    uav_vio_odom.twist.twist.angular.z = vio_angular_velocity[2]
+                    
+                    uav_vio_odom.pose.covariance = [0.01, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                                    0.0, 0.01, 0.0, 0.0, 0.0, 0.0,
+                                                    0.0, 0.0, 0.01, 0.0, 0.0, 0.0,
+                                                    0.0, 0.0, 0.0, 0.01, 0.0, 0.0,
+                                                    0.0, 0.0, 0.0, 0.0, 0.01, 0.0,
+                                                    0.0, 0.0, 0.0, 0.0, 0.0, 0.01]
+                    uav_vio_odom.twist.covariance = [0.01, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                                    0.0, 0.01, 0.0, 0.0, 0.0, 0.0,
+                                                    0.0, 0.0, 0.01, 0.0, 0.0, 0.0,
+                                                    0.0, 0.0, 0.0, 0.01, 0.0, 0.0,
+                                                    0.0, 0.0, 0.0, 0.0, 0.01, 0.0,
+                                                    0.0, 0.0, 0.0, 0.0, 0.0, 0.01]
+
+
+                    self.robot_vio[uav_id].publish(uav_vio_odom)
+
+
                     # Publish UAV attach odometry
                     attach_odom = Odometry()
                     attach_odom.header.stamp = current_time
@@ -745,16 +841,19 @@ class simulation_base():
                     imu_pub = Imu()
                     imu_pub.header.stamp = current_time
                     imu_pub.header.frame_id = self.worldframe
-                    imu_pub.orientation.w = uav_state[6]
-                    imu_pub.orientation.x = uav_state[7]
-                    imu_pub.orientation.y = uav_state[8]
-                    imu_pub.orientation.z = uav_state[9]
+                    imu_pub.orientation.w = odom_oritentaion_quat[3]
+                    imu_pub.orientation.x = odom_oritentaion_quat[0]
+                    imu_pub.orientation.y = odom_oritentaion_quat[1]
+                    imu_pub.orientation.z = odom_oritentaion_quat[2]
                     imu_pub.angular_velocity.x = uav_state[10]
-                    imu_pub.angular_velocity.y = uav_state[11]
-                    imu_pub.angular_velocity.z = uav_state[12]
+                    imu_pub.angular_velocity.y = -uav_state[11]
+                    imu_pub.angular_velocity.z = -uav_state[12]
                     imu_pub.linear_acceleration.x = self.imu_accel[0]
-                    imu_pub.linear_acceleration.y = self.imu_accel[1]
-                    imu_pub.linear_acceleration.z = self.imu_accel[2]
+                    imu_pub.linear_acceleration.y = -self.imu_accel[1]
+                    imu_pub.linear_acceleration.z = -self.imu_accel[2]
+                    imu_pub.orientation_covariance = [0.1, 0.0, 0.0, 0.0, 0.1, 0.0, 0.0, 0.0, 0.1]
+                    imu_pub.angular_velocity_covariance = [0.1, 0.0, 0.0, 0.0, 0.1, 0.0, 0.0, 0.0, 0.1]
+                    imu_pub.linear_acceleration_covariance = [0.1, 0.0, 0.0, 0.0, 0.1, 0.0, 0.0, 0.0, 0.1]
                     self.Imu_publisher[uav_id].publish(imu_pub)
 
                 cable_point_list[2*uav_id,:] = uav_state[0:3]
