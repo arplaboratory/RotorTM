@@ -10,7 +10,7 @@ from std_msgs.msg import Bool
 from nav_msgs.msg import Odometry 
 from rotor_tm_msgs.msg import PositionCommand,RPMCommand,FMCommand
 from rotor_tm_msgs.msg import CenPL_Command
-from geometry_msgs.msg import Vector3
+from geometry_msgs.msg import Vector3, Wrench
 
 from rotor_tm_utils import read_params
 from rotor_tm_utils import utilslib 
@@ -110,6 +110,7 @@ class controller_node:
             FM_message_name = mav_name + str(self.node_id+1) + "/fm_cmd"
             des_odom_name = mav_name + str(self.node_id+1) + "/des_odom"
             self.cen_pl_cmd_pub = rospy.Publisher(node_name + "/payload/cen_pl_cmd", CenPL_Command, queue_size = 10)
+            self.cen_pl_wrench_pub = rospy.Publisher(node_name + "/payload/cen_wrench_cmd", Wrench, queue_size = 10)
             self.FM_pub.append(rospy.Publisher(node_name +  FM_message_name, FMCommand, queue_size=1, tcp_nodelay=True))
             self.status_pub = rospy.Publisher(node_name + "/heartbeat", Bool, queue_size = 10)
 
@@ -429,12 +430,19 @@ class controller_node:
             F_list, M_list = self.controller.rigid_links_cooperative_payload_controller(ql, self.pl_params)
         elif self.pl_params.mechanism_type == 'Cable':
             if self.pl_params.payload_type == 'Rigid Body':
-                mu, att_acc, F_list, M_list, quat_list, rot_list = self.controller.cooperative_suspended_payload_controller(self.pl, self.qd, self.pl_params, self.quad_params)
+                mu, att_acc, F_list, M_list, quat_list, rot_list, F_pl, M_pl = self.controller.cooperative_suspended_payload_controller(self.pl, self.qd, self.pl_params, self.quad_params)
+                pl_des_wrench = Wrench()
+                pl_des_wrench.force.x = F_pl[0]
+                pl_des_wrench.force.y = F_pl[1]
+                pl_des_wrench.force.z = F_pl[2]
+                pl_des_wrench.torque.x= M_pl[0]
+                pl_des_wrench.torque.y= M_pl[1]
+                pl_des_wrench.torque.z= M_pl[2]
+                self.cen_pl_wrench_pub.publish(pl_des_wrench)
                 cen_pl_command = CenPL_Command()
                 cen_pl_command.header.stamp = rospy.get_rostime()
                 cen_pl_command.header.frame_id = "simulator" 
                 cen_pl_command.copr_status = 3
-                average_acc = np.array([0.0,0.0,0.0])
                 for i in range(self.pl_params.nquad):
                     acc_command = Vector3()
                     acc_command.x = att_acc[0,i]
@@ -449,14 +457,6 @@ class controller_node:
                     cen_pl_command.acc.append(acc_command)
                     cen_pl_command.mu.append(mu_command)
                     cen_pl_command.estimated_acc.append(acc_command)
-
-                    average_acc[0] += att_acc[0,i]
-                    average_acc[1] += att_acc[1,i]
-                    average_acc[2] += att_acc[2,i]
-                average_acc = average_acc / 3.0
-                cen_pl_command.pos_cmd.acceleration.x = average_acc[0]
-                cen_pl_command.pos_cmd.acceleration.y = average_acc[1]
-                cen_pl_command.pos_cmd.acceleration.z = average_acc[2]
 
                 cen_pl_command.pos_cmd.quaternion.x = self.pl["quat"][1,0]
                 cen_pl_command.pos_cmd.quaternion.y = self.pl["quat"][2,0]
