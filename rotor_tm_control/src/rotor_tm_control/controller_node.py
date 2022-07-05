@@ -457,6 +457,11 @@ class controller_node:
                 cen_pl_command.pos_cmd.acceleration.x = average_acc[0]
                 cen_pl_command.pos_cmd.acceleration.y = average_acc[1]
                 cen_pl_command.pos_cmd.acceleration.z = average_acc[2]
+
+                cen_pl_command.pos_cmd.quaternion.x = self.pl["quat"][1,0]
+                cen_pl_command.pos_cmd.quaternion.y = self.pl["quat"][2,0]
+                cen_pl_command.pos_cmd.quaternion.z = self.pl["quat"][3,0]
+                cen_pl_command.pos_cmd.quaternion.w = self.pl["quat"][0,0]
                 self.cen_pl_cmd_pub.publish(cen_pl_command)
             elif self.pl_params.payload_type == 'Point Mass':
                 plqd = self.assembly_plqd()

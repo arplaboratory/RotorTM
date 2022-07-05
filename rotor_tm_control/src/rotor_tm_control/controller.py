@@ -244,6 +244,7 @@ class controller:
             diag_rot = LA.block_diag(diag_rot, Rot)
 
         mu = diag_rot @ pl_params.pseudo_inv_P @ np.append(Rot.T @ F, M, axis=0)
+        print(mu)
         for i in range(1, nquad+1):
             if (0>mu[3*i-1, 0]):
                 mu[3*i-1, 0] = 0 
