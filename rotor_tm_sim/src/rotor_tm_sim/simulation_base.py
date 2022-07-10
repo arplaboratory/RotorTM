@@ -128,7 +128,7 @@ class simulation_base():
       self.ext_force = np.array([0.0,0.0,0.0])
       self.ext_torque = np.array([0.0,0.0,0.0])
       self.imu_accel = np.array([0.0,0.0,0.0])
-      self.variance = 0.01 # vio variance for ukf
+      self.variance = 0.01**6 # vio variance for ukf
       # Three scenario:
       #                 1. Cooperative
       #                 2. Point mass
@@ -572,9 +572,9 @@ class simulation_base():
                     odom_oritentaion_quat = r1.as_quat()
 
                     uav_vio_odom.pose.pose.orientation.w = odom_oritentaion_quat[3]
-                    uav_vio_odom.pose.pose.orientation.x = odom_oritentaion_quat[0]
+                    uav_vio_odom.pose.pose.orientation.x = odom_oritentaion_quat[2]
                     uav_vio_odom.pose.pose.orientation.y = odom_oritentaion_quat[1]
-                    uav_vio_odom.pose.pose.orientation.z = odom_oritentaion_quat[2]
+                    uav_vio_odom.pose.pose.orientation.z = odom_oritentaion_quat[0]
 
                     vio_angular_velocity = flipalongx @ uav_state[10:13]
 
