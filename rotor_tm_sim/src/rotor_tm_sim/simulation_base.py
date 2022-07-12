@@ -16,6 +16,7 @@ from rotor_tm_utils.vee import vee
 from rotor_tm_utils import utilslib
 from scipy.spatial.transform import Rotation as RotationM
 import time
+import scipy.linalg as LA
 
 def ptmassslackToTaut(t, x):
     # DESCRIPTION:
@@ -129,6 +130,7 @@ class simulation_base():
       self.ext_torque = np.array([0.0,0.0,0.0])
       self.imu_accel = np.array([0.0,0.0,0.0])
       self.variance = 0.01**6 # vio variance for ukf
+      self.wrench_value = Wrench()
       # Three scenario:
       #                 1. Cooperative
       #                 2. Point mass
@@ -225,6 +227,7 @@ class simulation_base():
       self.system_publisher = rospy.Publisher('system/marker',MarkerArray,queue_size=10)
       self.payload_odom_publisher = rospy.Publisher('payload/odom',Odometry,queue_size=1, tcp_nodelay=True)
       self.payload_path_publisher = rospy.Publisher('payload/path',Path,queue_size=1, tcp_nodelay=True)
+      self.robot_vio_publisher = rospy.Publisher('payload/vio', Odometry, queue_size=1, tcp_nodelay=True)
       self.payload_path = Path()
       self.robot_odom_publisher = []
       self.attach_publisher = []
@@ -244,6 +247,7 @@ class simulation_base():
           self.robot_command_subscriber.append(rospy.Subscriber(controller_name + '/' + mav_name + '/rpm_cmd',RPMCommand,self.rpm_command_callback,uav_id,queue_size=1, tcp_nodelay=True))
           self.robot_command_subscriber.append(rospy.Subscriber(controller_name + '/' + mav_name + '/fm_cmd',FMCommand,self.fm_command_callback,uav_id,queue_size=1, tcp_nodelay=True))
       self.payload_ext_wrench = rospy.Subscriber("/payload/so3_control/ext_wrench", Wrench, self.ext_wrench_callback, queue_size=1, tcp_nodelay=True)
+      self.payload_ctrl_wrench = rospy.Publisher("/payload/so3_control/payload_sim_net_force", Wrench,  queue_size=1, tcp_nodelay=True)
       # Visualization Init
       self.cable_marker_scale = 0.01 * np.ones(3)
       self.cable_marker_color = np.array([1.0,0.5,0.5,0.5])
@@ -409,7 +413,11 @@ class simulation_base():
             current_time = rospy.get_rostime()
             payload_odom = Odometry()
             payload_odom.header.stamp = current_time
-            payload_odom.header.frame_id = self.worldframe 
+            payload_odom.header.frame_id = self.worldframe
+            
+            payload_vio = Odometry()          
+            payload_vio.header.stamp = current_time
+            payload_vio.header.frame_id = self.worldframe 
             payload_rotmat = utilslib.QuatToRot(sol.y[:,0][6:10])
 
             if self.pl_params.mechanism_type == 'Rigid Link':
@@ -418,10 +426,16 @@ class simulation_base():
                 payload_odom.pose.pose.position.x = self.load_pos[0]
                 payload_odom.pose.pose.position.y = self.load_pos[1]
                 payload_odom.pose.pose.position.z = self.load_pos[2]
+                payload_vio.pose.pose.position.x = self.load_pos[0]
+                payload_vio.pose.pose.position.y = -self.load_pos[1]
+                payload_vio.pose.pose.position.z = -self.load_pos[2]
             else:
                 payload_odom.pose.pose.position.x    = x[0]
                 payload_odom.pose.pose.position.y    = x[1]
                 payload_odom.pose.pose.position.z    = x[2]
+                payload_vio.pose.pose.position.x    = x[0]
+                payload_vio.pose.pose.position.y    = -x[1]
+                payload_vio.pose.pose.position.z    = -x[2]
             payload_odom.twist.twist.linear.x    = x[3]
             payload_odom.twist.twist.linear.y    = x[4]
             payload_odom.twist.twist.linear.z    = x[5]
@@ -432,10 +446,44 @@ class simulation_base():
             payload_odom.twist.twist.angular.x   = x[10]
             payload_odom.twist.twist.angular.y   = x[11]
             payload_odom.twist.twist.angular.z   = x[12]
+            
+            payload_vio.twist.twist.linear.x    = x[3]
+            payload_vio.twist.twist.linear.y    = -x[4]
+            payload_vio.twist.twist.linear.z    = -x[5]
 
+            r0 = RotationM.from_quat(x[6:10])
+            odom_orientation_rmatrix = r0.as_matrix()
+            flipalongx = np.array([[1,0,0],[0,-1,0],[0,0,-1]])
+            vio_oritentation_rmatrix =  odom_orientation_rmatrix @ flipalongx
+            r1 = RotationM.from_matrix(vio_oritentation_rmatrix)
+            odom_oritentaion_quat = r1.as_quat()
+            payload_vio.pose.pose.orientation.w  = odom_oritentaion_quat[3]
+            payload_vio.pose.pose.orientation.x = odom_oritentaion_quat[2]
+            payload_vio.pose.pose.orientation.y = odom_oritentaion_quat[1]
+            payload_vio.pose.pose.orientation.z = odom_oritentaion_quat[0]
+
+            vio_angular_velocity = flipalongx @ x[10:13]
+
+            payload_vio.twist.twist.angular.x = vio_angular_velocity[0]
+            payload_vio.twist.twist.angular.y = vio_angular_velocity[1]
+            payload_vio.twist.twist.angular.z = vio_angular_velocity[2]
+                    
+            payload_vio.pose.covariance = [self.variance, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                            0.0, self.variance, 0.0, 0.0, 0.0, 0.0,
+                                            0.0, 0.0, self.variance, 0.0, 0.0, 0.0,
+                                            0.0, 0.0, 0.0, self.variance, 0.0, 0.0,
+                                            0.0, 0.0, 0.0, 0.0, self.variance, 0.0,
+                                            0.0, 0.0, 0.0, 0.0, 0.0, self.variance]
+            payload_vio.twist.covariance = [self.variance, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                            0.0, self.variance, 0.0, 0.0, 0.0, 0.0,
+                                            0.0, 0.0, self.variance, 0.0, 0.0, 0.0,
+                                            0.0, 0.0, 0.0, self.variance, 0.0, 0.0,
+                                            0.0, 0.0, 0.0, 0.0, self.variance, 0.0,
+                                            0.0, 0.0, 0.0, 0.0, 0.0, self.variance]
 
             self.payload_odom_publisher.publish(payload_odom)
-
+            self.robot_vio_publisher.publish(payload_vio)
+            self.payload_ctrl_wrench.publish(self.wrench_value)
             # Publish payload path
             current_time = rospy.get_rostime()
 
@@ -672,10 +720,16 @@ class simulation_base():
                 payload_odom.pose.pose.position.x = self.load_pos[0]
                 payload_odom.pose.pose.position.y = self.load_pos[1]
                 payload_odom.pose.pose.position.z = self.load_pos[2]
+                payload_vio.pose.pose.position.x = self.load_pos[0]
+                payload_vio.pose.pose.position.y = -self.load_pos[1]
+                payload_vio.pose.pose.position.z = -self.load_pos[2]
             else:
                 payload_odom.pose.pose.position.x    = x[0]
                 payload_odom.pose.pose.position.y    = x[1]
                 payload_odom.pose.pose.position.z    = x[2]
+                payload_vio.pose.pose.position.x    = x[0]
+                payload_vio.pose.pose.position.y    = -x[1]
+                payload_vio.pose.pose.position.z    = -x[2]
             payload_odom.twist.twist.linear.x    = x[3]
             payload_odom.twist.twist.linear.y    = x[4]
             payload_odom.twist.twist.linear.z    = x[5]
@@ -686,8 +740,44 @@ class simulation_base():
             payload_odom.twist.twist.angular.x   = x[10]
             payload_odom.twist.twist.angular.y   = x[11]
             payload_odom.twist.twist.angular.z   = x[12]
-            self.payload_odom_publisher.publish(payload_odom)
+            
+            payload_vio.twist.twist.linear.x    = x[3]
+            payload_vio.twist.twist.linear.y    = -x[4]
+            payload_vio.twist.twist.linear.z    = -x[5]
 
+            r0 = RotationM.from_quat(x[6:10])
+            odom_orientation_rmatrix = r0.as_matrix()
+            flipalongx = np.array([[1,0,0],[0,-1,0],[0,0,-1]])
+            vio_oritentation_rmatrix =  odom_orientation_rmatrix @ flipalongx
+            r1 = RotationM.from_matrix(vio_oritentation_rmatrix)
+            odom_oritentaion_quat = r1.as_quat()
+            payload_vio.pose.pose.orientation.w  = odom_oritentaion_quat[3]
+            payload_vio.pose.pose.orientation.x = odom_oritentaion_quat[2]
+            payload_vio.pose.pose.orientation.y = odom_oritentaion_quat[1]
+            payload_vio.pose.pose.orientation.z = odom_oritentaion_quat[0]
+
+            vio_angular_velocity = flipalongx @ x[10:13]
+
+            payload_vio.twist.twist.angular.x = vio_angular_velocity[0]
+            payload_vio.twist.twist.angular.y = vio_angular_velocity[1]
+            payload_vio.twist.twist.angular.z = vio_angular_velocity[2]
+                    
+            payload_vio.pose.covariance = [self.variance, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                            0.0, self.variance, 0.0, 0.0, 0.0, 0.0,
+                                            0.0, 0.0, self.variance, 0.0, 0.0, 0.0,
+                                            0.0, 0.0, 0.0, self.variance, 0.0, 0.0,
+                                            0.0, 0.0, 0.0, 0.0, self.variance, 0.0,
+                                            0.0, 0.0, 0.0, 0.0, 0.0, self.variance]
+            payload_vio.twist.covariance = [self.variance, 0.0, 0.0, 0.0, 0.0, 0.0,
+                                            0.0, self.variance, 0.0, 0.0, 0.0, 0.0,
+                                            0.0, 0.0, self.variance, 0.0, 0.0, 0.0,
+                                            0.0, 0.0, 0.0, self.variance, 0.0, 0.0,
+                                            0.0, 0.0, 0.0, 0.0, self.variance, 0.0,
+                                            0.0, 0.0, 0.0, 0.0, 0.0, self.variance]
+
+            self.payload_odom_publisher.publish(payload_odom)
+            self.robot_vio_publisher.publish(payload_vio)
+            self.payload_ctrl_wrench.publish(self.wrench_value)
             # Publish payload path
             current_time = rospy.get_rostime()
 
@@ -823,9 +913,9 @@ class simulation_base():
                     odom_oritentaion_quat = r1.as_quat()
 
                     uav_vio_odom.pose.pose.orientation.w = odom_oritentaion_quat[3]
-                    uav_vio_odom.pose.pose.orientation.x = odom_oritentaion_quat[0]
+                    uav_vio_odom.pose.pose.orientation.x = odom_oritentaion_quat[2]
                     uav_vio_odom.pose.pose.orientation.y = odom_oritentaion_quat[1]
-                    uav_vio_odom.pose.pose.orientation.z = odom_oritentaion_quat[2]
+                    uav_vio_odom.pose.pose.orientation.z = odom_oritentaion_quat[0]
 
                     vio_angular_velocity = flipalongx @ uav_state[10:13]
 
@@ -1053,8 +1143,8 @@ class simulation_base():
 
               # Sum Net Force, Moment and other corresponding terms
               # for the Payload Dynamics
-              pl_net_F = pl_net_F + attach_qn_force + self.ext_force
-              pl_net_M = pl_net_M + attach_qn_moment + self.ext_torque
+              pl_net_F = pl_net_F + attach_qn_force
+              pl_net_M = pl_net_M + attach_qn_moment
               Ck = self.uav_params.mass * np.matmul(rho_qn_asym, np.matmul(pl_rot.T, xixiT))
               Dk = - np.transpose(Ck)
               Ek = np.matmul(Ck, np.matmul(pl_rot, rho_qn_asym))
@@ -1065,7 +1155,22 @@ class simulation_base():
       
       invML = linalg.inv(ML)
 
+
+      payload_rot = utilslib.QuatToRot(s[6:10])
+      diag_rot = np.zeros((0,0), dtype=float)
+      for i in range(1, self.nquad+1):
+          diag_rot = LA.block_diag(diag_rot, payload_rot)
+      
+      #pl_ctrl_F = pl_net_F
+      #pl_ctrl_M = pl_net_M
+      pl_net_F = pl_net_F # pl_net_F is in world frame
+      pl_net_M = pl_net_M # pl_net_M is in world frame
+      mu_ext =  diag_rot @  self.pl_params.pseudo_inv_P @ np.append(self.ext_force, self.ext_torque, axis=0)
+      # print("mu_ext is\n", mu_ext)
       ## Dynamics of Payload
+
+
+      # print(pl_net_F)
       sdotLoad = self.rigidbody_payloadEOM_readonly(pl_state,pl_net_F,pl_net_M,invML,C,D,E)
       
       self.pl_accel = sdotLoad[3:6]
@@ -1080,11 +1185,23 @@ class simulation_base():
              M = self.uav_M[:,uav_idx]
              sdotQuad = self.slack_quadEOM_readonly(uav_s,F,M)
          else:
+             #print(tension_vector[:,uav_idx])
+             #print(xixiT)
+             #T = tension_vector[:,uav_idx] - np.matmul(xixiT, mu_ext[uav_idx*self.nquad:(uav_idx+1)*self.nquad])
              T = tension_vector[:,uav_idx]
-             F = self.uav_F[uav_idx]
+             
+             #test = mu_ext[uav_idx*self.nquad:(uav_idx+1)*self.nquad]
+             #print(test.shape)
+             #print(test)
+             #test2 = self.uav_F[uav_idx]
+             #print(test2.shape)
+             #print(test2)
+             F = self.uav_F[uav_idx] 
              M = self.uav_M[:,uav_idx]
              sdotQuad = self.taut_quadEOM_readonly(uav_s,F,M,T)
          sdot = np.concatenate((sdot,sdotQuad))
+        
+
       return sdot
     
   def rigidbody_payloadEOM_readonly(self, s, F, M, invML, C, D, E): 
@@ -1118,11 +1235,17 @@ class simulation_base():
       # Payload Angular acceleration
       effective_M = M - np.matmul(C, np.matmul(invML, F)) - np.cross(omega, np.matmul(self.pl_params.I, omega))
       effective_inertia = self.pl_params.I + np.matmul(C, np.matmul(invML, D)) - E
-      omgLdot = np.linalg.solve(effective_inertia,effective_M)
+      omgLdot = np.linalg.solve(effective_inertia,effective_M) + self.pl_params.invI @ self.ext_torque 
 
       # Payload Acceleration
-      accL = np.matmul(invML, F + np.matmul(D, omgLdot)) - np.array([0,0,self.pl_params.grav])
-
+      accL = np.matmul(invML, F + np.matmul(D, omgLdot)) - np.array([0,0,self.pl_params.grav]) + self.ext_force/self.pl_params.mass
+      temp = invML @ (F * self.pl_params.mass)
+      self.wrench_value.force.x = temp[0]
+      self.wrench_value.force.y = temp[1]
+      self.wrench_value.force.z = temp[2]
+      self.wrench_value.torque.x = M[0]
+      self.wrench_value.torque.y = M[1]
+      self.wrench_value.torque.z = M[2]
       # Assemble sdot
       sdotLoad = np.zeros(self.pl_dim_num)
       sdotLoad[0:3] = s[3:6] 
@@ -1655,8 +1778,8 @@ class simulation_base():
 ##################                  Call backs                  ####################
   
   def ext_wrench_callback(self, wrench_command):
-      self.ext_force = np.array([wrench_command.force.x, wrench_command.force.y, wrench_command.force.y])
-      self.ext_torque= np.array([wrench_command.torque.x, wrench_command.torque.y, wrench_command.torque.y])
+      self.ext_force = np.array([wrench_command.force.x, wrench_command.force.y, wrench_command.force.z])
+      self.ext_torque= np.array([wrench_command.torque.x, wrench_command.torque.y, wrench_command.torque.z])
 
   def rpm_command_callback(self,rpm_command,uav_id):
       return
