@@ -236,6 +236,7 @@ class simulation_base():
       self.attach_publisher = []
       self.UKF_publisher = []
       #self.robot_vio = []
+
       for i in range(self.nquad):
           self.robot_odom_publisher.append(rospy.Publisher(self.mav_name + str(i+1) + '/odom',Odometry, queue_size=1, tcp_nodelay=True))
           self.attach_publisher.append(rospy.Publisher(self.mav_name + str(i+1) + '/attach',Odometry, queue_size=1, tcp_nodelay=True))
@@ -520,7 +521,7 @@ class simulation_base():
             system_marker = MarkerArray()
             cable_point_list = np.zeros((2*self.nquad,3))
 
-            for uav_id in range(self.nquad):
+            for uav_id in range(self.nquad-1, -1, -1):
                 if self.pl_params.mechanism_type == 'Rigid Link':
                     uav_state = x[13:26]
                     attach_pos = self.load_pos.reshape((3,)) + np.matmul(payload_rotmat, (self.pl_params.rho_robot[:,uav_id]+np.array([0.028,0,0.032])))
@@ -695,9 +696,9 @@ class simulation_base():
 
             # Update cable visualization
             cable_marker_msg = rosutilslib.init_marker_msg(Marker(),5,0,self.worldframe,self.cable_marker_scale,self.cable_marker_color)
-            system_marker.markers.append(rosutilslib.update_line_msg(cable_marker_msg,cable_point_list,uav_id + 1))
+            system_marker.markers.append(rosutilslib.update_line_msg(cable_marker_msg,cable_point_list,self.nquad + 1))
             # Update payload visualization
-            system_marker.markers.append(rosutilslib.update_marker_msg(self.payload_marker_msg,x[0:3],x[6:10],uav_id+2))
+            system_marker.markers.append(rosutilslib.update_marker_msg(self.payload_marker_msg,x[0:3],x[6:10],self.nquad+2))
             self.system_publisher.publish(system_marker)
 
             rate.sleep()    
@@ -820,7 +821,8 @@ class simulation_base():
 
             system_marker = MarkerArray()
             cable_point_list = np.zeros((2*self.nquad,3))
-            for uav_id in range(self.nquad):
+            
+            for uav_id in range(self.nquad-1, -1, -1):
                 if self.pl_params.mechanism_type == 'Rigid Link':
                     uav_state = x[13:26]
                     attach_pos = self.load_pos.reshape((3,)) + np.matmul(payload_rotmat, (self.pl_params.rho_robot[:,uav_id]+np.array([0.028,0,0.032])))
