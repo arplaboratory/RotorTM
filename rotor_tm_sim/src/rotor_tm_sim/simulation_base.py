@@ -10,7 +10,8 @@ from visualization_msgs.msg import MarkerArray, Marker
 from nav_msgs.msg import Odometry, Path
 from geometry_msgs.msg import PoseStamped, Wrench
 from sensor_msgs.msg import Imu
-from rotor_tm_msgs.msg import RPMCommand, FMCommand 
+from rotor_tm_msgs.msg import RPMCommand, FMCommand
+from quadrotor_msgs.msg import ukf_measurement_update
 from rotor_tm_utils import utilslib, rosutilslib
 from rotor_tm_utils.vee import vee
 from rotor_tm_utils import utilslib
@@ -128,9 +129,11 @@ class simulation_base():
       self.last_odom_time_received = 0.0
       self.ext_force = np.array([0.0,0.0,0.0])
       self.ext_torque = np.array([0.0,0.0,0.0])
-      self.imu_accel = np.array([0.0,0.0,0.0])
-      self.variance = 0.01**6 # vio variance for ukf
+      self.imu_accel = np.zeros((3, self.nquad), dtype=float)
+      self.variance = 0.01**3   # variance for odom
+      self.imu_variance = 0.01**2 # variance for imu
       self.wrench_value = Wrench()
+      self.tension_ = np.zeros((3, self.nquad), dtype=float)
       # Three scenario:
       #                 1. Cooperative
       #                 2. Point mass
@@ -231,13 +234,13 @@ class simulation_base():
       self.payload_path = Path()
       self.robot_odom_publisher = []
       self.attach_publisher = []
-      self.Imu_publisher = []
-      self.robot_vio = []
+      self.UKF_publisher = []
+      #self.robot_vio = []
       for i in range(self.nquad):
           self.robot_odom_publisher.append(rospy.Publisher(self.mav_name + str(i+1) + '/odom',Odometry, queue_size=1, tcp_nodelay=True))
           self.attach_publisher.append(rospy.Publisher(self.mav_name + str(i+1) + '/attach',Odometry, queue_size=1, tcp_nodelay=True))
-          self.Imu_publisher.append(rospy.Publisher(self.mav_name + str(i+1) + '/imu', Imu, queue_size=1, tcp_nodelay=True))
-          self.robot_vio.append(rospy.Publisher(self.mav_name + str(i+1) + '/vio',Odometry, queue_size=1, tcp_nodelay=True))
+          self.UKF_publisher.append(rospy.Publisher(self.mav_name + str(i+1) + '/ukf_measurement', ukf_measurement_update, queue_size=1, tcp_nodelay=True))
+          #self.robot_vio.append(rospy.Publisher(self.mav_name + str(i+1) + '/vio',Odometry, queue_size=1, tcp_nodelay=True))
            
       # ROS Subscriber 
       self.robot_command_subscriber = []
@@ -642,9 +645,7 @@ class simulation_base():
                                                     0.0, 0.0, 0.0, self.variance, 0.0, 0.0,
                                                     0.0, 0.0, 0.0, 0.0, self.variance, 0.0,
                                                     0.0, 0.0, 0.0, 0.0, 0.0, self.variance]
-
-
-                    self.robot_vio[uav_id].publish(uav_vio_odom)
+                    # self.robot_vio[uav_id].publish(uav_vio_odom)
 
 
                     # Publish UAV attach odometry
@@ -660,23 +661,31 @@ class simulation_base():
                     self.attach_publisher[uav_id].publish(attach_odom)
 
                     # Publish UAV imu
+                    ukf_measure = ukf_measurement_update()
                     imu_pub = Imu()
                     imu_pub.header.stamp = current_time
                     imu_pub.header.frame_id = self.worldframe
                     imu_pub.orientation.w = odom_oritentaion_quat[3]
-                    imu_pub.orientation.x = odom_oritentaion_quat[0]
+                    imu_pub.orientation.x = odom_oritentaion_quat[2]
                     imu_pub.orientation.y = odom_oritentaion_quat[1]
-                    imu_pub.orientation.z = odom_oritentaion_quat[2]
+                    imu_pub.orientation.z = odom_oritentaion_quat[0]
                     imu_pub.angular_velocity.x = uav_state[10]
                     imu_pub.angular_velocity.y = -uav_state[11]
                     imu_pub.angular_velocity.z = -uav_state[12]
-                    imu_pub.linear_acceleration.x = self.imu_accel[0]
-                    imu_pub.linear_acceleration.y = -self.imu_accel[1]
-                    imu_pub.linear_acceleration.z = -self.imu_accel[2]
-                    imu_pub.orientation_covariance = [0.1, 0.0, 0.0, 0.0, 0.1, 0.0, 0.0, 0.0, 0.1]
-                    imu_pub.angular_velocity_covariance = [0.1, 0.0, 0.0, 0.0, 0.1, 0.0, 0.0, 0.0, 0.1]
-                    imu_pub.linear_acceleration_covariance = [0.1, 0.0, 0.0, 0.0, 0.1, 0.0, 0.0, 0.0, 0.1]
-                    self.Imu_publisher[uav_id].publish(imu_pub)
+                    imu_pub.linear_acceleration.x = self.imu_accel[0, uav_id]
+                    imu_pub.linear_acceleration.y = -self.imu_accel[1, uav_id]
+                    imu_pub.linear_acceleration.z = -self.imu_accel[2, uav_id]
+                    imu_pub.orientation_covariance = [self.imu_variance, 0.0, 0.0, 0.0, self.imu_variance, 0.0, 0.0, 0.0, self.imu_variance]
+                    imu_pub.angular_velocity_covariance = [self.imu_variance, 0.0, 0.0, 0.0, self.imu_variance, 0.0, 0.0, 0.0, self.imu_variance]
+                    imu_pub.linear_acceleration_covariance = [self.imu_variance, 0.0, 0.0, 0.0, self.imu_variance, 0.0, 0.0, 0.0, self.imu_variance]
+                    ukf_measure.header.stamp = current_time
+                    ukf_measure.header.frame_id = self.worldframe 
+                    ukf_measure.imu = imu_pub
+                    ukf_measure.odom = uav_vio_odom
+                    ukf_measure.wrench.force.x = self.tension_[0, uav_id]
+                    ukf_measure.wrench.force.y = self.tension_[1, uav_id]
+                    ukf_measure.wrench.force.z = self.tension_[2, uav_id]
+                    self.UKF_publisher[uav_id].publish(ukf_measure)
 
                 cable_point_list[2*uav_id,:] = uav_state[0:3]
                 cable_point_list[2*uav_id+1,:] = attach_pos[0:3]
@@ -711,6 +720,7 @@ class simulation_base():
             # Publish payload odometry
             current_time = rospy.get_rostime()
             payload_odom = Odometry()
+            payload_vio = Odometry()   
             payload_odom.header.stamp = current_time
             payload_odom.header.frame_id = self.worldframe 
             payload_rotmat = utilslib.QuatToRot(sol.y[:,0][6:10])
@@ -937,7 +947,7 @@ class simulation_base():
                                                     0.0, 0.0, 0.0, 0.0, 0.0, self.variance]
 
 
-                    self.robot_vio[uav_id].publish(uav_vio_odom)
+                    #self.robot_vio[uav_id].publish(uav_vio_odom)
 
 
                     # Publish UAV attach odometry
@@ -953,23 +963,31 @@ class simulation_base():
                     self.attach_publisher[uav_id].publish(attach_odom)
 
                     # Publish UAV imu
+                    ukf_measure = ukf_measurement_update()
                     imu_pub = Imu()
                     imu_pub.header.stamp = current_time
                     imu_pub.header.frame_id = self.worldframe
                     imu_pub.orientation.w = odom_oritentaion_quat[3]
-                    imu_pub.orientation.x = odom_oritentaion_quat[0]
+                    imu_pub.orientation.x = odom_oritentaion_quat[2]
                     imu_pub.orientation.y = odom_oritentaion_quat[1]
-                    imu_pub.orientation.z = odom_oritentaion_quat[2]
+                    imu_pub.orientation.z = odom_oritentaion_quat[0]
                     imu_pub.angular_velocity.x = uav_state[10]
                     imu_pub.angular_velocity.y = -uav_state[11]
                     imu_pub.angular_velocity.z = -uav_state[12]
-                    imu_pub.linear_acceleration.x = self.imu_accel[0]
-                    imu_pub.linear_acceleration.y = -self.imu_accel[1]
-                    imu_pub.linear_acceleration.z = -self.imu_accel[2]
-                    imu_pub.orientation_covariance = [0.1, 0.0, 0.0, 0.0, 0.1, 0.0, 0.0, 0.0, 0.1]
-                    imu_pub.angular_velocity_covariance = [0.1, 0.0, 0.0, 0.0, 0.1, 0.0, 0.0, 0.0, 0.1]
-                    imu_pub.linear_acceleration_covariance = [0.1, 0.0, 0.0, 0.0, 0.1, 0.0, 0.0, 0.0, 0.1]
-                    self.Imu_publisher[uav_id].publish(imu_pub)
+                    imu_pub.linear_acceleration.x = self.imu_accel[0, uav_id]
+                    imu_pub.linear_acceleration.y = -self.imu_accel[1, uav_id]
+                    imu_pub.linear_acceleration.z = -self.imu_accel[2, uav_id]
+                    imu_pub.orientation_covariance = [self.imu_variance, 0.0, 0.0, 0.0, self.imu_variance, 0.0, 0.0, 0.0, self.imu_variance]
+                    imu_pub.angular_velocity_covariance = [self.imu_variance, 0.0, 0.0, 0.0, self.imu_variance, 0.0, 0.0, 0.0, self.imu_variance]
+                    imu_pub.linear_acceleration_covariance = [self.imu_variance, 0.0, 0.0, 0.0, self.imu_variance, 0.0, 0.0, 0.0, self.imu_variance]
+                    ukf_measure.header.stamp = current_time
+                    ukf_measure.header.frame_id = self.worldframe 
+                    ukf_measure.imu = imu_pub
+                    ukf_measure.odom = uav_vio_odom
+                    ukf_measure.wrench.force.x = self.tension_[0, uav_id]
+                    ukf_measure.wrench.force.y = self.tension_[1, uav_id]
+                    ukf_measure.wrench.force.z = self.tension_[2, uav_id]
+                    self.UKF_publisher[uav_id].publish(ukf_measure)
 
                 cable_point_list[2*uav_id,:] = uav_state[0:3]
                 cable_point_list[2*uav_id+1,:] = attach_pos[0:3]
@@ -1152,7 +1170,8 @@ class simulation_base():
               D = D + Dk
               E = E + Ek
               ML = ML + self.uav_params.mass * xixiT
-      
+          self.tension_ = tension_vector 
+
       invML = linalg.inv(ML)
 
 
@@ -1183,7 +1202,7 @@ class simulation_base():
          if self.cable_is_slack[uav_idx]:
              F = self.uav_F[uav_idx]
              M = self.uav_M[:,uav_idx]
-             sdotQuad = self.slack_quadEOM_readonly(uav_s,F,M)
+             sdotQuad = self.slack_quadEOM_readonly(uav_s,F,M, uav_idx)
          else:
              #print(tension_vector[:,uav_idx])
              #print(xixiT)
@@ -1198,7 +1217,7 @@ class simulation_base():
              #print(test2)
              F = self.uav_F[uav_idx] 
              M = self.uav_M[:,uav_idx]
-             sdotQuad = self.taut_quadEOM_readonly(uav_s,F,M,T)
+             sdotQuad = self.taut_quadEOM_readonly(uav_s,F,M,T, uav_idx)
          sdot = np.concatenate((sdot,sdotQuad))
         
 
@@ -1236,9 +1255,11 @@ class simulation_base():
       effective_M = M - np.matmul(C, np.matmul(invML, F)) - np.cross(omega, np.matmul(self.pl_params.I, omega))
       effective_inertia = self.pl_params.I + np.matmul(C, np.matmul(invML, D)) - E
       omgLdot = np.linalg.solve(effective_inertia,effective_M) + self.pl_params.invI @ self.ext_torque 
+      #omgLdot = np.linalg.solve(effective_inertia,effective_M)
 
       # Payload Acceleration
       accL = np.matmul(invML, F + np.matmul(D, omgLdot)) - np.array([0,0,self.pl_params.grav]) + self.ext_force/self.pl_params.mass
+      # accL = np.matmul(invML, F + np.matmul(D, omgLdot)) - np.array([0,0,self.pl_params.grav])
       temp = invML @ (F * self.pl_params.mass)
       self.wrench_value.force.x = temp[0]
       self.wrench_value.force.y = temp[1]
@@ -1255,7 +1276,7 @@ class simulation_base():
 
       return sdotLoad
 
-  def taut_quadEOM_readonly(self, qd, F, M, T): 
+  def taut_quadEOM_readonly(self, qd, F, M, T, uav_idx): 
       # DESCRIPTION:
       # QUADEOM_READONLY Solve quadrotor equation of motion when the cable is
       # slack.
@@ -1277,8 +1298,8 @@ class simulation_base():
 
       # Acceleration
       #accel = 1 / self.uav_params.mass * (R * np.array([[0],[0],[F]]) + T * xi - np.array([[0],[0],[params.mass * params.grav]]))
-      accel =  (np.matmul(R , np.array([0,0,F]) + T)/self.uav_params.mass - np.array([0,0,self.uav_params.grav]))
-      self.imu_accel = (np.array([0,0,F]) + T)/self.uav_params.mass
+      accel =  (np.matmul(R , np.array([0,0,F])) + T)/self.uav_params.mass - np.array([0,0,self.uav_params.grav])
+      self.imu_accel[:, uav_idx] = accel
       # quaternion derivative 
       qdot = utilslib.quat_dot(quat,omega)
 
@@ -1302,7 +1323,7 @@ class simulation_base():
       sdot[12] = pqrdot[2]
       return sdot
     
-  def slack_quadEOM_readonly(self, qd, F, M): 
+  def slack_quadEOM_readonly(self, qd, F, M, uav_idx): 
       # DESCRIPTION:
       # QUADEOM_READONLY Solve quadrotor equation of motion when the cable is
       # slack.
@@ -1325,8 +1346,8 @@ class simulation_base():
       R = utilslib.QuatToRot(quat)
 
       # Acceleration
-      accel =  np.matmul(R , np.array([0,0,F])/self.uav_params.mass - np.array([0,0,self.uav_params.grav]))
-      self.imu_accel = np.array([0,0,F])/self.uav_params.mass
+      accel =  np.matmul(R , np.array([0,0,F]))/self.uav_params.mass - np.array([0,0,self.uav_params.grav])
+      self.imu_accel[:, uav_idx] = accel
       # Angular velocity
       qdot = utilslib.quat_dot(quat,omega)
 
