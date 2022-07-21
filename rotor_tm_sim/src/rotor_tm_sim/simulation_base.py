@@ -242,7 +242,12 @@ class simulation_base():
           self.attach_publisher.append(rospy.Publisher(self.mav_name + str(i+1) + '/attach',Odometry, queue_size=1, tcp_nodelay=True))
           self.UKF_publisher.append(rospy.Publisher(self.mav_name + str(i+1) + '/ukf_measurement', ukf_measurement_update, queue_size=1, tcp_nodelay=True))
           #self.robot_vio.append(rospy.Publisher(self.mav_name + str(i+1) + '/vio',Odometry, queue_size=1, tcp_nodelay=True))
-           
+      # add two dummy publishers
+      #for i in range(0,2):
+      #    self.robot_odom_publisher.append(rospy.Publisher('odom_dummy'+str(i+1),Odometry, queue_size=1, tcp_nodelay=True))
+      #    self.attach_publisher.append(rospy.Publisher('att_dummy'+str(i+1),Odometry, queue_size=1, tcp_nodelay=True))
+      #    self.UKF_publisher.append(rospy.Publisher('measure_dummy'+str(i+1), ukf_measurement_update, queue_size=1, tcp_nodelay=True))     
+    
       # ROS Subscriber 
       self.robot_command_subscriber = []
       for uav_id in range(self.nquad):
@@ -282,6 +287,7 @@ class simulation_base():
         print("LOW PERFORMANCE PROCESSOR PROCEDE WITH CAUTION")
         print("############################################################\n")
         while not rospy.is_shutdown():
+            current_time = rospy.get_rostime()
             start = time.time()
             # Three scenario:
             #                 1. Cooperative
@@ -414,7 +420,7 @@ class simulation_base():
             
             
             # Publish payload odometry
-            current_time = rospy.get_rostime()
+
             payload_odom = Odometry()
             payload_odom.header.stamp = current_time
             payload_odom.header.frame_id = self.worldframe
@@ -489,7 +495,7 @@ class simulation_base():
             self.robot_vio_publisher.publish(payload_vio)
             self.payload_ctrl_wrench.publish(self.wrench_value)
             # Publish payload path
-            current_time = rospy.get_rostime()
+            # current_time = rospy.get_rostime()
 
             self.payload_path.header.stamp = current_time
             self.payload_path.header.frame_id = self.worldframe 
@@ -520,6 +526,16 @@ class simulation_base():
 
             system_marker = MarkerArray()
             cable_point_list = np.zeros((2*self.nquad,3))
+
+            #uav_odom = Odometry()
+            #attach_odom = Odometry()
+            #ukf_measure = ukf_measurement_update()
+            #self.UKF_publisher[self.nquad+1].publish(ukf_measure)
+            #self.robot_odom_publisher[self.nquad+1].publish(uav_odom)
+            #self.attach_publisher[self.nquad+1].publish(attach_odom)
+            #self.UKF_publisher[self.nquad].publish(ukf_measure)
+            #self.robot_odom_publisher[self.nquad].publish(uav_odom)
+            #self.attach_publisher[self.nquad].publish(attach_odom)
 
             for uav_id in range(self.nquad-1, -1, -1):
                 if self.pl_params.mechanism_type == 'Rigid Link':
@@ -574,7 +590,7 @@ class simulation_base():
                         if uav_attach_distance > self.cable_len_list[uav_id]:
                             xi = uav_attach_vector/uav_attach_distance
                             uav_state[0:3] = attach_pos[0:3] + self.cable_len_list[uav_id] * xi
-                        
+                    print("this should be printed and time is: ", current_time.nsecs, "   : |", current_time.secs)
                     # Publish UAV odometry
                     uav_odom = Odometry()
                     uav_odom.header.stamp = current_time
@@ -790,7 +806,7 @@ class simulation_base():
             self.robot_vio_publisher.publish(payload_vio)
             self.payload_ctrl_wrench.publish(self.wrench_value)
             # Publish payload path
-            current_time = rospy.get_rostime()
+            # current_time = rospy.get_rostime()
 
             self.payload_path.header.stamp = current_time
             self.payload_path.header.frame_id = self.worldframe 
