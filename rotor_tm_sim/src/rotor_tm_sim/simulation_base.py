@@ -933,9 +933,9 @@ class simulation_base():
       # F      - 1 x 1, thrust output from controller (only used in simulation)
       # M      - 3 x 1, moments output from controller (only used in simulation)
       # invML  - 3 x 3, inverse of the ML with payload mass as diagnal elements
-      # C      - 
-      # D      - 
-      # E      - 
+      # C      - coeff
+      # D      - coeff
+      # E      - coeff
 
       # IMPORTANT ATTRIBUTE USED
       # params - struct, output from crazyflie() and whatever parameters you want to pass in
@@ -970,11 +970,14 @@ class simulation_base():
   def taut_quadEOM_readonly(self, qd, F, M, T): 
       # DESCRIPTION:
       # QUADEOM_READONLY Solve quadrotor equation of motion when the cable is
-      # slack.
+      # taut.
       # quadEOM_readonly calculate the derivative of the state vector
           
       # INPUTS:
-      # params - struct, parameters you want to pass in
+      # qd - struct, quadrotor parameters you want to pass in
+      # F - ndarray, thrust value from controller, in quadrotor frame
+      # M - ndarray, control moment from controller, in quadrotor frame
+      # T - ndarray, tension value from simulation
           
       # OUTPUTS:
       # sdot   - 13 x 1, derivative of state vector s
@@ -1021,9 +1024,9 @@ class simulation_base():
       # quadEOM_readonly calculate the derivative of the state vector
       
       # INPUTS:
-      # t      - 1 x 1, time
-      # qd     - struct, quadrotor states and inputs
-      # F      - struct, parameters you want to pass in
+      # qd - struct, quadrotor parameters you want to pass in
+      # F - ndarray, thrust value from controller, in quadrotor frame
+      # M - ndarray, control moment from controller, in quadrotor frame
       
       # OUTPUTS:
       # sdot   - 13 x 1, derivative of state vector s
@@ -1062,6 +1065,14 @@ class simulation_base():
       return sdot
 
   def cooperative_check_inelastic(self, x):
+      # DESCRIPTION:
+      # cooperative_check_inelastic check if any cables are slack or taut
+      
+      # INPUTS:
+      # x     - ndarray, state of the multi-robot-payload system
+      
+      # OUTPUTS:
+      # collision_condition   - self.nquad x 1 ndarray, True False value as collision condition
       # state assignment
       nquad = self.nquad
       rho_vec_list = self.pl_params.rho_vec_list
@@ -1084,6 +1095,16 @@ class simulation_base():
       return collision_condition
 
   def rigidbody_quad_inelastic_cable_collision(self, x, collision_idx):
+      # DESCRIPTION:
+      # rigidbody_quad_inelastic_cable_collision redistribute velocities between quadrotor
+      # and the payload immediately after one or more cables switch from slack to taut condition
+      
+      # INPUTS:
+      # x                   - ndarray, state of the multi-robot-payload system
+      # collision_idx       - ndarray, self.nquad by 1, True False value denotes collision is happen between payload and which quadrotor
+      
+      # OUTPUTS:
+      # collision_condition   - self.nquad x 1 ndarray, True False value as collision condition
       # state assignment
       xL = x[0:13].reshape((13, 1))
       xQs = x[13:].reshape((x.shape[0]-13, 1))
@@ -1178,6 +1199,7 @@ class simulation_base():
 ##################                    PTMASS                    ####################
 ####################################################################################
   def hybrid_ptmass_pl_transportationEOM(self, t, s):
+    # DESCRIPTION:
     # QUADEOM Wrapper function for solving quadrotor equation of motion
     # 	quadEOM takes in time, state vector, and output the derivative of the state vector, the
     # 	actual calcution is done in quadEOM_readonly.
@@ -1223,7 +1245,19 @@ class simulation_base():
           return self.taut_ptmass_payload_quadEOM_readonly(t, plqd, self.uav_F, self.uav_M)
 
   def slack_ptmass_payload_quadEOM_readonly(self, t, plqd, F, M):
-      # Assign params and states
+      # DESCRIPTION:
+      # slack_ptmass_payload_quadEOM_readonly Solve payload equation of motion
+      # calculating the derivative of the state vector when cable is slack
+          
+      # INPUTS:
+      # plqd - struct, quadrotor and payload parameters you want to pass in
+      # F - ndarray, thrust value from controller, in quadrotor frame
+      # M - ndarray, control moment from controller, in quadrotor frame
+      # t - float, time, not used currently
+          
+      # OUTPUTS:
+      # sdot   - 26 x 1, derivative of state vector s
+      # # Assign params and states
       mQ  =   self.uav_params.mass
       e3  =   np.array([[0.0],[0.0],[1.0]])
       g   =   self.uav_params.grav * e3
@@ -1263,6 +1297,18 @@ class simulation_base():
       return sdot
 
   def taut_ptmass_payload_quadEOM_readonly(self, t, plqd, F, M):
+      # DESCRIPTION:
+      # taut_ptmass_payload_quadEOM_readonly Solve payload equation of motion
+      # calculating the derivative of the state vector when cable is taut
+          
+      # INPUTS:
+      # plqd - struct, quadrotor and payload parameters you want to pass in
+      # F - ndarray, thrust value from controller, in quadrotor frame
+      # M - ndarray, control moment from controller, in quadrotor frame
+      # t - float, time, not used currently
+          
+      # OUTPUTS:
+      # sdot   - 26 x 1, derivative of state vector s
       mL = self.pl_params.mass
       mQ = self.uav_params.mass
       total_mass = mL + mQ
@@ -1310,7 +1356,20 @@ class simulation_base():
       return sdot
 
   def ptmass_inelastic_cable_collision(self, x1, x2, m1, m2): 
+      # DESCRIPTION:
+      # ptmass_inelastic_cable_collision 
+      # redistribute the velocity between payload and the quadrotor by assuming
       # perfectly inelastic collision of ptmass and the drone along the cable direction
+          
+      # INPUTS:
+      # x1 - float, position of object 1
+      # x2 - float, position of object 2
+      # m1 - float, mass of object 1
+      # m2 - float, mass of object 2
+          
+      # OUTPUTS:
+      # v1, v2   - both float, new velocities for the two object
+      
       obj1_pos = x1[0:3]
       obj1_pos = obj1_pos.reshape((3, 1))
       obj2_pos = x2[0:3]
@@ -1337,18 +1396,33 @@ class simulation_base():
 ##################                  Rigidlink                   ####################
 ####################################################################################
   def rigid_links_cooperative_rigidbody_pl_EOM(self, t, s):
-    # original          - 13 x 1, state vector = [xL,   yL,     zL, 
-    #                                             xLd,  yLd,    zLd, 
-    #                                             qw,   qx,     qy,     qz,   
-    #                                             pL,   qL,     rL]
-    # s: take_in/output - 26 x 1, state vector(dot-elementwise) = [ xL,         yL,         zL,     
-    #                                                               xLd,        yLd,        zLd,
-    #                                                               qLw = 0,    qLx = 0,    qLy = 0,    qLz = 0,    
-    #                                                               pL,         qL,         rL,
-    #                                                               xQ = 0,     yQ = 0,     zQ = 0, 
-    #                                                               xQd = 0,    yQd = 0,    zQd = 0,
-    #                                                               qw,         qx,         qy,         qz,     
-    #                                                               pQuad = 0,  qQuad = 0,  rQuad = 0]
+    # DESCRIPTION
+    # QUADEOM Wrapper function for solving quadrotor equation of motion
+    # 	quadEOM takes in time, state vector, and output the derivative of the state vector, the
+    # 	actual calcution is done in quadEOM_readonly.
+    #
+    # INPUTS:
+    # t             - 1 x 1, time
+    # s: take_in    - 26 x 1, state vector(dot-elementwise) = [ xL,         yL,         zL,     
+    #                                                           xLd,        yLd,        zLd,
+    #                                                           qLw = 0,    qLx = 0,    qLy = 0,    qLz = 0,    
+    #                                                           pL,         qL,         rL,
+    #                                                           xQ = 0,     yQ = 0,     zQ = 0, 
+    #                                                           xQd = 0,    yQd = 0,    zQd = 0,
+    #                                                           qw,         qx,         qy,         qz,     
+    #                                                           pQuad = 0,  qQuad = 0,  rQuad = 0]
+    #
+    #                   ,where [xL, yL, zL] is payload postion
+    #                          [xLd, yLd, zLd], is payload linear velocity
+    #                          [qLw, qLx, qLy, qLz], is payload orientation in quaternion
+    #                          [pL, qL, rL], is payload orientation in euler angle
+    #                          [xQ, yQ, zQ] is quadrotor position
+    #                          [xQd, yQd, zQd] is quadrotor velocity
+    #                          [qw, qx, qy, qz] is quadrotor orientation in quaternion
+    #                          [pQuad, qQuad, rQuad] is quadrotor angular velocity in its own frame
+    # OUTPUTS:
+    # sdot          - 26 x 1, derivative of state vector s as mentioned above (some values are forced to 0)
+  
       qd = {}
       # extract payload state_vector
       qd["pos"] = s[0:3]
@@ -1360,8 +1434,17 @@ class simulation_base():
       result = self.rigidbody_structEOM_readonly(t, qd, self.uav_F, self.uav_M)
       return result
   
-  # this is the same as the function in controller.py
   def rigid_links_cooperative_payload_controller_init(self, ql, params):
+    # DESCRIPTION:
+    # rigid_links_cooperative_payload_controller_init() initialize the robot_thrust_moment for rigid link robot system
+    # this function is only called once when initialization happens at __init__(), this is the same as the function in controller.py
+    #
+    # INPUTS:
+    # ql - struct, quadrotor and payload parameters you want to pass in
+    # params - struct, store important simulation parameter
+    #
+    # OUTPUTS:
+    # u          - ndarray, 6*1, controlled force and moment
         if not params.sim_start:
             self.icnt = 0
         self.icnt = self.icnt + 1
@@ -1422,6 +1505,18 @@ class simulation_base():
         return u
 
   def rigidbody_structEOM_readonly(self, t, s, F, M):
+    # DESCRIPTION:
+    # rigidbody_structEOM_readonly() Solve payload equation of motion
+    # calculating the derivative of the state vector
+    #
+    # INPUTS:
+    # s - struct, state of the rigidlink system
+    # F - ndarray, thrust value from controller, in quadrotor frame
+    # M - ndarray, control moment from controller, in quadrotor frame
+    # t - float, time, not used currently
+    #
+    # OUTPUTS:
+    # u          - ndarray, 6*1, controlled force and moment
       # Assign states
       quat = s["quat"]
       qW = quat[0]
@@ -1489,6 +1584,8 @@ class simulation_base():
       return
 
   def fm_command_callback(self,fm_command,uav_id):
+    # DESCRIPTION:
+    # call back function for fm_command, get force and moment command from quadrotor controllers
         if self.pl_params.mechanism_type == 'Rigid Link':
             self.uav_F[0,0] = fm_command.rlink_thrust.x
             self.uav_F[1,0] = fm_command.rlink_thrust.y
