@@ -261,8 +261,8 @@ class simulation_base():
 
       if self.hybrid_flag:
         print("\n############################################################")
-        print("HYBRID DYNAMICS IS TURN ON")
-        print("LOW PERFORMANCE PROCESSOR PROCEDE WITH CAUSTION")
+        print("HYBRID DYNAMICS IS ON")
+        print("LOW PERFORMANCE PROCESSOR PROCEDE WITH CAUTION")
         print("############################################################\n")
         while not rospy.is_shutdown():
             start = time.time()
@@ -560,7 +560,7 @@ class simulation_base():
             rate.sleep()    
       elif self.hybrid_flag == False:
         print("\n############################################################")
-        print("HYBRID DYNAMICS IS TURN OFF")
+        print("HYBRID DYNAMICS IS OFF")
         print("############################################################\n")
         while not rospy.is_shutdown():
             start = time.time()
@@ -732,8 +732,6 @@ class simulation_base():
             self.system_publisher.publish(system_marker)
 
             rate.sleep()
-
-
 
   def istaut(self, robot_pos, attach_pos, cable_length):
     # DESCRIPTION:
@@ -991,7 +989,7 @@ class simulation_base():
 
       # Acceleration
       #accel = 1 / self.uav_params.mass * (R * np.array([[0],[0],[F]]) + T * xi - np.array([[0],[0],[params.mass * params.grav]]))
-      accel =  (np.matmul(R , np.array([0,0,F]) + T)/self.uav_params.mass - np.array([0,0,self.uav_params.grav]))
+      accel =  (np.matmul(R , np.array([0,0,F])) + T)/self.uav_params.mass - np.array([0,0,self.uav_params.grav])
       
       # quaternion derivative 
       qdot = utilslib.quat_dot(quat,omega)
@@ -1039,7 +1037,7 @@ class simulation_base():
       R = utilslib.QuatToRot(quat)
 
       # Acceleration
-      accel =  np.matmul(R , np.array([0,0,F])/self.uav_params.mass - np.array([0,0,self.uav_params.grav]))
+      accel =  np.matmul(R , np.array([0,0,F]))/self.uav_params.mass - np.array([0,0,self.uav_params.grav])
       # Angular velocity
       qdot = utilslib.quat_dot(quat,omega)
 
@@ -1335,7 +1333,6 @@ class simulation_base():
 
       return v1, v2
 
-
 ####################################################################################
 ##################                  Rigidlink                   ####################
 ####################################################################################
@@ -1486,7 +1483,6 @@ class simulation_base():
 
       sdotLoad = sdotLoad.reshape((26, ))
       return sdotLoad
-
 
 ##################                  Call backs                  ####################
   def rpm_command_callback(self,rpm_command,uav_id):
