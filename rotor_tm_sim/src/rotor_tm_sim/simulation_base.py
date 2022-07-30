@@ -422,10 +422,12 @@ class simulation_base():
             # Publish payload odometry
 
             payload_odom = Odometry()
+            # current_time = rospy.get_rostime()
             payload_odom.header.stamp = current_time
             payload_odom.header.frame_id = self.worldframe
             
-            payload_vio = Odometry()          
+            payload_vio = Odometry()        
+            # current_time = rospy.get_rostime()  
             payload_vio.header.stamp = current_time
             payload_vio.header.frame_id = self.worldframe 
             payload_rotmat = utilslib.QuatToRot(sol.y[:,0][6:10])
@@ -502,6 +504,7 @@ class simulation_base():
             payload_rotmat = utilslib.QuatToRot(sol.y[:,0][6:10])
 
             pl_pose_stamped = PoseStamped()
+            # current_time = rospy.get_rostime()
             pl_pose_stamped.header.stamp = current_time
             pl_pose_stamped.header.frame_id = self.worldframe
 
@@ -539,6 +542,7 @@ class simulation_base():
 
             for uav_id in range(self.nquad-1, -1, -1):
                 if self.pl_params.mechanism_type == 'Rigid Link':
+                    print("I'm in Rigid Link", uav_id)
                     uav_state = x[13:26]
                     attach_pos = self.load_pos.reshape((3,)) + np.matmul(payload_rotmat, (self.pl_params.rho_robot[:,uav_id]+np.array([0.028,0,0.032])))
                     uav_state[0:3] = attach_pos
@@ -552,6 +556,7 @@ class simulation_base():
                         
                     # Publish UAV odometry
                     uav_odom = Odometry()
+                    # current_time = rospy.get_rostime()
                     uav_odom.header.stamp = current_time
                     uav_odom.header.frame_id = self.worldframe 
                     uav_odom.pose.pose.position.x = uav_state[0]
@@ -571,6 +576,7 @@ class simulation_base():
 
                     # Publish UAV attach odometry
                     attach_odom = Odometry()
+                    # current_time = rospy.get_rostime()
                     attach_odom.header.stamp = current_time
                     attach_odom.header.frame_id = self.worldframe 
                     attach_odom.pose.pose.position.x = attach_pos[0]
@@ -581,6 +587,7 @@ class simulation_base():
                     attach_odom.twist.twist.linear.z = attach_vel[2]
                     self.attach_publisher[uav_id].publish(attach_odom)
                 else:
+                    # print("I'm in non rigid link", uav_id)
                     uav_state = x[self.pl_dim_num+self.uav_dim_num*uav_id:self.pl_dim_num+self.uav_dim_num*(uav_id+1)]
                     attach_pos = x[0:3] + np.matmul(payload_rotmat, self.rho_vec_list[:,uav_id])
                     attach_vel = x[3:6] + np.matmul(payload_rotmat, np.cross(sol.y[:,0][10:13], self.rho_vec_list[:,uav_id]))
@@ -590,9 +597,10 @@ class simulation_base():
                         if uav_attach_distance > self.cable_len_list[uav_id]:
                             xi = uav_attach_vector/uav_attach_distance
                             uav_state[0:3] = attach_pos[0:3] + self.cable_len_list[uav_id] * xi
-                    print("this should be printed and time is: ", current_time.nsecs, "   : |", current_time.secs)
+                    # print("this should be printed and time is: ", current_time.nsecs, "   : |", current_time.secs)
                     # Publish UAV odometry
                     uav_odom = Odometry()
+                    # current_time = rospy.get_rostime()
                     uav_odom.header.stamp = current_time
                     uav_odom.header.frame_id = self.worldframe 
                     uav_odom.pose.pose.position.x = uav_state[0]
@@ -624,6 +632,7 @@ class simulation_base():
 
                     # Publish UAV vio odometry
                     uav_vio_odom = Odometry()
+                    # current_time = rospy.get_rostime()
                     uav_vio_odom.header.stamp = current_time
                     uav_vio_odom.header.frame_id = self.worldframe 
                     uav_vio_odom.pose.pose.position.x = uav_state[0]
@@ -667,6 +676,7 @@ class simulation_base():
 
                     # Publish UAV attach odometry
                     attach_odom = Odometry()
+                    # current_time = rospy.get_rostime()
                     attach_odom.header.stamp = current_time
                     attach_odom.header.frame_id = self.worldframe 
                     attach_odom.pose.pose.position.x = attach_pos[0]
@@ -680,6 +690,7 @@ class simulation_base():
                     # Publish UAV imu
                     ukf_measure = ukf_measurement_update()
                     imu_pub = Imu()
+                    # current_time = rospy.get_rostime()
                     imu_pub.header.stamp = current_time
                     imu_pub.header.frame_id = self.worldframe
                     imu_pub.orientation.w = odom_oritentaion_quat[3]
@@ -695,6 +706,7 @@ class simulation_base():
                     imu_pub.orientation_covariance = [self.imu_variance, 0.0, 0.0, 0.0, self.imu_variance, 0.0, 0.0, 0.0, self.imu_variance]
                     imu_pub.angular_velocity_covariance = [self.imu_variance, 0.0, 0.0, 0.0, self.imu_variance, 0.0, 0.0, 0.0, self.imu_variance]
                     imu_pub.linear_acceleration_covariance = [self.imu_variance, 0.0, 0.0, 0.0, self.imu_variance, 0.0, 0.0, 0.0, self.imu_variance]
+                    # current_time = rospy.get_rostime()
                     ukf_measure.header.stamp = current_time
                     ukf_measure.header.frame_id = self.worldframe 
                     ukf_measure.imu = imu_pub
@@ -806,13 +818,14 @@ class simulation_base():
             self.robot_vio_publisher.publish(payload_vio)
             self.payload_ctrl_wrench.publish(self.wrench_value)
             # Publish payload path
-            # current_time = rospy.get_rostime()
+            current_time = rospy.get_rostime()
 
             self.payload_path.header.stamp = current_time
             self.payload_path.header.frame_id = self.worldframe 
             payload_rotmat = utilslib.QuatToRot(sol.y[:,0][6:10])
 
             pl_pose_stamped = PoseStamped()
+            current_time = rospy.get_rostime()
             pl_pose_stamped.header.stamp = current_time
             pl_pose_stamped.header.frame_id = self.worldframe
 
@@ -853,6 +866,7 @@ class simulation_base():
                         
                     # Publish UAV odometry
                     uav_odom = Odometry()
+                    current_time = rospy.get_rostime()
                     uav_odom.header.stamp = current_time
                     uav_odom.header.frame_id = self.worldframe 
                     uav_odom.pose.pose.position.x = uav_state[0]
@@ -872,6 +886,7 @@ class simulation_base():
 
                     # Publish UAV attach odometry
                     attach_odom = Odometry()
+                    current_time = rospy.get_rostime()
                     attach_odom.header.stamp = current_time
                     attach_odom.header.frame_id = self.worldframe 
                     attach_odom.pose.pose.position.x = attach_pos[0]
@@ -894,6 +909,7 @@ class simulation_base():
                         
                     # Publish UAV odometry
                     uav_odom = Odometry()
+                    current_time = rospy.get_rostime()
                     uav_odom.header.stamp = current_time
                     uav_odom.header.frame_id = self.worldframe 
                     uav_odom.pose.pose.position.x = uav_state[0]
@@ -925,6 +941,7 @@ class simulation_base():
 
                     # Publish UAV vio odometry
                     uav_vio_odom = Odometry()
+                    current_time = rospy.get_rostime()
                     uav_vio_odom.header.stamp = current_time
                     uav_vio_odom.header.frame_id = self.worldframe 
                     uav_vio_odom.pose.pose.position.x = uav_state[0]
@@ -970,6 +987,7 @@ class simulation_base():
 
                     # Publish UAV attach odometry
                     attach_odom = Odometry()
+                    current_time = rospy.get_rostime()
                     attach_odom.header.stamp = current_time
                     attach_odom.header.frame_id = self.worldframe 
                     attach_odom.pose.pose.position.x = attach_pos[0]
@@ -983,6 +1001,7 @@ class simulation_base():
                     # Publish UAV imu
                     ukf_measure = ukf_measurement_update()
                     imu_pub = Imu()
+                    current_time = rospy.get_rostime()
                     imu_pub.header.stamp = current_time
                     imu_pub.header.frame_id = self.worldframe
                     imu_pub.orientation.w = odom_oritentaion_quat[3]
@@ -1015,9 +1034,9 @@ class simulation_base():
 
             # Update cable visualization
             cable_marker_msg = rosutilslib.init_marker_msg(Marker(),5,0,self.worldframe,self.cable_marker_scale,self.cable_marker_color)
-            system_marker.markers.append(rosutilslib.update_line_msg(cable_marker_msg,cable_point_list,uav_id + 1))
+            system_marker.markers.append(rosutilslib.update_line_msg(cable_marker_msg,cable_point_list,self.nquad + 1))
             # Update payload visualization
-            system_marker.markers.append(rosutilslib.update_marker_msg(self.payload_marker_msg,x[0:3],x[6:10],uav_id+2))
+            system_marker.markers.append(rosutilslib.update_marker_msg(self.payload_marker_msg,x[0:3],x[6:10],self.nquad+2))
             self.system_publisher.publish(system_marker)
 
             rate.sleep()
