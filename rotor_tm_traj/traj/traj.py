@@ -163,10 +163,10 @@ class traj:
 
 				distance[i-1, :] = np.linalg.norm(afterward-previous)
 				if distance[i-1,:]<=1:
-					self.timesegment[i-1, 0] = distance[i-1,:]
+					self.timesegment[i-1, 0] = distance[i-1,:]*4
 					self.timesegment[i-1, 1] = 0
 				else:
-					self.timesegment[i-1, :] = np.sqrt(distance[i-1,:])*2
+					self.timesegment[i-1, :] = np.sqrt(distance[i-1,:])*8
 					self.timesegment[i-1, 1] = 0
 			
 			time_temp = 0

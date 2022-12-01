@@ -143,6 +143,8 @@ class traj_node:
 	# /			- update the attribute self.current_state
 		self.curr_state = np.array([data.pose.pose.position.x,data.pose.pose.position.y,data.pose.pose.position.z,\
 									data.pose.pose.orientation.w, data.pose.pose.orientation.x,data.pose.pose.orientation.y,data.pose.pose.orientation.z])
+		t = rospy.get_time()
+		self.send_des_traj(t)
 
 	def send_des_traj(self,t):
 	# DESCRIPTION
@@ -159,6 +161,7 @@ class traj_node:
 				if (self.current_traj.traj_type == 1):
 					self.current_traj.circle(t-self.time_reference)
 				elif (self.current_traj.traj_type == 2):
+					print("The dt is", t-self.time_reference)
 					self.current_traj.line_quintic_traj(t-self.time_reference)
 				else: 
 					self.current_traj.min_snap_traj_generator(t-self.time_reference)
@@ -198,11 +201,11 @@ if __name__ == '__main__':
 	rospy.init_node(node_name)
 
 	# at a constant rate of 75 Hz, compute new trajectory way points
-	rate = rospy.Rate(75)
+	rate = rospy.Rate(100)
 	traj_node = traj_node()
 	while not rospy.is_shutdown():
 		t = rospy.get_time()
-		traj_node.send_des_traj(t)
+		#traj_node.send_des_traj(t)
 		rate.sleep()
 
 
