@@ -34,3 +34,7 @@
 # Python
 *.pyc
 __pycache__
+
+# Vim
+*.swp
+
