@@ -11,4 +11,4 @@ rho:
   - {x: -0.1540, y: 0.267,  z: 0.01125}
 
 # Define the cable length
-cable_length: [0.5,1.0,1.0]
+cable_length: [1.0,0.5,1.0]
