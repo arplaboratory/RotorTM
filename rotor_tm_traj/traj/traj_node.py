@@ -161,7 +161,6 @@ class traj_node:
 				if (self.current_traj.traj_type == 1):
 					self.current_traj.circle(t-self.time_reference)
 				elif (self.current_traj.traj_type == 2):
-					print("The dt is", t-self.time_reference)
 					self.current_traj.line_quintic_traj(t-self.time_reference)
 				else: 
 					self.current_traj.min_snap_traj_generator(t-self.time_reference)
