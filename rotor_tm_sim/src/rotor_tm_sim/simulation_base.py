@@ -10,6 +10,7 @@ from visualization_msgs.msg import MarkerArray, Marker
 from nav_msgs.msg import Odometry, Path
 from geometry_msgs.msg import PoseStamped
 from rotor_tm_msgs.msg import RPMCommand, FMCommand 
+from quadrotor_msgs.msg import FMCommand as QuadFMCommand
 from rotor_tm_utils import utilslib, rosutilslib
 from rotor_tm_utils.vee import vee
 from rotor_tm_utils import utilslib
@@ -114,6 +115,7 @@ class simulation_base():
       rate = rospy.Rate(self.rate)
       t_span = (0,1/self.rate)
       self.worldframe = "simulator"
+
       ################################## init parameters ################################
       self.pl_params = pl_params
       self.uav_params = uav_params
@@ -138,6 +140,7 @@ class simulation_base():
             self.uav_F = np.matmul(self.pl_params.pseudo_inv_P, np.array([0,0,self.pl_params.mass * self.pl_params.grav,0,0,0])) + np.kron([1]*self.nquad, [0,0,self.uav_params.mass * self.pl_params.grav]) 
             self.uav_F = self.uav_F.reshape(self.nquad, 3)[:,2]
             self.uav_M = np.zeros((3,self.nquad))
+
             self.rho_vec_list = self.pl_params.rho_vec_list
             self.cable_len_list = np.array(self.pl_params.cable_length)
             x = np.zeros(self.pl_dim_num + self.uav_dim_num * self.nquad)
@@ -195,19 +198,24 @@ class simulation_base():
       else:
         print("Initalizing Ptmass Scenario")
         ## init force to [sum of (quad and payload mass)] * gravity
-        self.uav_F = np.array([(self.pl_params.mass + self.uav_params.mass) * self.uav_params.grav])
+        self.uav_F = np.array([(self.pl_params.mass + self.uav_params[0].mass) * self.uav_params[0].grav])
+
         ## init M to [0; 0; 0]
         self.uav_M = np.zeros((3,self.nquad), dtype=float)
+
         ## init calbe to taut
         self.cable_is_slack = np.zeros(self.nquad)
+
         ## init rho_vec_list = [] (empty)
         self.rho_vec_list = self.pl_params.rho_vec_list
+
         ## init cable_len_list = cable_length (read)
         self.cable_len_list = np.array(self.pl_params.cable_length)
+
         ## init state x as a (26, 1) state vector with inital position hard code to (0, 0, 0.5)
         # x = (26, 1) state init
                                                     # Name      Element Location
-        x = np.array([0.0,  0.0,    0.0,            # pl pos    3
+        x = np.array([0.0,  0.0,    0.3,            # pl pos    3
                       0.0,  0.0,    0.0,            # pl vel    6
                       1.0,  0.0,    0.0,    0.0,    # pl quat   10
                       0.0,  0.0,    0.0,            # pl omega  13
@@ -234,17 +242,22 @@ class simulation_base():
           controller_name = "/controller_" + str(uav_id+1)
           self.robot_command_subscriber.append(rospy.Subscriber(controller_name + '/' + mav_name + '/rpm_cmd',RPMCommand,self.rpm_command_callback,uav_id,queue_size=1, tcp_nodelay=True))
           self.robot_command_subscriber.append(rospy.Subscriber(controller_name + '/' + mav_name + '/fm_cmd',FMCommand,self.fm_command_callback,uav_id,queue_size=1, tcp_nodelay=True))
+          self.robot_command_subscriber.append(rospy.Subscriber('/' + mav_name + '/fm_cmd',QuadFMCommand,self.quad_fm_command_callback,uav_id,queue_size=1, tcp_nodelay=True))
     
       # Visualization Init
       self.cable_marker_scale = 0.01 * np.ones(3)
       self.cable_marker_color = np.array([1.0,0.5,0.5,0.5])
       self.uav_marker_scale = 0.5 * np.ones(3)
       self.uav_marker_color = np.array([1.0,0.0,0.0,1.0])
-      self.uav_mesh = self.uav_params.mesh_path
+      self.uav_mesh = []
+      for idx in range(self.nquad):
+        self.uav_mesh.append(self.uav_params[idx].mesh_path)
+
       if self.nquad == 1:
         self.payload_marker_scale = np.array([0.1,0.1,0.1])
       else:
         self.payload_marker_scale = np.ones(3)
+
       self.payload_marker_color = np.array([1.0,0.745,0.812,0.941])
       self.payload_mesh = self.pl_params.mesh_path
       if self.nquad == 1:
@@ -290,7 +303,7 @@ class simulation_base():
                     cable_norm_vel = np.transpose(pl_pos - robot_pos) @ (pl_vel - robot_vel)
                     ## if collision, compute new velocities and assign to state
                     if cable_norm_vel > 1e-6 and not self.cable_is_slack:
-                        v1, v2 = self.ptmass_inelastic_cable_collision(x[0:6], x[13:19], self.pl_params.mass, self.uav_params.mass)
+                        v1, v2 = self.ptmass_inelastic_cable_collision(x[0:6], x[13:19], self.pl_params.mass, self.uav_params[0].mass)
                         x[3:6] = v1
                         x[16:19] = v2
                     
@@ -544,9 +557,10 @@ class simulation_base():
                     attach_odom.twist.twist.linear.y = attach_vel[1]
                     attach_odom.twist.twist.linear.z = attach_vel[2]
                     self.attach_publisher[uav_id].publish(attach_odom)
+
                 cable_point_list[2*uav_id,:] = uav_state[0:3]
                 cable_point_list[2*uav_id+1,:] = attach_pos[0:3]
-                uav_marker_msg = rosutilslib.init_marker_msg(Marker(),10,0,self.worldframe,self.uav_marker_scale,self.uav_marker_color,self.uav_mesh)
+                uav_marker_msg = rosutilslib.init_marker_msg(Marker(),10,0,self.worldframe,self.uav_marker_scale,self.uav_marker_color,self.uav_mesh[uav_id])
                 uav_marker = rosutilslib.update_marker_msg(uav_marker_msg,uav_state[0:3],uav_state[6:10],uav_id)
                 system_marker.markers.append(uav_marker)
 
@@ -878,16 +892,18 @@ class simulation_base():
           if not self.cable_is_slack[uav_idx]:
               cable_len = self.cable_len_list[uav_idx]
               # If the cable is taut, calculate these terms
+
               # Force and Moment at attach point
               attach_qn_force = u_parallel - self.uav_params.mass * cable_len * linalg.norm(cbl_omg)**2 * xi - \
                                 self.uav_params.mass * np.matmul(xixiT, np.matmul(pl_rot, attach_centrifugal_accel[:,uav_idx]))
               attach_qn_moment = np.matmul(rho_qn_asym, np.matmul(pl_rot.T, attach_qn_force))
+
+              # Tension Force on each cable
               tension = self.uav_params.mass*cable_len*np.sum(cbl_omg**2) - \
                         np.matmul(xi, qd_u - self.uav_params.mass * self.attach_accel[uav_idx,:])
               tension_vector[:,uav_idx] = tension * xi
 
-              # Sum Net Force, Moment and other corresponding terms
-              # for the Payload Dynamics
+              # Sum Net Force, Moment and other corresponding terms for the Payload Dynamics
               pl_net_F = pl_net_F + attach_qn_force
               pl_net_M = pl_net_M + attach_qn_moment
               Ck = self.uav_params.mass * np.matmul(rho_qn_asym, np.matmul(pl_rot.T, xixiT))
@@ -1258,9 +1274,9 @@ class simulation_base():
       # OUTPUTS:
       # sdot   - 26 x 1, derivative of state vector s
       # # Assign params and states
-      mQ  =   self.uav_params.mass
+      mQ  =   self.uav_params[0].mass
       e3  =   np.array([[0.0],[0.0],[1.0]])
-      g   =   self.uav_params.grav * e3
+      g   =   self.uav_params[0].grav * e3
       wRb =   plqd["qd_rot"];   # Rotation matrix of the quadrotor
       qd_quat     =   plqd["qd_quat"]
       qd_omega    =   plqd["qd_omega"]
@@ -1283,7 +1299,7 @@ class simulation_base():
                             [r,  q, -p,  0]]) @ qd_quat.reshape((qd_quat.shape[0], 1)) + K_quat * quaterror * qd_quat.reshape((qd_quat.shape[0], 1))
 
       # Solving for Quadrotor Angular Acceleration
-      pqrdot   = self.uav_params.invI @ (M - np.reshape(np.cross(qd_omega, self.uav_params.I @ qd_omega, axisa=0, axisb=0), (3,1)))
+      pqrdot   = self.uav_params[0].invI @ (M - np.reshape(np.cross(qd_omega, self.uav_params[0].I @ qd_omega, axisa=0, axisb=0), (3,1)))
       
       # Assemble sdot
       sdot = np.zeros((26,1), dtype=float)
@@ -1310,14 +1326,14 @@ class simulation_base():
       # OUTPUTS:
       # sdot   - 26 x 1, derivative of state vector s
       mL = self.pl_params.mass
-      mQ = self.uav_params.mass
+      mQ = self.uav_params[0].mass
       total_mass = mL + mQ
       l = self.pl_params.cable_length
       xi = plqd["xi"]
       xidot = plqd["xidot"]
       xi_omega = np.cross(xi,xidot)
       e3=np.array([[0.0],[0.0],[1.0]])
-      g = self.uav_params.grav * e3
+      g = self.uav_params[0].grav * e3
       wRb=plqd["qd_rot"]    #Rotation matrix of the quadrotor
       qd_quat = plqd["qd_quat"]
       qd_omega = plqd["qd_omega"]
@@ -1342,7 +1358,8 @@ class simulation_base():
                             [r,  q, -p,  0]]) @ qd_quat.reshape((qd_quat.shape[0], 1)) + K_quat * quaterror * qd_quat.reshape((qd_quat.shape[0], 1))
 
       # Solving for Quadrotor Angular Acceleration
-      pqrdot   = self.uav_params.invI @ (M - np.cross(qd_omega, self.uav_params.I @ qd_omega, axisa=0, axisb=0).T.reshape(3, 1))
+      pqrdot   = self.uav_params[0].invI @ (M - np.cross(qd_omega, self.uav_params[0].I @ qd_omega, axisa=0, axisb=0).T.reshape(3, 1))
+
       # Assemble sdot
       sdot = np.zeros((26,1), dtype=float)
       sdot[0:3] = plqd["vel"].reshape(3, 1)
@@ -1582,6 +1599,29 @@ class simulation_base():
 ##################                  Call backs                  ####################
   def rpm_command_callback(self,rpm_command,uav_id):
       return
+
+  def quad_fm_command_callback(self,fm_command,uav_id):
+    # DESCRIPTION:
+    # call back function for fm_command, get force and moment command from quadrotor controllers
+        if self.pl_params.mechanism_type == 'Rigid Link':
+            self.uav_F[0,0] = fm_command.rlink_thrust.x
+            self.uav_F[1,0] = fm_command.rlink_thrust.y
+            self.uav_F[2,0] = fm_command.rlink_thrust.z
+
+            self.uav_M[0,0] = fm_command.moments.x
+            self.uav_M[1,0] = fm_command.moments.y
+            self.uav_M[2,0] = fm_command.moments.z
+        elif self.pl_params.mechanism_type == 'Cable':
+            if self.pl_params.payload_type == 'Rigid Body':
+                self.uav_F[uav_id] = fm_command.thrust
+                self.uav_M[0,uav_id] = fm_command.moments.x
+                self.uav_M[1,uav_id] = fm_command.moments.y
+                self.uav_M[2,uav_id] = fm_command.moments.z
+            elif self.pl_params.payload_type == 'Point Mass':
+                self.uav_F[0] = fm_command.thrust
+                self.uav_M[0,0] = fm_command.moments.x
+                self.uav_M[1,0] = fm_command.moments.y
+                self.uav_M[2,0] = fm_command.moments.z
 
   def fm_command_callback(self,fm_command,uav_id):
     # DESCRIPTION:

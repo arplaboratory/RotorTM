@@ -606,10 +606,9 @@ class controller:
             e3 = np.array([[0],[0],[1]])
 
         self.icnt = self.icnt + 1
-        quad_m = qd_params.mass
+        quad_m = qd_params[0].mass
         pl_m = pl_params.mass
         l = pl_params.cable_length
-
 
         ## State Initialization
         quad_load_rel_pos = ql["qd_pos"]-ql["pos"]
@@ -647,7 +646,7 @@ class controller:
 
         e_xi = np.cross(xi_des_, xi_, axisa=0, axisb=0).T
         e_w = w_ + xi_asym_ @ xi_asym_ @ w_des_
-        Force = mu_ - quad_m*l*np.cross(xi_, qd_params.Kxi @ e_xi + qd_params.Kw @ e_w+ (xi_.T @ w_des_) * xidot_ + xi_asym_ @ xi_asym_ @ w_des_dot_, axisa=0, axisb=0).T
+        Force = mu_ - quad_m*l*np.cross(xi_, qd_params[0].Kxi @ e_xi + qd_params[0].Kw @ e_w+ (xi_.T @ w_des_) * xidot_ + xi_asym_ @ xi_asym_ @ w_des_dot_, axisa=0, axisb=0).T
         F = np.transpose(Force) @ Rot_worldtobody @ e3
 
         # Attitude Control        
@@ -672,5 +671,5 @@ class controller:
 
         # Moment
         # Missing the angular acceleration term but in general it is neglectable.
-        M = - qd_params.Kpe @ e_angle - qd_params.Kde @ e_omega + np.cross(ql["qd_omega"],qd_params.I @ ql["qd_omega"], axisa=0, axisb=0).T
+        M = - qd_params[0].Kpe @ e_angle - qd_params[0].Kde @ e_omega + np.cross(ql["qd_omega"],qd_params[0].I @ ql["qd_omega"], axisa=0, axisb=0).T
         return F, M
