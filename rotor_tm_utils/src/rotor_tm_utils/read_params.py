@@ -21,7 +21,7 @@ class uav_params_class:
   num_props: int # number of propellors
   max_rpm: int # maximum rpm of the rotor 
   min_rpm: int # minimum rpm of the rotor
-  motor_coefficients: float  
+  motor_coefficients: float # The motor coefficients gramf/rpm^2 
   mesh_path: str # UAV mesh file path for visualization 
 
 @dataclass
@@ -29,7 +29,8 @@ class mechanism_params_class:
   mechanism_type: str # attach mechanism type 
   num_of_robots: int # number of robots 
   rho: list # attach place on the payload 
-  cable_length: list
+  robot_list: list # This list of robots 
+  cable_length: list 
   yaw_list: list
 
 @dataclass
@@ -64,9 +65,13 @@ class read_params:
   def system_setup(self, payload_params_path = None,quad_params_path = None,mechanism_params_path = None,payload_control_params_path = None,uav_controller_params_path=None): 
     payload_control_gains = self.read_payload_control_gains(payload_control_params_path)
     uav_control_gains = self.read_uav_control_gains(uav_controller_params_path)
-    quad_params = self.read_uav_params(quad_params_path)
-    payload_params = self.read_payload_params(payload_params_path)
     mechanism_params = self.read_mechanism_params(mechanism_params_path)
+    quad_params = []
+    for robot_name in mechanism_params.robot_list:
+      quad_ = self.read_uav_params(quad_params_path+robot_name+".yaml")
+      quad_params.append(quad_)
+    #quad_params = self.read_uav_params(quad_params_path+robot_name+".yaml")
+    payload_params = self.read_payload_params(payload_params_path)
     params = payload_params
 
     params.nquad = mechanism_params.num_of_robots
@@ -90,7 +95,7 @@ class read_params:
         params.id = "Cable"
         ## This section sets up the essential controller parameters for cable suspended payload
         ## store cable length in both payload and uav params
-        quad_params.l = mechanism_params.cable_length[0] 
+        #quad_params.l = mechanism_params.cable_length[0] 
         params.cable_length = mechanism_params.cable_length
         if params.payload_type == 'Rigid Body':
           # Geometric parameters matrix for cooperative geometric controller
@@ -217,7 +222,7 @@ class read_params:
       rho_vec_list = []
       for i in range(0,params.num_of_robots):
           rho_vec_list.append(np.array([params.rho[i]['x'],params.rho[i]['y'],params.rho[i]['z']]))
-       
+
       params.rho_vec_list = np.array(rho_vec_list).T
       return params
 
