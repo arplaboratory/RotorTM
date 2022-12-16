@@ -264,7 +264,7 @@ class controller:
             qd[qn]["yawdot_des"] = 0
             qd[qn]["mu_des"] = mu[3*qn:3*(qn+1)]
             qd[qn]["attach_accel"] = att_acc_c[:,qn].reshape((3,1))
-            [F_qn, M_qn, Rot_des_qn] = self.cooperative_attitude_controller(qd, qn, qd_params)
+            [F_qn, M_qn, Rot_des_qn] = self.cooperative_attitude_controller(qd, qn, qd_params[qn])
             qd_F[qn] = F_qn
             qd_M[qn] = M_qn
             qd_quat_des[qn] = tranrot.from_matrix(Rot_des_qn).as_quat() 

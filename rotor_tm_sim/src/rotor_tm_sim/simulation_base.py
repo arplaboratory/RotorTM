@@ -137,8 +137,11 @@ class simulation_base():
         # First Scenario: Cooperative  
         if self.pl_params.id == "Cable":
             print("Initalizing Cooperative Scenario")
-            self.uav_F = np.matmul(self.pl_params.pseudo_inv_P, np.array([0,0,self.pl_params.mass * self.pl_params.grav,0,0,0])) + np.kron([1]*self.nquad, [0,0,self.uav_params.mass * self.pl_params.grav]) 
+            uav_hover_force = []
+            for idx in range(self.nquad) : uav_hover_force.extend([0,0,self.uav_params[idx].mass * self.pl_params.grav]) 
+            self.uav_F = np.matmul(self.pl_params.pseudo_inv_P, np.array([0,0,self.pl_params.mass * self.pl_params.grav,0,0,0])) + uav_hover_force
             self.uav_F = self.uav_F.reshape(self.nquad, 3)[:,2]
+            print(self.uav_F)
             self.uav_M = np.zeros((3,self.nquad))
 
             self.rho_vec_list = self.pl_params.rho_vec_list
@@ -932,12 +935,12 @@ class simulation_base():
          if self.cable_is_slack[uav_idx]:
              F = self.uav_F[uav_idx]
              M = self.uav_M[:,uav_idx]
-             sdotQuad = self.slack_quadEOM_readonly(uav_s,F,M)
+             sdotQuad = self.slack_quadEOM_readonly(uav_s,F,M,uav_idx)
          else:
              T = tension_vector[:,uav_idx]
              F = self.uav_F[uav_idx]
              M = self.uav_M[:,uav_idx]
-             sdotQuad = self.taut_quadEOM_readonly(uav_s,F,M,T)
+             sdotQuad = self.taut_quadEOM_readonly(uav_s,F,M,T,uav_idx)
          sdot = np.concatenate((sdot,sdotQuad))
       return sdot
     
