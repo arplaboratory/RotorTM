@@ -215,8 +215,8 @@ class simulation_base():
         ## init state x as a (26, 1) state vector with inital position hard code to (0, 0, 0.5)
         # x = (26, 1) state init
                                                     # Name      Element Location
-        x = np.array([0.0,  0.0,    0.3,            # pl pos    3
-                      0.0,  0.0,    0.0,            # pl vel    6
+        x = np.array([0.0,  0.0,    0.0,            # pl pos    3
+                      0.5,  0.0,    1.0,            # pl vel    6
                       1.0,  0.0,    0.0,    0.0,    # pl quat   10
                       0.0,  0.0,    0.0,            # pl omega  13
                       0.0,  0.0,    0.5,            # qd pos    16
@@ -303,6 +303,7 @@ class simulation_base():
                     cable_norm_vel = np.transpose(pl_pos - robot_pos) @ (pl_vel - robot_vel)
                     ## if collision, compute new velocities and assign to state
                     if cable_norm_vel > 1e-6 and not self.cable_is_slack:
+                        print("Colliding")
                         v1, v2 = self.ptmass_inelastic_cable_collision(x[0:6], x[13:19], self.pl_params.mass, self.uav_params[0].mass)
                         x[3:6] = v1
                         x[16:19] = v2
@@ -317,10 +318,12 @@ class simulation_base():
 
                     ## state integration
                     if self.cable_is_slack:
-                        # print("Cable is slack")
+                        print("Cable is slack")
+                        #print(x)
                         sol = scipy.integrate.solve_ivp(self.hybrid_ptmass_pl_transportationEOM, t_span, x, method= 'RK45', t_eval=t_span, events=ptmassslackToTaut)
                     else:
-                        # print("Cable is taut")
+                        print("Cable is taut")
+                        print(x)
                         sol = scipy.integrate.solve_ivp(self.hybrid_ptmass_pl_transportationEOM, t_span, x, method= 'RK45', t_eval=t_span, events=ptmasstautToSlack)
                     
                     ## extract state from solver soltion
@@ -864,7 +867,7 @@ class simulation_base():
       qd_xidot = (pl_vel + np.matmul(pl_rot, np.matmul(pl_omg_asym, self.rho_vec_list)).T - qd_vel) / self.cable_len_list[:, np.newaxis]
       cable_omg = np.cross(qd_xi,qd_xidot)
       attach_centrifugal_accel = np.matmul(pl_omg_asym, np.matmul(pl_omg_asym, self.rho_vec_list))
-      self.attach_accel = self.pl_accel + np.array([0,0,self.uav_params.grav]) + \
+      self.attach_accel = self.pl_accel + np.array([0,0,self.pl_params.grav]) + \
                           np.matmul(pl_rot, np.matmul(utilslib.vec2asym(self.pl_ang_accel), self.rho_vec_list)).T + \
                           np.matmul(pl_rot, attach_centrifugal_accel).T
 
@@ -894,25 +897,25 @@ class simulation_base():
               # If the cable is taut, calculate these terms
 
               # Force and Moment at attach point
-              attach_qn_force = u_parallel - self.uav_params.mass * cable_len * linalg.norm(cbl_omg)**2 * xi - \
-                                self.uav_params.mass * np.matmul(xixiT, np.matmul(pl_rot, attach_centrifugal_accel[:,uav_idx]))
+              attach_qn_force = u_parallel - self.uav_params[uav_idx].mass * cable_len * linalg.norm(cbl_omg)**2 * xi - \
+                                self.uav_params[uav_idx].mass * np.matmul(xixiT, np.matmul(pl_rot, attach_centrifugal_accel[:,uav_idx]))
               attach_qn_moment = np.matmul(rho_qn_asym, np.matmul(pl_rot.T, attach_qn_force))
 
               # Tension Force on each cable
-              tension = self.uav_params.mass*cable_len*np.sum(cbl_omg**2) - \
-                        np.matmul(xi, qd_u - self.uav_params.mass * self.attach_accel[uav_idx,:])
+              tension = self.uav_params[uav_idx].mass*cable_len*np.sum(cbl_omg**2) - \
+                        np.matmul(xi, qd_u - self.uav_params[uav_idx].mass * self.attach_accel[uav_idx,:])
               tension_vector[:,uav_idx] = tension * xi
 
               # Sum Net Force, Moment and other corresponding terms for the Payload Dynamics
               pl_net_F = pl_net_F + attach_qn_force
               pl_net_M = pl_net_M + attach_qn_moment
-              Ck = self.uav_params.mass * np.matmul(rho_qn_asym, np.matmul(pl_rot.T, xixiT))
+              Ck = self.uav_params[uav_idx].mass * np.matmul(rho_qn_asym, np.matmul(pl_rot.T, xixiT))
               Dk = - np.transpose(Ck)
               Ek = np.matmul(Ck, np.matmul(pl_rot, rho_qn_asym))
               C = C + Ck
               D = D + Dk
               E = E + Ek
-              ML = ML + self.uav_params.mass * xixiT
+              ML = ML + self.uav_params[uav_idx].mass * xixiT
       
       invML = linalg.inv(ML)
 
@@ -983,7 +986,7 @@ class simulation_base():
 
       return sdotLoad
 
-  def taut_quadEOM_readonly(self, qd, F, M, T): 
+  def taut_quadEOM_readonly(self, qd, F, M, T, uav_idx): 
       # DESCRIPTION:
       # QUADEOM_READONLY Solve quadrotor equation of motion when the cable is
       # taut.
@@ -1008,13 +1011,13 @@ class simulation_base():
 
       # Acceleration
       #accel = 1 / self.uav_params.mass * (R * np.array([[0],[0],[F]]) + T * xi - np.array([[0],[0],[params.mass * params.grav]]))
-      accel =  (np.matmul(R , np.array([0,0,F])) + T)/self.uav_params.mass - np.array([0,0,self.uav_params.grav])
+      accel =  (np.matmul(R , np.array([0,0,F])) + T)/self.uav_params[uav_idx].mass - np.array([0,0,self.uav_params[uav_idx].grav])
       
       # quaternion derivative 
       qdot = utilslib.quat_dot(quat,omega)
 
       # Angular acceleration
-      pqrdot = np.matmul(self.uav_params.invI, M - np.cross(omega,np.matmul(self.uav_params.I, omega)))
+      pqrdot = np.matmul(self.uav_params[uav_idx].invI, M - np.cross(omega,np.matmul(self.uav_params[uav_idx].I, omega)))
 
       # Assemble sdot
       sdot = np.zeros(self.uav_dim_num)
@@ -1033,7 +1036,7 @@ class simulation_base():
       sdot[12] = pqrdot[2]
       return sdot
     
-  def slack_quadEOM_readonly(self, qd, F, M): 
+  def slack_quadEOM_readonly(self, qd, F, M, uav_idx): 
       # DESCRIPTION:
       # QUADEOM_READONLY Solve quadrotor equation of motion when the cable is
       # slack.
@@ -1056,12 +1059,12 @@ class simulation_base():
       R = utilslib.QuatToRot(quat)
 
       # Acceleration
-      accel =  np.matmul(R , np.array([0,0,F]))/self.uav_params.mass - np.array([0,0,self.uav_params.grav])
+      accel =  np.matmul(R , np.array([0,0,F]))/self.uav_params[uav_idx].mass - np.array([0,0,self.uav_params[uav_idx].grav])
       # Angular velocity
       qdot = utilslib.quat_dot(quat,omega)
 
       # Angular acceleration
-      pqrdot = np.matmul(self.uav_params.invI , M - np.cross(omega, np.matmul(self.uav_params.I, omega)))
+      pqrdot = np.matmul(self.uav_params[uav_idx].invI , M - np.cross(omega, np.matmul(self.uav_params[uav_idx].I, omega)))
 
       # Assemble sdot
       sdot = np.zeros(self.uav_dim_num)
@@ -1340,6 +1343,7 @@ class simulation_base():
       p = qd_omega[0]
       q = qd_omega[1]
       r = qd_omega[2]
+
       # Obtain tension vector
       quad_force_vector = F * wRb @ e3
       quad_centrifugal_f = mQ * l * (xi_omega.T @ xi_omega)
