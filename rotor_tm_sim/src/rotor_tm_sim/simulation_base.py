@@ -740,13 +740,14 @@ class simulation_base():
                     self.attach_publisher[uav_id].publish(attach_odom)
                 cable_point_list[2*uav_id,:] = uav_state[0:3]
                 cable_point_list[2*uav_id+1,:] = attach_pos[0:3]
-                uav_marker_msg = rosutilslib.init_marker_msg(Marker(),10,0,self.worldframe,self.uav_marker_scale,self.uav_marker_color,self.uav_mesh)
+                uav_marker_msg = rosutilslib.init_marker_msg(Marker(),10,0,self.worldframe,self.uav_marker_scale,self.uav_marker_color,self.uav_mesh[uav_id])
                 uav_marker = rosutilslib.update_marker_msg(uav_marker_msg,uav_state[0:3],uav_state[6:10],uav_id)
                 system_marker.markers.append(uav_marker)
 
             # Update cable visualization
             cable_marker_msg = rosutilslib.init_marker_msg(Marker(),5,0,self.worldframe,self.cable_marker_scale,self.cable_marker_color)
             system_marker.markers.append(rosutilslib.update_line_msg(cable_marker_msg,cable_point_list,uav_id + 1))
+
             # Update payload visualization
             system_marker.markers.append(rosutilslib.update_marker_msg(self.payload_marker_msg,x[0:3],x[6:10],uav_id+2))
             self.system_publisher.publish(system_marker)

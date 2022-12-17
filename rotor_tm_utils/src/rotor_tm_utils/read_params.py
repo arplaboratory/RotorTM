@@ -66,7 +66,7 @@ class read_params:
     payload_control_gains = self.read_payload_control_gains(payload_control_params_path)
     mechanism_params = self.read_mechanism_params(mechanism_params_path)
     quad_params = []
-    for robot_name in mechanism_params.robot_list:
+    for robot_idx, robot_name in enumerate(mechanism_params.robot_list):
       quad_ = self.read_uav_params(quad_params_path+robot_name+".yaml")
       uav_control_gains = self.read_uav_control_gains(uav_controller_params_path+robot_name+"_control_gains.yaml")
       quad_.Kp = uav_control_gains.Kp
@@ -75,6 +75,7 @@ class read_params:
       quad_.Kde = uav_control_gains.Kde
       quad_.Kxi = uav_control_gains.Kxi
       quad_.Kw = uav_control_gains.Kw
+      quad_.l = mechanism_params.cable_length[robot_idx] 
       quad_params.append(quad_)
     #quad_params = self.read_uav_params(quad_params_path+robot_name+".yaml")
     payload_params = self.read_payload_params(payload_params_path)
