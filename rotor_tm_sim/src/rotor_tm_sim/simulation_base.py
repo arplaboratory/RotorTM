@@ -1129,11 +1129,12 @@ class simulation_base():
       # OUTPUTS:
       # collision_condition   - self.nquad x 1 ndarray, True False value as collision condition
       # state assignment
+
       xL = x[0:13].reshape((13, 1))
       xQs = x[13:].reshape((x.shape[0]-13, 1))
       nquad = self.nquad
       ntaut_quad = 0
-      for i in range(np.max(collision_idx.shape)):
+      for i in range(nquad):
           if collision_idx[i] != 0:
               ntaut_quad += 1
       IL = self.pl_params.I
@@ -1141,22 +1142,21 @@ class simulation_base():
       
       rho_vec_idx_bool = np.repeat(collision_idx, 3)
       rho_vec_idx_int = np.zeros(int(np.sum(rho_vec_idx_bool)), dtype=int)
+
       index = 0
-      for j in range(np.max(rho_vec_idx_bool.shape)):
+      for j in range(3*nquad):
           if rho_vec_idx_bool[j] == 1:
               rho_vec_idx_int[index] = j
               index = index + 1
       temp_rho_vec_asym_mat = self.pl_params.rho_vec_asym_mat[:, rho_vec_idx_int]
       rho_vec_asym_mat = temp_rho_vec_asym_mat   
       
-      index = 0
-      collision_idx_int = np.zeros(int(np.sum(collision_idx)), dtype=int)
-      for j in range(np.max(collision_idx.shape)):
+      collision_idx_int = [] 
+      for j in range(nquad):
           if collision_idx[j] == 1:
-              collision_idx_int[index] = j
-              index = index + 1
-      
-      temp_rho_vec_list = self.pl_params.rho_vec_list[:, utilslib.toint(collision_idx_int)]
+              collision_idx_int.append(j) 
+      #temp_rho_vec_list = self.pl_params.rho_vec_list[:, utilslib.toint(collision_idx_int)]
+      temp_rho_vec_list = self.pl_params.rho_vec_list[:, collision_idx_int]
       rho_vec_list = temp_rho_vec_list
 
       pl_rot = utilslib.QuatToRot(xL[6:10])
@@ -1167,8 +1167,10 @@ class simulation_base():
       robot_state = np.zeros((13, nquad))
       for i in range(nquad):
         robot_state[:, i] = xQs[13*i:13*(i+1), 0]
-      robot_pos = robot_state[0:3, utilslib.toint(collision_idx_int)]
-      robot_vel = robot_state[3:6, utilslib.toint(collision_idx_int)]
+      #robot_pos = robot_state[0:3, utilslib.toint(collision_idx_int)]
+      #robot_vel = robot_state[3:6, utilslib.toint(collision_idx_int)]
+      robot_pos = robot_state[0:3, collision_idx_int]
+      robot_vel = robot_state[3:6, collision_idx_int]
       
       # state computation
       xi = (attach_pos - robot_pos) / np.linalg.norm(attach_pos - robot_pos, 2, 0)
@@ -1182,7 +1184,6 @@ class simulation_base():
       temp_hatrho_rotL_xi = np.zeros((hatrho_index.shape), dtype=float)
       for i in range(hatrho_index.shape[1]): # for each col of the index
           temp_hatrho_rotL_xi[:, i] = hatrho_rotL_xi[hatrho_index[:, i], i]
-
       hatrho_rotL_xi = temp_hatrho_rotL_xi
 
       # cal for collision
@@ -1190,7 +1191,11 @@ class simulation_base():
       ML_top = np.hstack((mL * np.eye(3), np.zeros((3, 3))))
       ML_bottom = np.hstack((np.zeros((3, 3)), IL))
       ML = np.vstack((ML_top, ML_bottom))
-      MQ = self.uav_params.mass * np.eye(ntaut_quad)
+      MQ_list = []
+      for collide_uav_idx in collision_idx_int: 
+        MQ_list.append(self.uav_params[collide_uav_idx].mass)
+      #MQ = self.uav_params.mass * np.eye(ntaut_quad)
+      MQ = np.diag(np.array(MQ_list)) 
       M = ML + G1 @ MQ @ G1.T
       right_element = xi @ MQ @ robot_vel_xi_proj.T
       right_element = right_element.reshape((right_element.shape[0],1))
