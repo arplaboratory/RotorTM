@@ -75,7 +75,6 @@ class read_params:
       quad_.Kde = uav_control_gains.Kde
       quad_.Kxi = uav_control_gains.Kxi
       quad_.Kw = uav_control_gains.Kw
-      quad_.l = mechanism_params.cable_length[robot_idx] 
       quad_params.append(quad_)
     #quad_params = self.read_uav_params(quad_params_path+robot_name+".yaml")
     payload_params = self.read_payload_params(payload_params_path)
@@ -103,6 +102,8 @@ class read_params:
           P = np.vstack((identity_stack_mat,params.rho_vec_asym_mat))
           params.pseudo_inv_P = np.matmul(P.T, LA.inv(np.matmul(P, P.T)))
           params.P = P
+          for robot_idx, robot_name in enumerate(mechanism_params.robot_list):
+            quad_params[robot_idx].l = mechanism_params.cable_length[robot_idx] 
     else:
         if params.mechanism_type == 'Rigid Link':
           params.id = "Rigid Link"
@@ -113,22 +114,24 @@ class read_params:
           params.struct_I = params.I
           params.struct_mass = params.mass
           rho_c = np.zeros((1,3), dtype=float)
-          for k in np.arange(1,params.nquad+1):
-              params.struct_mass = params.struct_mass + quad_params.mass
-              rho_c = rho_c + quad_params.mass * mechanism_params.rho_vec_list[:,k-1].T
+          total_quad_mass = 0.0
+          for uav_idx in range(params.nquad):
+              params.struct_mass = params.struct_mass + quad_params[uav_idx].mass
+              rho_c = rho_c + quad_params[uav_idx].mass * mechanism_params.rho_vec_list[:,uav_idx].T
+              total_quad_mass += quad_params[uav_idx].mass
 
-          rho_c = rho_c / (quad_params.mass * params.nquad + params.mass)
+          rho_c = rho_c / (total_quad_mass + params.mass)
           rho_c = rho_c.T
  
           params.struct_I = params.struct_I + params.mass * np.array([[rho_c[1, 0]**2,0,0],[0,rho_c[0, 0]**2,0],[0,0,rho_c[0, 0]**2+rho_c[1, 0]**2]])
 
           ## Calculate the geometric constraints of the structure
           A = np.zeros((4,0), dtype=float)
-          for k in np.arange(1,params.nquad+1).reshape(-1):
-              rho = mechanism_params.rho_vec_list[:, k-1] - rho_c.T
+          for k in range(params.nquad):
+              rho = mechanism_params.rho_vec_list[:, k] - rho_c.T
               rho = rho.T
-              R = np.transpose(RPYtoRot_ZXY(0,0,mechanism_params.yaw_list[k-1]))
-              params.struct_I = params.struct_I + R @ quad_params.I @ R.T + quad_params.mass * np.array([[rho[1,0]**2,0,0],[0,rho[0,0]**2,0],[0,0,rho[0,0]**2+rho[1,0]**2]])
+              R = np.transpose(RPYtoRot_ZXY(0,0,mechanism_params.yaw_list[k]))
+              params.struct_I = params.struct_I + R @ quad_params[k].I @ R.T + quad_params[k].mass * np.array([[rho[1,0]**2,0,0],[0,rho[0,0]**2,0],[0,0,rho[0,0]**2+rho[1,0]**2]])
               A = np.hstack((A, np.vstack((np.array([1,0,0,0]), np.hstack((np.array([[rho[1,0]],[rho[0,0]],[0.0]]), R))))))
           params.rho_load = -rho_c
           params.rho_robot = mechanism_params.rho_vec_list - rho_c
