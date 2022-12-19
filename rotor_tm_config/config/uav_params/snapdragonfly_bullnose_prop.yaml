@@ -7,6 +7,6 @@ max_angle: 80 #degree
 num_props: 4
 max_rpm: 16400
 min_rpm: 5500
-motor_coefficients: 6.69952015e-07 
+motor_coefficients: 6.57222927e-9
 
 mesh_path: "package://rotor_tm/mesh/uav/snapdragonflight.stl"

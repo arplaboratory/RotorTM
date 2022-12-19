@@ -1,12 +1,12 @@
 mass: 0.95
-inertia: {Ixx: 0.000601, Ixy: 0.0, Ixz: 0.0, Iyx: 0.0, Iyy: 0.000589, Iyz: 0.0, Izx: 0.0, Izy: 0.0, Izz: 0.001076}
-arm_length: 0.1075 
+inertia: {Ixx: 0.003, Ixy: 0.0, Ixz: 0.0, Iyx: 0.0, Iyy: 0.003, Iyz: 0.0, Izx: 0.0, Izy: 0.0, Izz: 0.004} # To be fixed
+arm_length: 0.10125
 
 max_angle: 80 #degree
 
 num_props: 4
 max_rpm: 23000
 min_rpm: 5500
-motor_coefficients:  
+motor_coefficients: 1.21702136e-8
 
-mesh_path: "package://rotor_tm/mesh/uav/race.stl"
+mesh_path: "package://rotor_tm/mesh/uav/race.STL"
