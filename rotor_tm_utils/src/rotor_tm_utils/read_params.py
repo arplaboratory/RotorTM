@@ -241,7 +241,7 @@ class read_params:
     params.grav = 9.81
     params.maxangle = params.max_angle * np.pi/180
     params.maxF = params.num_props * params.motor_coefficients * params.max_rpm**2 
-    params.minF = params.num_props * params.motor_coefficients * params.min_rpm**2 
+    params.minF = params.num_props * params.motor_coefficients * params.min_rpm**2
     self.uav_params = params
     return params
 
