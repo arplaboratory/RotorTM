@@ -9,4 +9,4 @@ max_rpm: 23000
 min_rpm: 5500
 motor_coefficients: 1.21702136e-8
 
-mesh_path: "package://rotor_tm/mesh/uav/race.STL"
+mesh_path: "package://rotor_tm/mesh/uav/race.stl"
