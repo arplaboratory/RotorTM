@@ -14,4 +14,4 @@ rho:
 cable_length: [1.0,1.0,1.0]
 
 # Define the types of robots attach to the payload
-robot_list: ["snapdragonfly","hummingbird","snapdragonfly_bullnose_prop"]
+robot_list: ["snapdragonfly","race","hummingbird"]
