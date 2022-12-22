@@ -1,3 +1,4 @@
+uav_name: "race"
 mass: 0.95
 inertia: {Ixx: 0.003, Ixy: 0.0, Ixz: 0.0, Iyx: 0.0, Iyy: 0.003, Iyz: 0.0, Izx: 0.0, Izy: 0.0, Izz: 0.004} # To be fixed
 arm_length: 0.10125

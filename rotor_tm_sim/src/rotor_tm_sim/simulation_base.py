@@ -219,7 +219,7 @@ class simulation_base():
         # x = (26, 1) state init
                                                     # Name      Element Location
         x = np.array([0.0,  0.0,    0.0,            # pl pos    3
-                      0.5,  0.0,    1.0,            # pl vel    6
+                      0.0,  0.0,    0.0,            # pl vel    6
                       1.0,  0.0,    0.0,    0.0,    # pl quat   10
                       0.0,  0.0,    0.0,            # pl omega  13
                       0.0,  0.0,    0.5,            # qd pos    16
@@ -234,18 +234,30 @@ class simulation_base():
       self.payload_path = Path()
       self.robot_odom_publisher = []
       self.attach_publisher = []
-      for i in range(self.nquad):
-          self.robot_odom_publisher.append(rospy.Publisher(self.mav_name + str(i+1) + '/odom',Odometry, queue_size=1, tcp_nodelay=True))
-          self.attach_publisher.append(rospy.Publisher(self.mav_name + str(i+1) + '/attach',Odometry, queue_size=1, tcp_nodelay=True))
-           
-      # ROS Subscriber 
       self.robot_command_subscriber = []
-      for uav_id in range(self.nquad):
-          mav_name = self.mav_name + str(uav_id+1)
-          controller_name = "/controller_" + str(uav_id+1)
-          self.robot_command_subscriber.append(rospy.Subscriber(controller_name + '/' + mav_name + '/rpm_cmd',RPMCommand,self.rpm_command_callback,uav_id,queue_size=1, tcp_nodelay=True))
-          self.robot_command_subscriber.append(rospy.Subscriber(controller_name + '/' + mav_name + '/fm_cmd',FMCommand,self.fm_command_callback,uav_id,queue_size=1, tcp_nodelay=True))
-          self.robot_command_subscriber.append(rospy.Subscriber('/' + mav_name + '/fm_cmd',QuadFMCommand,self.quad_fm_command_callback,uav_id,queue_size=1, tcp_nodelay=True))
+      uav_type = []
+      uav_in_team = []
+      for i in range(self.nquad):
+          uav_name = self.uav_params[i].uav_name
+          if uav_name in uav_type: 
+            uav_type_idx = uav_type.index(uav_name)
+            total_num_uav_of_current_type = len(uav_in_team[uav_type_idx])
+            uav_name_with_id = uav_name + str(total_num_uav_of_current_type+1)
+            uav_in_team[uav_type_idx].append(uav_name_with_id)
+          else: 
+            uav_type.append(uav_name)
+            uav_name_with_id = uav_name + str(1)
+            uav_in_team.append([uav_name_with_id])
+
+          # ROS Publisher
+          self.robot_odom_publisher.append(rospy.Publisher(uav_name_with_id + '/odom',Odometry, queue_size=1, tcp_nodelay=True))
+          self.attach_publisher.append(rospy.Publisher(uav_name_with_id + '/attach',Odometry, queue_size=1, tcp_nodelay=True))
+           
+          # ROS Subscriber 
+          controller_name = "/controller_" + str(i+1)
+          self.robot_command_subscriber.append(rospy.Subscriber(controller_name + '/' + uav_name_with_id + '/rpm_cmd',RPMCommand,self.rpm_command_callback,i,queue_size=1, tcp_nodelay=True))
+          self.robot_command_subscriber.append(rospy.Subscriber(controller_name + '/' + uav_name_with_id + '/fm_cmd',FMCommand,self.fm_command_callback,i,queue_size=1, tcp_nodelay=True))
+          self.robot_command_subscriber.append(rospy.Subscriber('/' + uav_name_with_id + '/fm_cmd',QuadFMCommand,self.quad_fm_command_callback,i,queue_size=1, tcp_nodelay=True))
     
       # Visualization Init
       self.cable_marker_scale = 0.01 * np.ones(3)
@@ -272,8 +284,9 @@ class simulation_base():
       try:
         self.hybrid_flag = rospy.get_param("hybrid_switch")
       except:
-        rospy.set_param("hybrid_switch", True)
+        rospy.set_param("hybrid_switch", False)
         self.hybrid_flag = rospy.get_param("hybrid_switch")
+        print("The hybrid flag is ", self.hybrid_flag)
 
       if self.hybrid_flag:
         print("\n############################################################")
@@ -393,7 +406,7 @@ class simulation_base():
                         id = id + 1
 
                     ## state integration
-                    sol = scipy.integrate.solve_ivp(self.hybrid_cooperative_rigidbody_pl_transportationEOM, t_span, x, method='RK45', t_eval=t_span, events=GuardEvents)
+                    sol = scipy.integrate.solve_ivp(self.hybrid_cooperative_rigidbody_pl_transportationEOM, t_span, x, method='RK23', t_eval=t_span, events=GuardEvents)
                     
                     ## extract state from solver soltion
                     EventTriggered_bool = sol.status
@@ -423,15 +436,14 @@ class simulation_base():
             payload_rotmat = utilslib.QuatToRot(sol.y[:,0][6:10])
 
             if self.pl_params.mechanism_type == 'Rigid Link':
-                # for rigid link scenario, the payload position is uav position
                 self.load_pos = x[0:3].reshape((3,1)) + payload_rotmat @ self.pl_params.rho_load
                 payload_odom.pose.pose.position.x = self.load_pos[0]
                 payload_odom.pose.pose.position.y = self.load_pos[1]
                 payload_odom.pose.pose.position.z = self.load_pos[2]
             else:
-                payload_odom.pose.pose.position.x    = x[0]
-                payload_odom.pose.pose.position.y    = x[1]
-                payload_odom.pose.pose.position.z    = x[2]
+                payload_odom.pose.pose.position.x  = x[0]
+                payload_odom.pose.pose.position.y  = x[1]
+                payload_odom.pose.pose.position.z  = x[2]
             payload_odom.twist.twist.linear.x    = x[3]
             payload_odom.twist.twist.linear.y    = x[4]
             payload_odom.twist.twist.linear.z    = x[5]

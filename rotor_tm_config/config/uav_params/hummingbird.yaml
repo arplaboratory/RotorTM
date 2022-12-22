@@ -1,3 +1,4 @@
+uav_name: "hummingbird"
 mass: 0.5
 inertia: {Ixx: 2.64e-3, Ixy: 0.0, Ixz: 0.0, Iyx: 0.0, Iyy: 2.64e-3, Iyz: 0.0, Izx: 0.0, Izy: 0.0, Izz: 4.96e-3}
 arm_length: 0.17

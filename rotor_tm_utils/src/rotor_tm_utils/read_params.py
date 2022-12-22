@@ -14,6 +14,7 @@ from rotor_tm_utils.RPYtoRot_ZXY import RPYtoRot_ZXY
 # Class to store various parameters of the UAV and the controller
 @dataclass
 class uav_params_class:
+  uav_name: str # The UAV's name
   mass: float # UAV mass 
   inertia: list # UAV inertia
   arm_length: float # motor arm length 
