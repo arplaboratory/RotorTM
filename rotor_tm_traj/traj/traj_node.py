@@ -8,7 +8,7 @@ import create_options
 # need to build quadrotor_msgs package
 from rotor_tm_msgs.msg import PositionCommand
 from nav_msgs.msg import Odometry
-from std_msgs.msg import Bool 
+from std_msgs.msg import Header
 from rotor_tm_traj.srv import Circle, Line
 
 
@@ -34,9 +34,9 @@ class traj_node:
 
 		## ROS Publisher
 		self.des_traj_pub = rospy.Publisher('payload/des_traj', PositionCommand, queue_size=1, tcp_nodelay=True)
-		self.cir_traj_status_pub = rospy.Publisher('payload/cir_traj_status', Bool, queue_size=1, tcp_nodelay=True)
-		self.line_traj_status_pub = rospy.Publisher('payload/line_traj_status', Bool, queue_size=1, tcp_nodelay=True)
-		self.min_der_traj_status_pub = rospy.Publisher('payload/min_der_traj_status', Bool, queue_size=1, tcp_nodelay=True)
+		self.cir_traj_status_pub = rospy.Publisher('payload/cir_traj_status', Header, queue_size=1, tcp_nodelay=True)
+		self.line_traj_status_pub = rospy.Publisher('payload/line_traj_status', Header, queue_size=1, tcp_nodelay=True)
+		self.min_der_traj_status_pub = rospy.Publisher('payload/min_der_traj_status', Header, queue_size=1, tcp_nodelay=True)
 
         ## ROS Server
 		server = []
@@ -70,7 +70,8 @@ class traj_node:
 			self.traj_type = 1
 			self.current_traj.circle(0, self.curr_state[0:3], req.radius, req.T, req.duration)
 			self.traj_start = True
-			status_msgs = Bool()
+			status_msgs = Header()
+			status_msgs.stamp = rospy.get_rostime()
 			self.cir_traj_status_pub.publish(status_msgs)
 
 
@@ -104,8 +105,9 @@ class traj_node:
 			self.current_traj.line_quintic_traj(0, self.map, np.array(path))
 			# self.traj_type = 2
 			self.traj_start = True
-			status_msgs = Bool()
-			self.min_der_traj_status_pub.publish(status_msgs)
+			status_msgs = Header()
+			status_msgs.stamp = rospy.get_rostime()
+			self.line_traj_status_pub.publish(status_msgs)
 
 
 	def min_derivative_line_traj_cb(self, req):
@@ -138,7 +140,8 @@ class traj_node:
 			self.time_reference = rospy.get_time()
 			self.current_traj.min_snap_traj_generator(self, path, options=traj_constant)
 			self.traj_start = True
-			status_msgs = Bool()
+			status_msgs = Header()
+			status_msgs.stamp = rospy.get_rostime()
 			self.min_der_traj_status_pub.publish(status_msgs)
 
 
@@ -170,10 +173,22 @@ class traj_node:
 			if (self.current_traj.traj_type != 0):
 				if (self.current_traj.traj_type == 1):
 					self.current_traj.circle(t-self.time_reference)
+					if not self.current_traj.finished:
+						status_msgs = Header()
+						status_msgs.stamp = rospy.get_rostime()
+						self.cir_traj_status_pub.publish(status_msgs)
 				elif (self.current_traj.traj_type == 2):
 					self.current_traj.line_quintic_traj(t-self.time_reference)
+					if not self.current_traj.finished:
+						status_msgs = Header()
+						status_msgs.stamp = rospy.get_rostime()
+						self.line_traj_status_pub.publish(status_msgs)
 				else: 
 					self.current_traj.min_snap_traj_generator(t-self.time_reference)
+					if not self.current_traj.finished:
+						status_msgs = Header()
+						status_msgs.stamp = rospy.get_rostime()
+						self.min_der_traj_status_pub.publish(status_msgs)
 			
 				# Publish the command
 				now = rospy.get_rostime()
