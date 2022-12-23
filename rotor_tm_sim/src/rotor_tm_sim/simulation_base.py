@@ -237,17 +237,10 @@ class simulation_base():
       self.robot_command_subscriber = []
       uav_type = []
       uav_in_team = []
+      print(pl_params.uav_in_team)
       for i in range(self.nquad):
           uav_name = self.uav_params[i].uav_name
-          if uav_name in uav_type: 
-            uav_type_idx = uav_type.index(uav_name)
-            total_num_uav_of_current_type = len(uav_in_team[uav_type_idx])
-            uav_name_with_id = uav_name + str(total_num_uav_of_current_type+1)
-            uav_in_team[uav_type_idx].append(uav_name_with_id)
-          else: 
-            uav_type.append(uav_name)
-            uav_name_with_id = uav_name + str(1)
-            uav_in_team.append([uav_name_with_id])
+          uav_name_with_id = pl_params.uav_in_team[i]
 
           # ROS Publisher
           self.robot_odom_publisher.append(rospy.Publisher(uav_name_with_id + '/odom',Odometry, queue_size=1, tcp_nodelay=True))
@@ -259,6 +252,7 @@ class simulation_base():
           self.robot_command_subscriber.append(rospy.Subscriber(controller_name + '/' + uav_name_with_id + '/fm_cmd',FMCommand,self.fm_command_callback,i,queue_size=1, tcp_nodelay=True))
           self.robot_command_subscriber.append(rospy.Subscriber('/' + uav_name_with_id + '/fm_cmd',QuadFMCommand,self.quad_fm_command_callback,i,queue_size=1, tcp_nodelay=True))
     
+      print("The list of uav is", sum(uav_in_team, []))
       # Visualization Init
       self.cable_marker_scale = 0.01 * np.ones(3)
       self.cable_marker_color = np.array([1.0,0.5,0.5,0.5])

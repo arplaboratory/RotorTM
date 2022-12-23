@@ -67,6 +67,8 @@ class read_params:
     payload_control_gains = self.read_payload_control_gains(payload_control_params_path)
     mechanism_params = self.read_mechanism_params(mechanism_params_path)
     quad_params = []
+    uav_type = []
+    uav_in_team = []
     for robot_idx, robot_name in enumerate(mechanism_params.robot_list):
       quad_ = self.read_uav_params(quad_params_path+robot_name+".yaml")
       uav_control_gains = self.read_uav_control_gains(uav_controller_params_path+robot_name+"_control_gains.yaml")
@@ -77,9 +79,21 @@ class read_params:
       quad_.Kxi = uav_control_gains.Kxi
       quad_.Kw = uav_control_gains.Kw
       quad_params.append(quad_)
+
+      uav_name = quad_.uav_name
+      if uav_name in uav_type: 
+        uav_type_idx = uav_type.index(uav_name)
+        total_num_uav_of_current_type = len(uav_in_team[uav_type_idx])
+        uav_name_with_id = uav_name + str(total_num_uav_of_current_type+1)
+        uav_in_team[uav_type_idx].append(uav_name_with_id)
+      else: 
+        uav_type.append(uav_name)
+        uav_name_with_id = uav_name + str(1)
+        uav_in_team.append([uav_name_with_id])
+
     #quad_params = self.read_uav_params(quad_params_path+robot_name+".yaml")
-    payload_params = self.read_payload_params(payload_params_path)
-    params = payload_params
+    params = self.read_payload_params(payload_params_path)
+    params.uav_in_team = sum(uav_in_team, [])
 
     params.nquad = mechanism_params.num_of_robots
     params.mechanism_type = mechanism_params.mechanism_type
