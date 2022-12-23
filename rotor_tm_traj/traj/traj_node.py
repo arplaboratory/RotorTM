@@ -8,6 +8,7 @@ import create_options
 # need to build quadrotor_msgs package
 from rotor_tm_msgs.msg import PositionCommand
 from nav_msgs.msg import Odometry
+from std_msgs.msg import Bool 
 from rotor_tm_traj.srv import Circle, Line
 
 
@@ -33,6 +34,9 @@ class traj_node:
 
 		## ROS Publisher
 		self.des_traj_pub = rospy.Publisher('payload/des_traj', PositionCommand, queue_size=1, tcp_nodelay=True)
+		self.cir_traj_status_pub = rospy.Publisher('payload/cir_traj_status', Bool, queue_size=1, tcp_nodelay=True)
+		self.line_traj_status_pub = rospy.Publisher('payload/line_traj_status', Bool, queue_size=1, tcp_nodelay=True)
+		self.min_der_traj_status_pub = rospy.Publisher('payload/min_der_traj_status', Bool, queue_size=1, tcp_nodelay=True)
 
         ## ROS Server
 		server = []
@@ -66,6 +70,8 @@ class traj_node:
 			self.traj_type = 1
 			self.current_traj.circle(0, self.curr_state[0:3], req.radius, req.T, req.duration)
 			self.traj_start = True
+			status_msgs = Bool()
+			self.cir_traj_status_pub.publish(status_msgs)
 
 
 	def line_traj_cb(self, req):
@@ -98,6 +104,8 @@ class traj_node:
 			self.current_traj.line_quintic_traj(0, self.map, np.array(path))
 			# self.traj_type = 2
 			self.traj_start = True
+			status_msgs = Bool()
+			self.min_der_traj_status_pub.publish(status_msgs)
 
 
 	def min_derivative_line_traj_cb(self, req):
@@ -130,6 +138,8 @@ class traj_node:
 			self.time_reference = rospy.get_time()
 			self.current_traj.min_snap_traj_generator(self, path, options=traj_constant)
 			self.traj_start = True
+			status_msgs = Bool()
+			self.min_der_traj_status_pub.publish(status_msgs)
 
 
 	def odom_callback(self, data):

@@ -188,6 +188,7 @@ class controller:
     #                                                               set to [[0., 0., 0.]] currently
     # pl_params   - a read_params class object containing payload parameters
     # qd_params   - a read_params class objects containing all MAV parameters
+    # uav_id      - the id of the current node
     
     # OUTPUTS:
     # mu              - a 3*(Number of MAV(s)) by 1 ndarray, describing tension condition of each cable  
