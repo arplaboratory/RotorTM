@@ -146,7 +146,7 @@ class controller:
 
         return M
 
-    def cooperative_suspended_payload_controller(self, ql, qd, pl_params, qd_params):
+    def cooperative_suspended_payload_controller(self, ql, qd, pl_params, qd_params, uav_id):
     # DESCRIPTION:
     # Controller for cooperative cable suspended payload and MAV(s) 
 
@@ -259,18 +259,29 @@ class controller:
         qd_rot_des = {}
         qd_quat_des = {}
 
-        for qn in range(0, nquad):
-            qd[qn]["yaw_des"] = 0
-            qd[qn]["yawdot_des"] = 0
-            qd[qn]["mu_des"] = mu[3*qn:3*(qn+1)]
-            qd[qn]["attach_accel"] = att_acc_c[:,qn].reshape((3,1))
-            [F_qn, M_qn, Rot_des_qn] = self.cooperative_attitude_controller(qd, qn, qd_params[qn])
-            qd_F[qn] = F_qn
-            qd_M[qn] = M_qn
-            qd_quat_des[qn] = tranrot.from_matrix(Rot_des_qn).as_quat() 
-            qd_rot_des[qn] = Rot_des_qn 
+        qd[uav_id]["yaw_des"] = 0
+        qd[uav_id]["yawdot_des"] = 0
+        qd[uav_id]["mu_des"] = mu[3*uav_id:3*(uav_id+1)]
+        qd[uav_id]["attach_accel"] = att_acc_c[:,uav_id].reshape((3,1))
+        [F_qn, M_qn, Rot_des_qn] = self.cooperative_attitude_controller(qd, uav_id, qd_params[uav_id])
+        qd_F[uav_id] = F_qn
+        qd_M[uav_id] = M_qn
+        qd_quat_des[uav_id] = tranrot.from_matrix(Rot_des_qn).as_quat() 
+        qd_rot_des[uav_id] = Rot_des_qn 
+
+        #for qn in range(0, nquad):
+        #    qd[qn]["yaw_des"] = 0
+        #    qd[qn]["yawdot_des"] = 0
+        #    qd[qn]["mu_des"] = mu[3*qn:3*(qn+1)]
+        #    qd[qn]["attach_accel"] = att_acc_c[:,qn].reshape((3,1))
+        #    [F_qn, M_qn, Rot_des_qn] = self.cooperative_attitude_controller(qd, qn, qd_params[qn])
+        #    qd_F[qn] = F_qn
+        #    qd_M[qn] = M_qn
+        #    qd_quat_des[qn] = tranrot.from_matrix(Rot_des_qn).as_quat() 
+        #    qd_rot_des[qn] = Rot_des_qn 
     
         #return qd_F, qd_M
+
         return mu, att_acc_c, qd_F, qd_M, qd_quat_des, qd_rot_des
 
     # untested

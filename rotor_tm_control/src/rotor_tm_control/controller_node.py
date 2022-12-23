@@ -24,7 +24,6 @@ class controller_node:
         self.pl = {}
         self.qd = {}
         self.FM_pub = []
-        self.des_odom_pub = []
         self.last_odom_time_received = 0.0 
         self.last_des_traj_time_received = 0.0 
         self.controller = controller()
@@ -73,10 +72,8 @@ class controller_node:
             self.cen_pl_cmd_pub = rospy.Publisher("/payload/cen_pl_cmd", CenPL_Command, queue_size = 10)
             for i in range(self.pl_params.nquad):
                 FM_message_name = mav_name + str(i+1) + "/fm_cmd"
-                des_odom_name = mav_name + str(i+1) + "/des_odom"
                 FM_prefix = "controller_"+str(i+1)+"/"
                 self.FM_pub.append(rospy.Publisher(FM_prefix + FM_message_name, FMCommand, queue_size=10))
-                self.des_odom_pub.append(rospy.Publisher(des_odom_name, Odometry, queue_size=10))
 
             rospy.spin()
         else:
@@ -93,22 +90,19 @@ class controller_node:
             ##
 
             print("Using multiple controller nodes")
-            node_id += 1
-            # TODO: make this to ROS parameters
-            mav_name = '/dragonfly'
 
             # init ROS Subscribers
             rospy.Subscriber('/payload/des_traj', PositionCommand, self.desired_traj_callback, queue_size=1, tcp_nodelay=True)
             rospy.Subscriber('/payload/odom', Odometry, self.pl_odom_callback, queue_size=1,tcp_nodelay=True)
 
-            for uav_id in range(self.pl_params.nquad):
-                mav_odom = mav_name + str(uav_id+1) + '/odom'
-                self.qd[uav_id] = {}
-                rospy.Subscriber(mav_odom, Odometry, self.qd_odom_callback, uav_id, queue_size=1,tcp_nodelay=True)
+            uav_name = self.pl_params.uav_in_team[node_id]
+            uav_odom = '/' + uav_name + '/odom'
+            self.qd[node_id] = {}
+            rospy.Subscriber(uav_odom, Odometry, self.qd_odom_callback, node_id, queue_size=1,tcp_nodelay=True)
                 
             # init ROS Publishers
-            FM_message_name = mav_name + str(self.node_id+1) + "/fm_cmd"
-            des_odom_name = mav_name + str(self.node_id+1) + "/des_odom"
+            FM_message_name = '/' + uav_name + "/fm_cmd"
+            des_odom_name = '/' + uav_name + "/des_odom"
             self.cen_pl_cmd_pub = rospy.Publisher(node_name + "/payload/cen_pl_cmd", CenPL_Command, queue_size = 10)
             self.FM_pub.append(rospy.Publisher(node_name +  FM_message_name, FMCommand, queue_size=1, tcp_nodelay=True))
             self.status_pub = rospy.Publisher(node_name + "/heartbeat", Bool, queue_size = 10)
@@ -429,7 +423,7 @@ class controller_node:
             F_list, M_list = self.controller.rigid_links_cooperative_payload_controller(ql, self.pl_params)
         elif self.pl_params.mechanism_type == 'Cable':
             if self.pl_params.payload_type == 'Rigid Body':
-                mu, att_acc, F_list, M_list, quat_list, rot_list = self.controller.cooperative_suspended_payload_controller(self.pl, self.qd, self.pl_params, self.quad_params)
+                mu, att_acc, F_list, M_list, quat_list, rot_list = self.controller.cooperative_suspended_payload_controller(self.pl, self.qd, self.pl_params, self.quad_params, self.node_id)
                 cen_pl_command = CenPL_Command()
                 cen_pl_command.header.stamp = rospy.get_rostime()
                 cen_pl_command.header.frame_id = "simulator" 
@@ -455,6 +449,7 @@ class controller_node:
                 F_list, M_list = self.controller.single_payload_geometric_controller(ql = plqd, pl_params = self.pl_params, qd_params = self.quad_params)
         
         if self.single_node:
+            print("The self.single_node is ", self.single_node)
             for i in range(self.pl_params.nquad):
                 FM_message = self.assembly_FM_message(F_list, M_list, i)
                 self.FM_pub[i].publish(FM_message)
