@@ -430,14 +430,13 @@ class simulation_base():
             payload_rotmat = utilslib.QuatToRot(sol.y[:,0][6:10])
 
             if self.pl_params.mechanism_type == 'Rigid Link':
-                self.load_pos = x[0:3].reshape((3,1)) + payload_rotmat @ self.pl_params.rho_load
-                payload_odom.pose.pose.position.x = self.load_pos[0]
-                payload_odom.pose.pose.position.y = self.load_pos[1]
-                payload_odom.pose.pose.position.z = self.load_pos[2]
+                load_pos = x[0:3].reshape((3,1)) + payload_rotmat @ self.pl_params.rho_load
             else:
-                payload_odom.pose.pose.position.x  = x[0]
-                payload_odom.pose.pose.position.y  = x[1]
-                payload_odom.pose.pose.position.z  = x[2]
+                load_pos = x[0:3].reshape((3,1))
+
+            payload_odom.pose.pose.position.x = load_pos[0]
+            payload_odom.pose.pose.position.y = load_pos[1]
+            payload_odom.pose.pose.position.z = load_pos[2]
             payload_odom.twist.twist.linear.x    = x[3]
             payload_odom.twist.twist.linear.y    = x[4]
             payload_odom.twist.twist.linear.z    = x[5]
@@ -448,7 +447,6 @@ class simulation_base():
             payload_odom.twist.twist.angular.x   = x[10]
             payload_odom.twist.twist.angular.y   = x[11]
             payload_odom.twist.twist.angular.z   = x[12]
-
 
             self.payload_odom_publisher.publish(payload_odom)
 
@@ -462,22 +460,7 @@ class simulation_base():
             pl_pose_stamped = PoseStamped()
             pl_pose_stamped.header.stamp = current_time
             pl_pose_stamped.header.frame_id = self.worldframe
-
-            if self.pl_params.mechanism_type == 'Rigid Link':
-                # for rigid link scenario, the payload position is uav position
-                self.load_pos = x[0:3].reshape((3,1)) + payload_rotmat @ self.pl_params.rho_load
-                pl_pose_stamped.pose.position.x = self.load_pos[0]
-                pl_pose_stamped.pose.position.y = self.load_pos[1]
-                pl_pose_stamped.pose.position.z = self.load_pos[2]
-            else:
-                pl_pose_stamped.pose.position.x    = x[0]
-                pl_pose_stamped.pose.position.y    = x[1]
-                pl_pose_stamped.pose.position.z    = x[2]
-
-            pl_pose_stamped.pose.orientation.w = x[6]
-            pl_pose_stamped.pose.orientation.x = x[7]
-            pl_pose_stamped.pose.orientation.y = x[8]
-            pl_pose_stamped.pose.orientation.z = x[9]
+            pl_pose_stamped.pose = payload_odom.pose.pose 
 
             self.payload_path.poses.append(pl_pose_stamped)
             self.payload_path_publisher.publish(self.payload_path)
@@ -488,7 +471,7 @@ class simulation_base():
             for uav_id in range(self.nquad):
                 if self.pl_params.mechanism_type == 'Rigid Link':
                     uav_state = x[13:26]
-                    attach_pos = self.load_pos.reshape((3,)) + np.matmul(payload_rotmat, (self.pl_params.rho_robot[:,uav_id]+np.array([0.028,0,0.032])))
+                    attach_pos = x[0:3] + payload_rotmat @ (self.pl_params.rho_robot[:,uav_id]+np.array([-0.06,0,0.02]))
                     uav_state[0:3] = attach_pos
                     attach_vel = uav_state[3:6] + np.matmul(payload_rotmat, np.cross(sol.y[:,0][10:13], self.pl_params.rho_robot[:,uav_id]))
                     if not self.cable_is_slack[uav_id]:
@@ -608,14 +591,13 @@ class simulation_base():
             payload_rotmat = utilslib.QuatToRot(sol.y[:,0][6:10])
 
             if self.pl_params.mechanism_type == 'Rigid Link':
-                self.load_pos = x[0:3].reshape((3,1)) + payload_rotmat @ self.pl_params.rho_load
-                payload_odom.pose.pose.position.x = self.load_pos[0]
-                payload_odom.pose.pose.position.y = self.load_pos[1]
-                payload_odom.pose.pose.position.z = self.load_pos[2]
+                load_pos = x[0:3].reshape((3,1)) + payload_rotmat @ self.pl_params.rho_load
             else:
-                payload_odom.pose.pose.position.x    = x[0]
-                payload_odom.pose.pose.position.y    = x[1]
-                payload_odom.pose.pose.position.z    = x[2]
+                load_pos = x[0:3].reshape((3,1)) 
+
+            payload_odom.pose.pose.position.x = load_pos[0]
+            payload_odom.pose.pose.position.y = load_pos[1]
+            payload_odom.pose.pose.position.z = load_pos[2]
             payload_odom.twist.twist.linear.x    = x[3]
             payload_odom.twist.twist.linear.y    = x[4]
             payload_odom.twist.twist.linear.z    = x[5]
@@ -638,22 +620,7 @@ class simulation_base():
             pl_pose_stamped = PoseStamped()
             pl_pose_stamped.header.stamp = current_time
             pl_pose_stamped.header.frame_id = self.worldframe
-
-            if self.pl_params.mechanism_type == 'Rigid Link':
-                # for rigid link scenario, the payload position is uav position
-                self.load_pos = x[0:3].reshape((3,1)) + payload_rotmat @ self.pl_params.rho_load
-                pl_pose_stamped.pose.position.x = self.load_pos[0]
-                pl_pose_stamped.pose.position.y = self.load_pos[1]
-                pl_pose_stamped.pose.position.z = self.load_pos[2]
-            else:
-                pl_pose_stamped.pose.position.x    = x[0]
-                pl_pose_stamped.pose.position.y    = x[1]
-                pl_pose_stamped.pose.position.z    = x[2]
-
-            pl_pose_stamped.pose.orientation.w = x[6]
-            pl_pose_stamped.pose.orientation.x = x[7]
-            pl_pose_stamped.pose.orientation.y = x[8]
-            pl_pose_stamped.pose.orientation.z = x[9]
+            pl_pose_stamped.pose = payload_odom.pose.pose 
 
             self.payload_path.poses.append(pl_pose_stamped)
             self.payload_path_publisher.publish(self.payload_path)
@@ -663,7 +630,7 @@ class simulation_base():
             for uav_id in range(self.nquad):
                 if self.pl_params.mechanism_type == 'Rigid Link':
                     uav_state = x[13:26]
-                    attach_pos = self.load_pos.reshape((3,)) + np.matmul(payload_rotmat, (self.pl_params.rho_robot[:,uav_id]+np.array([0.028,0,0.032])))
+                    attach_pos = x[0:3] + payload_rotmat @ (self.pl_params.rho_robot[:,uav_id]+np.array([-0.06,0,0.02]))
                     uav_state[0:3] = attach_pos
                     attach_vel = uav_state[3:6] + np.matmul(payload_rotmat, np.cross(sol.y[:,0][10:13], self.pl_params.rho_robot[:,uav_id]))
                     if not self.cable_is_slack[uav_id]:
@@ -755,7 +722,7 @@ class simulation_base():
             system_marker.markers.append(rosutilslib.update_line_msg(cable_marker_msg,cable_point_list,uav_id + 1))
 
             # Update payload visualization
-            system_marker.markers.append(rosutilslib.update_marker_msg(self.payload_marker_msg,x[0:3],x[6:10],uav_id+2))
+            system_marker.markers.append(rosutilslib.update_marker_msg(self.payload_marker_msg,load_pos[0:3],x[6:10],uav_id+2))
             self.system_publisher.publish(system_marker)
 
             rate.sleep()
