@@ -238,22 +238,23 @@ class traj:
 			
 			# optimization
 			T_seg_c = allocate_time(path,self.traj_constant.max_vel,self.traj_constant.max_acc)
-			print(T_seg_c)
 			self.coefficient, self.timelist = optimize_traj(path, self.traj_constant, T_seg_c, self.traj_constant.cor_constraint)
+			print(self.timelist)
+			print("The total traj num is ", self.traj_constant.total_traj_num)
 			self.traj_type = 3
 
 		else:
-			for i in range(1, self.traj_constant.total_traj_num+1):
-				if (self.traj_constant.pt_num == 2) or (i%(self.traj_constant.pt_num-1) == 1):
-					t_start = self.timelist[i-1,0]
+			for i in range(self.traj_constant.total_traj_num):
+				if (self.traj_constant.pt_num == 2) or ((i+1)%(self.traj_constant.pt_num-1) == 1):
+					t_start = self.timelist[i,0]
 				
-				if (t_current >= self.timelist[i-1,0]) and (t_current < self.timelist[i,0]):
+				if (t_current >= self.timelist[i,0]) and (t_current < self.timelist[i+1,0]):
 					
 					time_term = t_current - t_start
 					time_matrix = generate_polynomial_matrix(self.traj_constant.max_exponent,3,time_term)
-					state = np.matmul(np.multiply(self.polynomial_coeff[0:4,:], time_matrix), self.coefficient[:,(i-1)*self.traj_constant.dim:i*self.traj_constant.dim])
+					state = np.matmul(np.multiply(self.polynomial_coeff[0:4,:], time_matrix), self.coefficient[:,i*self.traj_constant.dim:(i+1)*self.traj_constant.dim])
 					
-				elif t_current >= self.timelist[self.traj_constant.total_traj_num-1]:
+				elif t_current >= self.timelist[self.traj_constant.total_traj_num]:
 					
 					state = np.zeros((4, 3), dtype=float)
 					state[0,:] = self.finalpath[self.traj_constant.total_traj_num:self.traj_constant.total_traj_num+1,:]

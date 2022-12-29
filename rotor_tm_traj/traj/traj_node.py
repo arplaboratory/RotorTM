@@ -66,9 +66,9 @@ class traj_node:
 			print("Please wait for the previous traj to finish")
 		else:
 			self.current_traj = traj.traj()
-			self.time_reference = rospy.get_time()
 			self.traj_type = 1
 			self.current_traj.circle(0, self.curr_state[0:3], req.radius, req.T, req.duration)
+			self.time_reference = rospy.get_time()
 			self.traj_start = True
 			status_msgs = Header()
 			status_msgs.stamp = rospy.get_rostime()
@@ -100,10 +100,9 @@ class traj_node:
 				path.append([pt.x,pt.y,pt.z])
 			
 			self.current_traj = traj.traj()
-			self.time_reference = rospy.get_time()
 			# self.traj_type = 2
 			self.current_traj.line_quintic_traj(0, self.map, np.array(path))
-			# self.traj_type = 2
+			self.time_reference = rospy.get_time()
 			self.traj_start = True
 			status_msgs = Header()
 			status_msgs.stamp = rospy.get_rostime()
@@ -137,8 +136,8 @@ class traj_node:
 			traj_constant = create_options.options()
 			traj_constant.create_default_option(path.shape[0])
 			self.current_traj = traj.traj()
-			self.time_reference = rospy.get_time()
 			self.current_traj.min_snap_traj_generator(self, path, options=traj_constant)
+			self.time_reference = rospy.get_time()
 			self.traj_start = True
 			status_msgs = Header()
 			status_msgs.stamp = rospy.get_rostime()
