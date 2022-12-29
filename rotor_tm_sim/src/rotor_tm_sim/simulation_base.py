@@ -112,6 +112,8 @@ class simulation_base():
   def __init__(self,pl_params,uav_params):
       rospy.init_node('simulation')
       self.rate = 100
+      white_noise_cov = np.diag(np.array([1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6]))
+      uav_white_noise_cov = np.diag(np.array([1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6]))
       rate = rospy.Rate(self.rate)
       t_span = (0,1/self.rate)
       self.worldframe = "simulator"
@@ -434,19 +436,24 @@ class simulation_base():
             else:
                 load_pos = x[0:3].reshape((3,1))
 
-            payload_odom.pose.pose.position.x = load_pos[0]
-            payload_odom.pose.pose.position.y = load_pos[1]
-            payload_odom.pose.pose.position.z = load_pos[2]
-            payload_odom.twist.twist.linear.x    = x[3]
-            payload_odom.twist.twist.linear.y    = x[4]
-            payload_odom.twist.twist.linear.z    = x[5]
-            payload_odom.pose.pose.orientation.w = x[6]
-            payload_odom.pose.pose.orientation.x = x[7]
-            payload_odom.pose.pose.orientation.y = x[8]
-            payload_odom.pose.pose.orientation.z = x[9]
-            payload_odom.twist.twist.angular.x   = x[10]
-            payload_odom.twist.twist.angular.y   = x[11]
-            payload_odom.twist.twist.angular.z   = x[12]
+            white_noise = np.random.multivariate_normal(np.zeros(12),white_noise_cov)
+            deltaR = utilslib.expSO3(white_noise[6:9])
+            payload_rot_with_noise = np.matmul(rot_math.from_quat([x[7],x[8],x[9],x[6]]).as_matrix(), deltaR)
+            payload_quat_with_noise = rot_math.from_matrix(payload_rot_with_noise).as_quat()
+
+            payload_odom.pose.pose.position.x = load_pos[0] + white_noise[0]
+            payload_odom.pose.pose.position.y = load_pos[1] + white_noise[1]
+            payload_odom.pose.pose.position.z = load_pos[2] + white_noise[2]
+            payload_odom.twist.twist.linear.x    = x[3] + white_noise[3]
+            payload_odom.twist.twist.linear.y    = x[4] + white_noise[4]
+            payload_odom.twist.twist.linear.z    = x[5] + white_noise[5]
+            payload_odom.pose.pose.orientation.w = payload_quat_with_noise[3] 
+            payload_odom.pose.pose.orientation.x = payload_quat_with_noise[0]
+            payload_odom.pose.pose.orientation.y = payload_quat_with_noise[1]
+            payload_odom.pose.pose.orientation.z = payload_quat_with_noise[2]
+            payload_odom.twist.twist.angular.x   = x[10] + white_noise[9]
+            payload_odom.twist.twist.angular.y   = x[11] + white_noise[10]
+            payload_odom.twist.twist.angular.z   = x[12] + white_noise[11]
 
             self.payload_odom_publisher.publish(payload_odom)
 
@@ -455,7 +462,6 @@ class simulation_base():
 
             self.payload_path.header.stamp = current_time
             self.payload_path.header.frame_id = self.worldframe 
-            payload_rotmat = utilslib.QuatToRot(sol.y[:,0][6:10])
 
             pl_pose_stamped = PoseStamped()
             pl_pose_stamped.header.stamp = current_time
@@ -480,37 +486,7 @@ class simulation_base():
                         if uav_attach_distance > self.cable_len_list[uav_id]:
                             xi = uav_attach_vector/uav_attach_distance
                             uav_state[0:3] = attach_pos[0:3] + self.cable_len_list[uav_id] * xi
-                        
-                    # Publish UAV odometry
-                    uav_odom = Odometry()
-                    uav_odom.header.stamp = current_time
-                    uav_odom.header.frame_id = self.worldframe 
-                    uav_odom.pose.pose.position.x = uav_state[0]
-                    uav_odom.pose.pose.position.y = uav_state[1]
-                    uav_odom.pose.pose.position.z = uav_state[2]
-                    uav_odom.twist.twist.linear.x = uav_state[3]
-                    uav_odom.twist.twist.linear.y = uav_state[4]
-                    uav_odom.twist.twist.linear.z = uav_state[5]
-                    uav_odom.pose.pose.orientation.w = uav_state[6]
-                    uav_odom.pose.pose.orientation.x = uav_state[7]
-                    uav_odom.pose.pose.orientation.y = uav_state[8]
-                    uav_odom.pose.pose.orientation.z = uav_state[9]
-                    uav_odom.twist.twist.angular.x = uav_state[10]
-                    uav_odom.twist.twist.angular.y = uav_state[11]
-                    uav_odom.twist.twist.angular.z = uav_state[12]
-                    self.robot_odom_publisher[uav_id].publish(uav_odom)
 
-                    # Publish UAV attach odometry
-                    attach_odom = Odometry()
-                    attach_odom.header.stamp = current_time
-                    attach_odom.header.frame_id = self.worldframe 
-                    attach_odom.pose.pose.position.x = attach_pos[0]
-                    attach_odom.pose.pose.position.y = attach_pos[1]
-                    attach_odom.pose.pose.position.z = attach_pos[2]
-                    attach_odom.twist.twist.linear.x = attach_vel[0]
-                    attach_odom.twist.twist.linear.y = attach_vel[1]
-                    attach_odom.twist.twist.linear.z = attach_vel[2]
-                    self.attach_publisher[uav_id].publish(attach_odom)
                 else:
                     uav_state = x[self.pl_dim_num+self.uav_dim_num*uav_id:self.pl_dim_num+self.uav_dim_num*(uav_id+1)]
                     attach_pos = x[0:3] + np.matmul(payload_rotmat, self.rho_vec_list[:,uav_id])
@@ -522,36 +498,41 @@ class simulation_base():
                             xi = uav_attach_vector/uav_attach_distance
                             uav_state[0:3] = attach_pos[0:3] + self.cable_len_list[uav_id] * xi
                         
-                    # Publish UAV odometry
-                    uav_odom = Odometry()
-                    uav_odom.header.stamp = current_time
-                    uav_odom.header.frame_id = self.worldframe 
-                    uav_odom.pose.pose.position.x = uav_state[0]
-                    uav_odom.pose.pose.position.y = uav_state[1]
-                    uav_odom.pose.pose.position.z = uav_state[2]
-                    uav_odom.twist.twist.linear.x = uav_state[3]
-                    uav_odom.twist.twist.linear.y = uav_state[4]
-                    uav_odom.twist.twist.linear.z = uav_state[5]
-                    uav_odom.pose.pose.orientation.w = uav_state[6]
-                    uav_odom.pose.pose.orientation.x = uav_state[7]
-                    uav_odom.pose.pose.orientation.y = uav_state[8]
-                    uav_odom.pose.pose.orientation.z = uav_state[9]
-                    uav_odom.twist.twist.angular.x = uav_state[10]
-                    uav_odom.twist.twist.angular.y = uav_state[11]
-                    uav_odom.twist.twist.angular.z = uav_state[12]
-                    self.robot_odom_publisher[uav_id].publish(uav_odom)
+                white_noise = np.random.multivariate_normal(np.zeros(12),uav_white_noise_cov)
+                deltaR = utilslib.expSO3(white_noise[6:9])
+                uav_rot_with_noise = np.matmul(rot_math.from_quat([uav_state[7],uav_state[8],uav_state[9],uav_state[6]]).as_matrix(), deltaR)
+                uav_quat_with_noise = rot_math.from_matrix(uav_rot_with_noise).as_quat()
 
-                    # Publish UAV attach odometry
-                    attach_odom = Odometry()
-                    attach_odom.header.stamp = current_time
-                    attach_odom.header.frame_id = self.worldframe 
-                    attach_odom.pose.pose.position.x = attach_pos[0]
-                    attach_odom.pose.pose.position.y = attach_pos[1]
-                    attach_odom.pose.pose.position.z = attach_pos[2]
-                    attach_odom.twist.twist.linear.x = attach_vel[0]
-                    attach_odom.twist.twist.linear.y = attach_vel[1]
-                    attach_odom.twist.twist.linear.z = attach_vel[2]
-                    self.attach_publisher[uav_id].publish(attach_odom)
+                # Publish UAV odometry
+                uav_odom = Odometry()
+                uav_odom.header.stamp = current_time
+                uav_odom.header.frame_id = self.worldframe 
+                uav_odom.pose.pose.position.x = uav_state[0] + white_noise[0]
+                uav_odom.pose.pose.position.y = uav_state[1] + white_noise[1]
+                uav_odom.pose.pose.position.z = uav_state[2] + white_noise[2]
+                uav_odom.twist.twist.linear.x    = uav_state[3] + white_noise[3]
+                uav_odom.twist.twist.linear.y    = uav_state[4] + white_noise[4]
+                uav_odom.twist.twist.linear.z    = uav_state[5] + white_noise[5]
+                uav_odom.pose.pose.orientation.w = uav_quat_with_noise[3]
+                uav_odom.pose.pose.orientation.x = uav_quat_with_noise[0]
+                uav_odom.pose.pose.orientation.y = uav_quat_with_noise[1]
+                uav_odom.pose.pose.orientation.z = uav_quat_with_noise[2]
+                uav_odom.twist.twist.angular.x   = uav_state[10] + white_noise[9]     
+                uav_odom.twist.twist.angular.y   = uav_state[11] + white_noise[10]    
+                uav_odom.twist.twist.angular.z   = uav_state[12] + white_noise[11]    
+                self.robot_odom_publisher[uav_id].publish(uav_odom)
+
+                # Publish UAV attach odometry
+                attach_odom = Odometry()
+                attach_odom.header.stamp = current_time
+                attach_odom.header.frame_id = self.worldframe 
+                attach_odom.pose.pose.position.x = attach_pos[0]
+                attach_odom.pose.pose.position.y = attach_pos[1]
+                attach_odom.pose.pose.position.z = attach_pos[2]
+                attach_odom.twist.twist.linear.x = attach_vel[0]
+                attach_odom.twist.twist.linear.y = attach_vel[1]
+                attach_odom.twist.twist.linear.z = attach_vel[2]
+                self.attach_publisher[uav_id].publish(attach_odom)
 
                 cable_point_list[2*uav_id,:] = uav_state[0:3]
                 cable_point_list[2*uav_id+1,:] = attach_pos[0:3]
@@ -595,19 +576,25 @@ class simulation_base():
             else:
                 load_pos = x[0:3].reshape((3,1)) 
 
-            payload_odom.pose.pose.position.x = load_pos[0]
-            payload_odom.pose.pose.position.y = load_pos[1]
-            payload_odom.pose.pose.position.z = load_pos[2]
-            payload_odom.twist.twist.linear.x    = x[3]
-            payload_odom.twist.twist.linear.y    = x[4]
-            payload_odom.twist.twist.linear.z    = x[5]
-            payload_odom.pose.pose.orientation.w = x[6]
-            payload_odom.pose.pose.orientation.x = x[7]
-            payload_odom.pose.pose.orientation.y = x[8]
-            payload_odom.pose.pose.orientation.z = x[9]
-            payload_odom.twist.twist.angular.x   = x[10]
-            payload_odom.twist.twist.angular.y   = x[11]
-            payload_odom.twist.twist.angular.z   = x[12]
+            white_noise = np.random.multivariate_normal(np.zeros(12),white_noise_cov)
+            deltaR = utilslib.expSO3(white_noise[6:9])
+            payload_rot_with_noise = np.matmul(rot_math.from_quat([x[7],x[8],x[9],x[6]]).as_matrix(), deltaR)
+            payload_quat_with_noise = rot_math.from_matrix(payload_rot_with_noise).as_quat()
+
+            payload_odom.pose.pose.position.x = load_pos[0] + white_noise[0]
+            payload_odom.pose.pose.position.y = load_pos[1] + white_noise[1]
+            payload_odom.pose.pose.position.z = load_pos[2] + white_noise[2]
+            payload_odom.twist.twist.linear.x    = x[3] + white_noise[3]
+            payload_odom.twist.twist.linear.y    = x[4] + white_noise[4]
+            payload_odom.twist.twist.linear.z    = x[5] + white_noise[5]
+            payload_odom.pose.pose.orientation.w = payload_quat_with_noise[3] 
+            payload_odom.pose.pose.orientation.x = payload_quat_with_noise[0]
+            payload_odom.pose.pose.orientation.y = payload_quat_with_noise[1]
+            payload_odom.pose.pose.orientation.z = payload_quat_with_noise[2]
+            payload_odom.twist.twist.angular.x   = x[10] + white_noise[9]
+            payload_odom.twist.twist.angular.y   = x[11] + white_noise[10]
+            payload_odom.twist.twist.angular.z   = x[12] + white_noise[11]
+
             self.payload_odom_publisher.publish(payload_odom)
 
             # Publish payload path
@@ -640,36 +627,6 @@ class simulation_base():
                             xi = uav_attach_vector/uav_attach_distance
                             uav_state[0:3] = attach_pos[0:3] + self.cable_len_list[uav_id] * xi
                         
-                    # Publish UAV odometry
-                    uav_odom = Odometry()
-                    uav_odom.header.stamp = current_time
-                    uav_odom.header.frame_id = self.worldframe 
-                    uav_odom.pose.pose.position.x = uav_state[0]
-                    uav_odom.pose.pose.position.y = uav_state[1]
-                    uav_odom.pose.pose.position.z = uav_state[2]
-                    uav_odom.twist.twist.linear.x = uav_state[3]
-                    uav_odom.twist.twist.linear.y = uav_state[4]
-                    uav_odom.twist.twist.linear.z = uav_state[5]
-                    uav_odom.pose.pose.orientation.w = uav_state[6]
-                    uav_odom.pose.pose.orientation.x = uav_state[7]
-                    uav_odom.pose.pose.orientation.y = uav_state[8]
-                    uav_odom.pose.pose.orientation.z = uav_state[9]
-                    uav_odom.twist.twist.angular.x = uav_state[10]
-                    uav_odom.twist.twist.angular.y = uav_state[11]
-                    uav_odom.twist.twist.angular.z = uav_state[12]
-                    self.robot_odom_publisher[uav_id].publish(uav_odom)
-
-                    # Publish UAV attach odometry
-                    attach_odom = Odometry()
-                    attach_odom.header.stamp = current_time
-                    attach_odom.header.frame_id = self.worldframe 
-                    attach_odom.pose.pose.position.x = attach_pos[0]
-                    attach_odom.pose.pose.position.y = attach_pos[1]
-                    attach_odom.pose.pose.position.z = attach_pos[2]
-                    attach_odom.twist.twist.linear.x = attach_vel[0]
-                    attach_odom.twist.twist.linear.y = attach_vel[1]
-                    attach_odom.twist.twist.linear.z = attach_vel[2]
-                    self.attach_publisher[uav_id].publish(attach_odom)
                 else:
                     uav_state = x[self.pl_dim_num+self.uav_dim_num*uav_id:self.pl_dim_num+self.uav_dim_num*(uav_id+1)]
                     attach_pos = x[0:3] + np.matmul(payload_rotmat, self.rho_vec_list[:,uav_id])
@@ -681,36 +638,42 @@ class simulation_base():
                             xi = uav_attach_vector/uav_attach_distance
                             uav_state[0:3] = attach_pos[0:3] + self.cable_len_list[uav_id] * xi
                         
-                    # Publish UAV odometry
-                    uav_odom = Odometry()
-                    uav_odom.header.stamp = current_time
-                    uav_odom.header.frame_id = self.worldframe 
-                    uav_odom.pose.pose.position.x = uav_state[0]
-                    uav_odom.pose.pose.position.y = uav_state[1]
-                    uav_odom.pose.pose.position.z = uav_state[2]
-                    uav_odom.twist.twist.linear.x = uav_state[3]
-                    uav_odom.twist.twist.linear.y = uav_state[4]
-                    uav_odom.twist.twist.linear.z = uav_state[5]
-                    uav_odom.pose.pose.orientation.w = uav_state[6]
-                    uav_odom.pose.pose.orientation.x = uav_state[7]
-                    uav_odom.pose.pose.orientation.y = uav_state[8]
-                    uav_odom.pose.pose.orientation.z = uav_state[9]
-                    uav_odom.twist.twist.angular.x = uav_state[10]
-                    uav_odom.twist.twist.angular.y = uav_state[11]
-                    uav_odom.twist.twist.angular.z = uav_state[12]
-                    self.robot_odom_publisher[uav_id].publish(uav_odom)
+                white_noise = np.random.multivariate_normal(np.zeros(12),uav_white_noise_cov)
+                deltaR = utilslib.expSO3(white_noise[6:9])
+                uav_rot_with_noise = np.matmul(rot_math.from_quat([uav_state[7],uav_state[8],uav_state[9],uav_state[6]]).as_matrix(), deltaR)
+                uav_quat_with_noise = rot_math.from_matrix(uav_rot_with_noise).as_quat()
 
-                    # Publish UAV attach odometry
-                    attach_odom = Odometry()
-                    attach_odom.header.stamp = current_time
-                    attach_odom.header.frame_id = self.worldframe 
-                    attach_odom.pose.pose.position.x = attach_pos[0]
-                    attach_odom.pose.pose.position.y = attach_pos[1]
-                    attach_odom.pose.pose.position.z = attach_pos[2]
-                    attach_odom.twist.twist.linear.x = attach_vel[0]
-                    attach_odom.twist.twist.linear.y = attach_vel[1]
-                    attach_odom.twist.twist.linear.z = attach_vel[2]
-                    self.attach_publisher[uav_id].publish(attach_odom)
+                # Publish UAV odometry
+                uav_odom = Odometry()
+                uav_odom.header.stamp = current_time
+                uav_odom.header.frame_id = self.worldframe 
+                uav_odom.pose.pose.position.x = uav_state[0] + white_noise[0]
+                uav_odom.pose.pose.position.y = uav_state[1] + white_noise[1]
+                uav_odom.pose.pose.position.z = uav_state[2] + white_noise[2]
+                uav_odom.twist.twist.linear.x    = uav_state[3] + white_noise[3]
+                uav_odom.twist.twist.linear.y    = uav_state[4] + white_noise[4]
+                uav_odom.twist.twist.linear.z    = uav_state[5] + white_noise[5]
+                uav_odom.pose.pose.orientation.w = uav_quat_with_noise[3]
+                uav_odom.pose.pose.orientation.x = uav_quat_with_noise[0]
+                uav_odom.pose.pose.orientation.y = uav_quat_with_noise[1]
+                uav_odom.pose.pose.orientation.z = uav_quat_with_noise[2]
+                uav_odom.twist.twist.angular.x   = uav_state[10] + white_noise[9]     
+                uav_odom.twist.twist.angular.y   = uav_state[11] + white_noise[10]    
+                uav_odom.twist.twist.angular.z   = uav_state[12] + white_noise[11]    
+                self.robot_odom_publisher[uav_id].publish(uav_odom)
+
+                # Publish UAV attach odometry
+                attach_odom = Odometry()
+                attach_odom.header.stamp = current_time
+                attach_odom.header.frame_id = self.worldframe 
+                attach_odom.pose.pose.position.x = attach_pos[0]
+                attach_odom.pose.pose.position.y = attach_pos[1]
+                attach_odom.pose.pose.position.z = attach_pos[2]
+                attach_odom.twist.twist.linear.x = attach_vel[0]
+                attach_odom.twist.twist.linear.y = attach_vel[1]
+                attach_odom.twist.twist.linear.z = attach_vel[2]
+                self.attach_publisher[uav_id].publish(attach_odom)
+
                 cable_point_list[2*uav_id,:] = uav_state[0:3]
                 cable_point_list[2*uav_id+1,:] = attach_pos[0:3]
                 uav_marker_msg = rosutilslib.init_marker_msg(Marker(),10,0,self.worldframe,self.uav_marker_scale,self.uav_marker_color,self.uav_mesh[uav_id])
