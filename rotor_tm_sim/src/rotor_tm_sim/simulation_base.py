@@ -1,8 +1,5 @@
-from ast import Break
-from turtle import left
 import numpy as np
 import numpy.linalg as linalg
-from yaml.error import Mark
 import rospy
 import scipy.integrate
 from scipy.spatial.transform import Rotation as rot_math
@@ -13,7 +10,6 @@ from rotor_tm_msgs.msg import RPMCommand, FMCommand
 from quadrotor_msgs.msg import FMCommand as QuadFMCommand
 from rotor_tm_utils import utilslib, rosutilslib
 from rotor_tm_utils.vee import vee
-from rotor_tm_utils import utilslib
 import time
 
 def ptmassslackToTaut(t, x):
