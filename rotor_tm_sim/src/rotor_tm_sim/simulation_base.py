@@ -108,8 +108,12 @@ class simulation_base():
   def __init__(self,pl_params,uav_params):
       rospy.init_node('simulation')
       self.rate = 100
-      white_noise_cov = np.diag(np.array([1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6]))
-      uav_white_noise_cov = np.diag(np.array([1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6]))
+      white_noise_cov = np.diag(np.zeros(12))
+      uav_white_noise_cov = np.diag(np.zeros(12))
+      #white_noise_cov = np.diag(np.array([1e-4,1e-4,1e-4,1e-4,1e-4,1e-4,1e-4,1e-4,1e-4,1e-4,1e-4,1e-4]))
+      #uav_white_noise_cov = np.diag(np.array([1e-4,1e-4,1e-4,1e-4,1e-4,1e-4,1e-4,1e-4,1e-4,1e-4,1e-4,1e-4]))
+      # white_noise_cov = np.diag(np.array([1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6]))
+      # uav_white_noise_cov = np.diag(np.array([1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6]))
       rate = rospy.Rate(self.rate)
       t_span = (0,1/self.rate)
       self.worldframe = "simulator"
@@ -228,6 +232,7 @@ class simulation_base():
       # ROS Publisher 
       self.system_publisher = rospy.Publisher('system/marker',MarkerArray,queue_size=10)
       self.payload_odom_publisher = rospy.Publisher('payload/odom',Odometry,queue_size=1, tcp_nodelay=True)
+      self.payload_odom_ground_truth_publisher = rospy.Publisher('payload/odom_ground_truth',Odometry,queue_size=1, tcp_nodelay=True)
       self.payload_path_publisher = rospy.Publisher('payload/path',Path,queue_size=1, tcp_nodelay=True)
       self.payload_path = Path()
       self.robot_odom_publisher = []
@@ -276,7 +281,7 @@ class simulation_base():
       try:
         self.hybrid_flag = rospy.get_param("hybrid_switch")
       except:
-        rospy.set_param("hybrid_switch", False)
+        rospy.set_param("hybrid_switch", True)
         self.hybrid_flag = rospy.get_param("hybrid_switch")
         print("The hybrid flag is ", self.hybrid_flag)
 
@@ -330,8 +335,8 @@ class simulation_base():
                         #print(x)
                         sol = scipy.integrate.solve_ivp(self.hybrid_ptmass_pl_transportationEOM, t_span, x, method= 'RK45', t_eval=t_span, events=ptmassslackToTaut)
                     else:
-                        print("Cable is taut")
-                        print(x)
+                        #print("Cable is taut")
+                        #print(x)
                         sol = scipy.integrate.solve_ivp(self.hybrid_ptmass_pl_transportationEOM, t_span, x, method= 'RK45', t_eval=t_span, events=ptmasstautToSlack)
                     
                     ## extract state from solver soltion
@@ -352,11 +357,13 @@ class simulation_base():
                     
                     ## make sure velocities are distributed with no new collisions happening 
                     while np.any(inelastic_collision_flag):
-                        # print("collision!")
+                        print("collision!")
+                        print("The inelastic collision_flag is", inelastic_collision_flag)
                         before_collide_inelastic_collision_flag = inelastic_collision_flag
                         x = self.rigidbody_quad_inelastic_cable_collision(x, inelastic_collision_flag)
-                        # print("collision finished!")
+                        print("collision finished!")
                         after_collide_inelastic_collision_flag = self.cooperative_check_inelastic(x)
+                        print("Checking after collision")
                         if np.any((after_collide_inelastic_collision_flag - before_collide_inelastic_collision_flag)>0):
                             inelastic_collision_flag = after_collide_inelastic_collision_flag + before_collide_inelastic_collision_flag
                             for i in range(inelastic_collision_flag.shape[0]):
@@ -452,6 +459,22 @@ class simulation_base():
             payload_odom.twist.twist.angular.z   = x[12] + white_noise[11]
 
             self.payload_odom_publisher.publish(payload_odom)
+
+            payload_odom.pose.pose.position.x = load_pos[0]
+            payload_odom.pose.pose.position.y = load_pos[1]
+            payload_odom.pose.pose.position.z = load_pos[2]
+            payload_odom.twist.twist.linear.x    = x[3]
+            payload_odom.twist.twist.linear.y    = x[4]
+            payload_odom.twist.twist.linear.z    = x[5]
+            payload_odom.pose.pose.orientation.w = x[6] 
+            payload_odom.pose.pose.orientation.x = x[7]
+            payload_odom.pose.pose.orientation.y = x[8]
+            payload_odom.pose.pose.orientation.z = x[9]
+            payload_odom.twist.twist.angular.x   = x[10]
+            payload_odom.twist.twist.angular.y   = x[11]
+            payload_odom.twist.twist.angular.z   = x[12]
+
+            self.payload_odom_ground_truth_publisher.publish(payload_odom)
 
             # Publish payload path
             current_time = rospy.get_rostime()
@@ -593,6 +616,22 @@ class simulation_base():
 
             self.payload_odom_publisher.publish(payload_odom)
 
+            payload_odom.pose.pose.position.x = load_pos[0]
+            payload_odom.pose.pose.position.y = load_pos[1]
+            payload_odom.pose.pose.position.z = load_pos[2]
+            payload_odom.twist.twist.linear.x    = x[3]
+            payload_odom.twist.twist.linear.y    = x[4]
+            payload_odom.twist.twist.linear.z    = x[5]
+            payload_odom.pose.pose.orientation.w = x[6] 
+            payload_odom.pose.pose.orientation.x = x[7]
+            payload_odom.pose.pose.orientation.y = x[8]
+            payload_odom.pose.pose.orientation.z = x[9]
+            payload_odom.twist.twist.angular.x   = x[10]
+            payload_odom.twist.twist.angular.y   = x[11]
+            payload_odom.twist.twist.angular.z   = x[12]
+
+            self.payload_odom_ground_truth_publisher.publish(payload_odom)
+
             # Publish payload path
             current_time = rospy.get_rostime()
 
@@ -703,7 +742,8 @@ class simulation_base():
     # OUTPUTS:
     # flag                      - a (# of robots) sized ndarray (shape of (3,)) with boolean type elements
     #                             the n-th element describes if the n-th cable is taut
-      np.linalg.norm(robot_pos-attach_pos, 2, 0)
+      #print("The distance is", np.linalg.norm(robot_pos-attach_pos, 2, 0))
+      #print("Taut condition is ", flag)
       flag = (np.linalg.norm(robot_pos - attach_pos, 2, 0) > (cable_length - 1e-4))
       return flag
 
@@ -1042,7 +1082,7 @@ class simulation_base():
       xi = (attach_pos - robot_pos) / np.linalg.norm(attach_pos - robot_pos, 2, 0)
       
       # check collision condition
-      positive_attach_robot_vel = (np.sum(xi * (attach_vel - robot_vel), 0) > 1e-6)
+      positive_attach_robot_vel = (np.sum(xi * (attach_vel - robot_vel), 0) > 1e-3)
       taut_condition = self.istaut(attach_pos, robot_pos, self.pl_params.cable_length)
       collision_condition = np.empty((taut_condition.shape))
       for i in range(taut_condition.shape[0]):
