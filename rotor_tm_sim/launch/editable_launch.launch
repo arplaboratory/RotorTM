@@ -13,24 +13,64 @@
 <!--Lists of provided scenarios-->
 
 <!--
-    3 snapdragon flights with triangular payload using cable mechanisms
+    1 snapdragon flights with triangular payload using cable mechanisms (0.5 m)
+    <arg name="uav_params_path"             default = "$(find rotor_tm_config)/config/uav_params/"/>
+    <arg name="payload_params_path"         default = "$(find rotor_tm_config)/config/load_params/pointmass_payload.yaml"/>
+    <arg name="mechanism_params_path"       default = "$(find rotor_tm_config)/config/attach_mechanism/cable/1_robot_point_mass_0-5m.yaml"/>
+    <arg name="payload_control_gain_path"   default = "$(find rotor_tm_config)/config/control_params/pointmass_cable_gains.yaml"/>
+    <arg name="uav_control_gain_path"       default = "$(find rotor_tm_config)/config/control_params/"/>
+    <arg name="number_of_robots"            default = "1"/>
+-->
+
+<!--
+    3 snapdragon flights with triangular payload using cable mechanisms (1 m)
+-->
     <arg name="uav_params_path"             default = "$(find rotor_tm_config)/config/uav_params/"/>
     <arg name="payload_params_path"         default = "$(find rotor_tm_config)/config/load_params/triangular_payload.yaml"/>
     <arg name="mechanism_params_path"       default = "$(find rotor_tm_config)/config/attach_mechanism/cable/3_robots_triangular_payload_1m.yaml"/>
     <arg name="payload_control_gain_path"   default = "$(find rotor_tm_config)/config/control_params/triangular_payload_cooperative_cable_gains.yaml"/>
     <arg name="uav_control_gain_path"       default = "$(find rotor_tm_config)/config/control_params/"/>
     <arg name="number_of_robots"            default = "3"/>
+
+<!--
+    3 snapdragon flights with triangular payload using cable mechanisms (0.5 m)
+    <arg name="uav_params_path"             default = "$(find rotor_tm_config)/config/uav_params/"/>
+    <arg name="payload_params_path"         default = "$(find rotor_tm_config)/config/load_params/triangular_payload.yaml"/>
+    <arg name="mechanism_params_path"       default = "$(find rotor_tm_config)/config/attach_mechanism/cable/3_robots_triangular_payload_0-5m.yaml"/>
+    <arg name="payload_control_gain_path"   default = "$(find rotor_tm_config)/config/control_params/triangular_payload_cooperative_cable_gains.yaml"/>
+    <arg name="uav_control_gain_path"       default = "$(find rotor_tm_config)/config/control_params/"/>
+    <arg name="number_of_robots"            default = "3"/>
 -->
 
 <!--
-    3 snapdragon flights with triangular payload using cable mechanisms with different cable length
+    2 snapdragon flights with triangular payload using cable mechanisms (0.5 m)
+    <arg name="uav_params_path"             default = "$(find rotor_tm_config)/config/uav_params/"/>
+    <arg name="payload_params_path"         default = "$(find rotor_tm_config)/config/load_params/triangular_payload.yaml"/>
+    <arg name="mechanism_params_path"       default = "$(find rotor_tm_config)/config/attach_mechanism/cable/2_robots_triangular_payload_0-5m.yaml"/>
+    <arg name="payload_control_gain_path"   default = "$(find rotor_tm_config)/config/control_params/triangular_payload_cooperative_cable_gains.yaml"/>
+    <arg name="uav_control_gain_path"       default = "$(find rotor_tm_config)/config/control_params/"/>
+    <arg name="number_of_robots"            default = "2"/>
 -->
+
+<!--
+    3 snapdragon flights with triangular payload using cable mechanisms with different cable length (2 robots with 1 m, 1 robot with 0.5 m)
     <arg name="uav_params_path"             default = "$(find rotor_tm_config)/config/uav_params/"/>
     <arg name="payload_params_path"         default = "$(find rotor_tm_config)/config/load_params/triangular_payload.yaml"/>
     <arg name="mechanism_params_path"       default = "$(find rotor_tm_config)/config/attach_mechanism/cable/3_robots_triangular_payload_1m_0-5m_different_cable_length.yaml"/>
     <arg name="payload_control_gain_path"   default = "$(find rotor_tm_config)/config/control_params/triangular_payload_cooperative_cable_gains.yaml"/>
     <arg name="uav_control_gain_path"       default = "$(find rotor_tm_config)/config/control_params/"/>
     <arg name="number_of_robots"            default = "3"/>
+-->
+
+<!--
+    3 snapdragon flights with triangular payload using cable mechanisms with different cable length (1 robot with 1.2 m, 1 robot with 1 m, 1 robot with 0.8 m)
+    <arg name="uav_params_path"             default = "$(find rotor_tm_config)/config/uav_params/"/>
+    <arg name="payload_params_path"         default = "$(find rotor_tm_config)/config/load_params/triangular_payload.yaml"/>
+    <arg name="mechanism_params_path"       default = "$(find rotor_tm_config)/config/attach_mechanism/cable/3_robots_triangular_payload_1-2m_1m_0-8m_different_cable_length.yaml"/>
+    <arg name="payload_control_gain_path"   default = "$(find rotor_tm_config)/config/control_params/triangular_payload_cooperative_cable_gains.yaml"/>
+    <arg name="uav_control_gain_path"       default = "$(find rotor_tm_config)/config/control_params/"/>
+    <arg name="number_of_robots"            default = "3"/>
+-->
 
 <!--
     race, snapdragon, hummingbird with triangular payload using cable mechanisms
@@ -74,6 +114,16 @@
     <arg name="number_of_robots"            default = "1"/>
 -->
 
+
+<!--
+    race, snapdragon, hummingbird with triangular payload using rigid link mechanisms
+    <arg name="uav_params_path"             default = "$(find rotor_tm_config)/config/uav_params/"/>
+    <arg name="payload_params_path"         default = "$(find rotor_tm_config)/config/load_params/triangular_payload.yaml"/>
+    <arg name="mechanism_params_path"       default = "$(find rotor_tm_config)/config/attach_mechanism/rigid_link/3_hetereogeneous_robots_triangular_payload.yaml"/>
+    <arg name="payload_control_gain_path"   default = "$(find rotor_tm_config)/config/control_params/triangular_payload_cooperative_rigidlink_gains.yaml"/>
+    <arg name="uav_control_gain_path"       default = "$(find rotor_tm_config)/config/control_params/"/>
+    <arg name="number_of_robots"            default = "3"/>
+-->
 
 <!--
     3 snapdragon flights with triangular payload using rigid link mechanisms
