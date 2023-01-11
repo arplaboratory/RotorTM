@@ -246,10 +246,10 @@ class controller_node:
         self.pl["jrk_des"] = np.array([ [des_traj.jerk.x],
                                         [des_traj.jerk.y],
                                         [des_traj.jerk.z]])                     
-        self.pl["quat_des"] = np.array([ [1.0],
-                                    [0.0],
-                                    [0.0],
-                                    [0.0]])
+        self.pl["quat_des"] = np.array([[des_traj.quaternion.w],
+                                        [des_traj.quaternion.x],
+                                        [des_traj.quaternion.y],
+                                        [des_traj.quaternion.z]])
         self.pl["omega_des"] = np.array([[0.0, 0.0, 0.0]])
         self.pl["yaw_des"] = 0.0
         self.pl["yawdot_des"] = 0.0
