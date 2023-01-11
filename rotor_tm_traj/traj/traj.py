@@ -2,6 +2,7 @@
 import numpy as np
 from numpy import sin
 from numpy import cos
+from scipy.spatial.transform import Rotation as rot
 from Optimization.entire_path.generate_poly import generate_poly
 from Optimization.entire_path.generate_poly_coeff import generate_poly_coeff
 from Optimization.optimize_traj import optimize_traj
@@ -127,6 +128,112 @@ class traj:
 			self.state_struct["quat_des"] = np.array([1,0,0,0])
 			self.state_struct["omega_des"] = np.array([0,0,0])
 
+	def circlewithrotbody(self, t, init_pos = None, r = None, rangle = None, period = None, circle_duration = None):
+		# CIRCLE trajectory generator for a circle
+		
+		if (np.all(init_pos!=None)) and (r != None) and (period != None) and (circle_duration != None):
+			print('Generating Circular Trajectory ...')
+
+			self.finished = False
+			self.Radius = r
+			self.offset_pos = np.array([init_pos[0]-self.Radius, init_pos[1], init_pos[2]])
+			self.offset_euler = rot.from_quat(np.array([init_pos[4], init_pos[5], init_pos[6], init_pos[3]])).as_euler('ZYX')
+			self.T = period
+			self.omega_des = 2*np.pi/self.T
+			self.alpha_des = np.pi/40
+			self.start = init_pos
+			self.ramp_t = self.omega_des/self.alpha_des
+			self.duration = circle_duration
+			self.angle_amp = rangle
+
+			thetainitial = np.array([[0],[0],[0],[self.ramp_t*self.omega_des],[0],[0]])
+			A = np.append(generate_poly(5,2,0), generate_poly(5,2,1), axis = 0)
+
+			self.ramp_theta_coeff = np.matmul(np.linalg.inv(A), thetainitial)
+			self.ramp_dist = sum(np.multiply(self.ramp_theta_coeff, np.array([[1],[1/2],[1/3],[1/4],[1/5],[1/6]])))
+			self.circle_dist = self.omega_des*self.duration
+			self.tf = self.ramp_t * 2 + self.duration
+			self.traj_type = 2
+
+		else:
+			if t < self.tf:
+				if t<=self.ramp_t:  # ramping up the circle
+					dt = t/self.ramp_t
+					integral_poly = generate_poly(6,0,dt)
+					integral_poly = np.multiply(integral_poly[:,1:7],[1,1/2,1/3,1/4,1/5,1/6])
+					polynominalmat = np.append(integral_poly, generate_poly(5,2,dt), axis=0)
+					theta_d = np.matmul(polynominalmat, self.ramp_theta_coeff)
+					theta_d = np.multiply(theta_d, np.array([[1],[1/self.ramp_t],[1/self.ramp_t**2],[1/self.ramp_t**3]]))
+				else:
+					if t<=(self.ramp_t + self.duration): # constant velocity cruising
+						dt = t - self.ramp_t
+						theta_d = np.zeros((4,1),dtype=float)
+						theta_d[0] = self.omega_des * dt + self.ramp_dist
+						theta_d[1] = self.omega_des
+
+					else:  # ramping down the circle
+						dt = 1 - (t - self.duration - self.ramp_t)/self.ramp_t
+						integral_poly = generate_poly(6,0,dt)
+						integral_poly = np.multiply(integral_poly[:,1:7],[1,1/2,1/3,1/4,1/5,1/6])
+						polynominalmat = np.append(integral_poly, generate_poly(5,2,dt), axis=0)
+
+						theta_d = np.matmul(polynominalmat, self.ramp_theta_coeff)
+						theta_d = np.multiply(theta_d, np.array([[1],[1/self.ramp_t],[1/self.ramp_t**2],[1/self.ramp_t**3]]))
+						theta_d[0] = self.circle_dist + 2*self.ramp_dist - theta_d[0]
+
+				cos_t = cos(theta_d[0])
+				sin_t = sin(theta_d[0])
+
+				x_pos = self.Radius * cos_t
+				y_pos = self.Radius * sin_t
+				x_vel = -self.Radius * sin_t * theta_d[1]
+				y_vel =  self.Radius * cos_t * theta_d[1]
+				x_acc = -self.Radius * cos_t * theta_d[1]**2 - self.Radius * sin_t * theta_d[2]
+				y_acc = -self.Radius * sin_t * theta_d[1]**2 + self.Radius * cos_t * theta_d[2]
+				x_jrk =  self.Radius * sin_t * theta_d[1]**3 - 3 * self.Radius * cos_t * theta_d[1] * theta_d[2] - self.Radius * sin_t * theta_d[3]
+				y_jrk = -self.Radius * cos_t * theta_d[1]**3 - 3 * self.Radius * sin_t * theta_d[1] * theta_d[2] + self.Radius * cos_t * theta_d[3]
+
+				pos = self.offset_pos + np.array([x_pos[0], y_pos[0], 0]) 
+				self.last_pos = pos 
+				vel = np.array([x_vel[0], y_vel[0], 0.0])
+				acc = np.array([x_acc[0], y_acc[0], 0.0])
+				jrk = np.array([x_jrk[0], y_jrk[0], 0.0])
+
+				# compute the desired roll pitch yaw
+				cmd_roll =  self.angle_amp[0] * sin_t
+				cmd_pitch = self.angle_amp[1] * sin_t
+				cmd_yaw =   self.offset_euler[0] + self.angle_amp[2] * sin_t
+				# print("The commended yaw is", cmd_yaw)
+
+			    # compute the quaternion
+				quat = rot.from_euler('ZYX', [cmd_yaw[0], cmd_pitch[0], cmd_roll[0]]).as_quat() 
+
+				# reorder the quaternion
+				quat = quat[[3,0,1,2]] 
+				self.last_quat = quat
+				# print("The commended quat is", quat)
+				
+				# compute the desired angular velocity
+				angv = np.array([self.angle_amp[0] * (cos_t * theta_d[1]), self.angle_amp[1] * (cos_t * theta_d[1]), self.angle_amp[2] * (cos_t * theta_d[1])]) 
+
+				# ang_vel_dot = np.array([rangle[0] * (-sin_t * theta_d[1]**2 + cos_t * theta_d[2]), rangle[1] * (-sin_t * theta_d[1]**2 + cos_t * theta_d[2]), rangle[2] * (-sin_t * theta_d[1]**2 + cos_t * theta_d[2])])
+
+			else:
+				pos = self.last_pos
+				vel = np.zeros(3)
+				acc = np.zeros(3)
+				jrk = np.zeros(3)
+				quat = self.last_quat
+				angv = np.zeros(3)
+				self.finished = True
+
+			self.state_struct["pos_des"] = pos
+			self.state_struct["vel_des"] = vel
+			self.state_struct["acc_des"] = acc
+			self.state_struct["jrk_des"] = jrk
+			self.state_struct["quat_des"] = quat 
+			self.state_struct["omega_des"] = angv
+
 	def line_quintic_traj(self, t, map = None, path = None):
 
 		# map is a class 
@@ -194,7 +301,7 @@ class traj:
 				inverse = np.linalg.inv(constraints[6*j-6:6*j,0:6])
 				coefficient_temp = np.matmul(inverse,condition[6*j-6:6*j,0:3])
 				self.coefficient[6*j-6:6*j,0:3] = coefficient_temp
-			self.traj_type = 2
+			self.traj_type = 3
 		else:
 				lengthtime = self.timepoint.shape[0]
 				length = lengthtime -1 
@@ -241,7 +348,7 @@ class traj:
 			self.coefficient, self.timelist = optimize_traj(path, self.traj_constant, T_seg_c, self.traj_constant.cor_constraint)
 			print(self.timelist)
 			print("The total traj num is ", self.traj_constant.total_traj_num)
-			self.traj_type = 3
+			self.traj_type = 4
 
 		else:
 			for i in range(self.traj_constant.total_traj_num):

@@ -9,7 +9,7 @@ import create_options
 from rotor_tm_msgs.msg import PositionCommand
 from nav_msgs.msg import Odometry
 from std_msgs.msg import Header
-from rotor_tm_traj.srv import Circle, Line
+from rotor_tm_traj.srv import Circle, Line, CircleWithRotation
 
 
 class traj_node:
@@ -41,11 +41,12 @@ class traj_node:
         ## ROS Server
 		server = []
 		server.append(rospy.Service(node_name + '/Circle', Circle, self.circle_traj_cb))
+		server.append(rospy.Service(node_name + '/Circle_Rot_Rigidbody', CircleWithRotation, self.circle_with_rot_body_traj_cb))
 		server.append(rospy.Service(node_name + '/Line', Line, self.line_traj_cb))
 		server.append(rospy.Service(node_name + '/Min_Derivative_Line', Line, self.min_derivative_line_traj_cb))
 
 		print("Trajectory Generator Initialization Finished")
-	
+
 	def circle_traj_cb(self, req):
 	# DESCRIPTION
 	# call back function for the circular trajectory service "/Circle"
@@ -66,8 +67,37 @@ class traj_node:
 			print("Please wait for the previous traj to finish")
 		else:
 			self.current_traj = traj.traj()
-			self.traj_type = 1
 			self.current_traj.circle(0, self.curr_state[0:3], req.radius, req.T, req.duration)
+			self.time_reference = rospy.get_time()
+			self.traj_start = True
+			status_msgs = Header()
+			status_msgs.stamp = rospy.get_rostime()
+			self.cir_traj_status_pub.publish(status_msgs)
+	
+	def circle_with_rot_body_traj_cb(self, req):
+	# DESCRIPTION
+	# call back function for the circular trajectory service "/CircleWithRotBody"
+	# It first check if (if any) previous trajectory generation has finished
+	# if yes, it will create a circlar traj object that would initialize the trajectory (when called the first time)
+	# 												          output waypoint of the trajectory (for subsequent calls)
+	
+	# INPUT
+	# req		- parameters necessary for create the circular trajectory. 
+	# 			  Check ~/ws/src/rotorTM/rotor_tm_traj/srv/Circle_Rot_Rigidbody.srv for details
+
+	# OUTPUT
+	# /			- update the attribute self.current_traj to be of circular type
+		if self.traj_start:
+			self.is_finished = self.current_traj.finished
+		## call circular traj services
+		if self.is_finished == False:
+			print("Please wait for the previous traj to finish")
+		else:
+			print("I am here in the circle traj")
+			print("The request angle amp is, ", req.angle_amp[0],  req.angle_amp[1],  req.angle_amp[2])
+			angle_amp = [req.angle_amp[0],  req.angle_amp[1],  req.angle_amp[2]]
+			self.current_traj = traj.traj()
+			self.current_traj.circlewithrotbody(0, self.curr_state[0:7], req.radius, angle_amp, req.T, req.duration)
 			self.time_reference = rospy.get_time()
 			self.traj_start = True
 			status_msgs = Header()
@@ -100,7 +130,6 @@ class traj_node:
 				path.append([pt.x,pt.y,pt.z])
 			
 			self.current_traj = traj.traj()
-			# self.traj_type = 2
 			self.current_traj.line_quintic_traj(0, self.map, np.array(path))
 			self.time_reference = rospy.get_time()
 			self.traj_start = True
@@ -177,6 +206,12 @@ class traj_node:
 						status_msgs.stamp = rospy.get_rostime()
 						self.cir_traj_status_pub.publish(status_msgs)
 				elif (self.current_traj.traj_type == 2):
+					self.current_traj.circlewithrotbody(t-self.time_reference)
+					if not self.current_traj.finished:
+						status_msgs = Header()
+						status_msgs.stamp = rospy.get_rostime()
+						self.cir_traj_status_pub.publish(status_msgs)
+				elif (self.current_traj.traj_type == 3):
 					self.current_traj.line_quintic_traj(t-self.time_reference)
 					if not self.current_traj.finished:
 						status_msgs = Header()
