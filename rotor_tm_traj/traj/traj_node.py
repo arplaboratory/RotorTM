@@ -93,8 +93,6 @@ class traj_node:
 		if self.is_finished == False:
 			print("Please wait for the previous traj to finish")
 		else:
-			print("I am here in the circle traj")
-			print("The request angle amp is, ", req.angle_amp[0],  req.angle_amp[1],  req.angle_amp[2])
 			angle_amp = [req.angle_amp[0],  req.angle_amp[1],  req.angle_amp[2]]
 			self.current_traj = traj.traj()
 			self.current_traj.circlewithrotbody(0, self.curr_state[0:7], req.radius, angle_amp, req.T, req.duration)

@@ -250,7 +250,9 @@ class controller_node:
                                         [des_traj.quaternion.x],
                                         [des_traj.quaternion.y],
                                         [des_traj.quaternion.z]])
-        self.pl["omega_des"] = np.array([[0.0, 0.0, 0.0]])
+        self.pl["omega_des"] = np.array([[des_traj.angular_velocity.x],
+                                         [des_traj.angular_velocity.y],
+                                         [des_traj.angular_velocity.z]])
         self.pl["yaw_des"] = 0.0
         self.pl["yawdot_des"] = 0.0
         self.sim_subscriber()

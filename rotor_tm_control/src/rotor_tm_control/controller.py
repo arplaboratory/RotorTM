@@ -1,7 +1,8 @@
 #!/usr/bin/python3
 import numpy as np
-from rotor_tm_utils.vec2asym import vec2asym
 import scipy.linalg as LA
+from scipy.spatial.transform import Rotation as rot
+from rotor_tm_utils.vec2asym import vec2asym
 from rotor_tm_utils.vee import vee
 from rotor_tm_utils.RPYtoRot_ZXY import RPYtoRot_ZXY
 from rotor_tm_utils import utilslib 
@@ -524,7 +525,8 @@ class controller:
 
         ## Parameter Initialization
         quat_des = ql["quat_des"]
-        yaw_des = 0
+        euler_des = rot.from_quat(np.array([quat_des[1][0], quat_des[2][0], quat_des[3][0], quat_des[0][0]])).as_euler('ZYX') 
+        yaw_des = euler_des[0] 
         omega_des = ql["omega_des"]
         g = params.grav
         m = params.struct_mass
