@@ -234,7 +234,7 @@ class controller:
         # Errors of anlges and angular velocities
         e_Rot = Rot_des.T @ Rot - Rot.T @ Rot_des
         e_angle = np.divide(vee(e_Rot), 2)
-        e_omega = ql["omega"] - Rot.T @ Rot_des @ omega_des.T 
+        e_omega = ql["omega"] - Rot.T @ Rot_des @ omega_des 
 
         # Net moment
         # Missing the angular acceleration term but in general it is neglectable.
