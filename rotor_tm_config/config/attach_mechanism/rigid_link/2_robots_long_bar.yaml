@@ -1,0 +1,18 @@
+# Define the type of the connection
+mechanism_type: "Rigid Link" 
+
+# Define the total number of robots
+num_of_robots: 2
+
+# Define where the cable is attached at
+rho: 
+  - {x: 0.0, y: -0.19, z: 0.0097}
+  - {x: 0.0, y: 0.19,  z: 0.0097}
+
+# Define the initial yaw of each UAV
+yaw_list: [0.0,0.0]
+
+# Define the types of robots attach to the payload
+robot_list: ["snapdragonfly","snapdragonfly"]
+# robot_list: ["hummingbird","hummingbird","hummingbird"]
+
