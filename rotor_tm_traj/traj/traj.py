@@ -377,4 +377,20 @@ class traj:
 			self.state_struct["quat_des"] = np.array([1,0,0,0])
 			self.state_struct["omega_des"] = np.array([0,0,0])
 
+	def step_des(self, t, des_pose = None):
+		if (np.any(des_pose!= None)):
+			self.step_des_pose = des_pose
+			self.finished = False
+			self.traj_type = 5
+		else:
+			if (t >= 10): 
+				print("The t in step_des is ", t)
+				self.finished = True
 
+			self.state_struct["pos_des"] = self.step_des_pose[0:3] 
+			self.state_struct["vel_des"] = np.zeros(3)
+			self.state_struct["acc_des"] = np.zeros(3)
+			self.state_struct["jrk_des"] = np.zeros(3) 
+			self.state_struct["quat_des"] = self.step_des_pose[3:7]
+			self.state_struct["omega_des"] = np.array([0,0,0])
+			

@@ -23,6 +23,7 @@ add_service_files(
     Circle.srv
     CircleWithRotation.srv
     Line.srv
+    StepPose.srv
 )
 
 generate_messages(
