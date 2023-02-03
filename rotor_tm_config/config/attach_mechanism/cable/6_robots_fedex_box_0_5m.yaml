@@ -15,3 +15,6 @@ rho:
 
 # Define the cable length
 cable_length: [0.5,0.5,0.5,0.5,0.5,0.5]
+
+# Define the types of robots attach to the payload
+robot_list: ["snapdragonfly","snapdragonfly","snapdragonfly","snapdragonfly","snapdragonfly","snapdragonfly"]

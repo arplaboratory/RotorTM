@@ -1,6 +1,0 @@
-# payload inertia parameters
-mass: 0.18
-inertia: {Ixx: 0.000601, Ixy: 0.0, Ixz: 0.0, Iyx: 0.0, Iyy: 0.000589, Iyz: 0.0, Izx: 0.0, Izy: 0.0, Izz: 0.01076}
-
-# path to payload mesh
-mesh_path: "package://rotor_tm/mesh/triangular_payload.STL"

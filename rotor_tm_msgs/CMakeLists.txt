@@ -17,9 +17,6 @@ find_package(catkin REQUIRED COMPONENTS
 
 add_message_files(DIRECTORY msg
   FILES
-  AuxCommand.msg
-  Corrections.msg
-  OutputData.msg
   PositionCommand.msg
   FMCommand.msg
   RPMCommand.msg

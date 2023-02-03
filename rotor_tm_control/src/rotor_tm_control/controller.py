@@ -1,7 +1,8 @@
 #!/usr/bin/python3
 import numpy as np
-from rotor_tm_utils.vec2asym import vec2asym
 import scipy.linalg as LA
+from scipy.spatial.transform import Rotation as rot
+from rotor_tm_utils.vec2asym import vec2asym
 from rotor_tm_utils.vee import vee
 from rotor_tm_utils.RPYtoRot_ZXY import RPYtoRot_ZXY
 from rotor_tm_utils import utilslib 
@@ -146,7 +147,7 @@ class controller:
 
         return M
 
-    def cooperative_suspended_payload_controller(self, ql, qd, pl_params, qd_params):
+    def cooperative_suspended_payload_controller(self, ql, qd, pl_params, qd_params, uav_id):
     # DESCRIPTION:
     # Controller for cooperative cable suspended payload and MAV(s) 
 
@@ -188,6 +189,7 @@ class controller:
     #                                                               set to [[0., 0., 0.]] currently
     # pl_params   - a read_params class object containing payload parameters
     # qd_params   - a read_params class objects containing all MAV parameters
+    # uav_id      - the id of the current node
     
     # OUTPUTS:
     # mu              - a 3*(Number of MAV(s)) by 1 ndarray, describing tension condition of each cable  
@@ -259,18 +261,29 @@ class controller:
         qd_rot_des = {}
         qd_quat_des = {}
 
-        for qn in range(0, nquad):
-            qd[qn]["yaw_des"] = 0
-            qd[qn]["yawdot_des"] = 0
-            qd[qn]["mu_des"] = mu[3*qn:3*(qn+1)]
-            qd[qn]["attach_accel"] = att_acc_c[:,qn].reshape((3,1))
-            [F_qn, M_qn, Rot_des_qn] = self.cooperative_attitude_controller(qd, qn, qd_params)
-            qd_F[qn] = F_qn
-            qd_M[qn] = M_qn
-            qd_quat_des[qn] = tranrot.from_matrix(Rot_des_qn).as_quat() 
-            qd_rot_des[qn] = Rot_des_qn 
+        qd[uav_id]["yaw_des"] = 0
+        qd[uav_id]["yawdot_des"] = 0
+        qd[uav_id]["mu_des"] = mu[3*uav_id:3*(uav_id+1)]
+        qd[uav_id]["attach_accel"] = att_acc_c[:,uav_id].reshape((3,1))
+        [F_qn, M_qn, Rot_des_qn] = self.cooperative_attitude_controller(qd, uav_id, qd_params[uav_id])
+        qd_F[uav_id] = F_qn
+        qd_M[uav_id] = M_qn
+        qd_quat_des[uav_id] = tranrot.from_matrix(Rot_des_qn).as_quat() 
+        qd_rot_des[uav_id] = Rot_des_qn 
+
+        #for qn in range(0, nquad):
+        #    qd[qn]["yaw_des"] = 0
+        #    qd[qn]["yawdot_des"] = 0
+        #    qd[qn]["mu_des"] = mu[3*qn:3*(qn+1)]
+        #    qd[qn]["attach_accel"] = att_acc_c[:,qn].reshape((3,1))
+        #    [F_qn, M_qn, Rot_des_qn] = self.cooperative_attitude_controller(qd, qn, qd_params[qn])
+        #    qd_F[qn] = F_qn
+        #    qd_M[qn] = M_qn
+        #    qd_quat_des[qn] = tranrot.from_matrix(Rot_des_qn).as_quat() 
+        #    qd_rot_des[qn] = Rot_des_qn 
     
         #return qd_F, qd_M
+
         return mu, att_acc_c, qd_F, qd_M, qd_quat_des, qd_rot_des
 
     # untested
@@ -512,7 +525,8 @@ class controller:
 
         ## Parameter Initialization
         quat_des = ql["quat_des"]
-        yaw_des = 0
+        euler_des = rot.from_quat(np.array([quat_des[1][0], quat_des[2][0], quat_des[3][0], quat_des[0][0]])).as_euler('ZYX') 
+        yaw_des = euler_des[0] 
         omega_des = ql["omega_des"]
         g = params.grav
         m = params.struct_mass
@@ -606,10 +620,9 @@ class controller:
             e3 = np.array([[0],[0],[1]])
 
         self.icnt = self.icnt + 1
-        quad_m = qd_params.mass
+        quad_m = qd_params[0].mass
         pl_m = pl_params.mass
         l = pl_params.cable_length
-
 
         ## State Initialization
         quad_load_rel_pos = ql["qd_pos"]-ql["pos"]
@@ -647,7 +660,7 @@ class controller:
 
         e_xi = np.cross(xi_des_, xi_, axisa=0, axisb=0).T
         e_w = w_ + xi_asym_ @ xi_asym_ @ w_des_
-        Force = mu_ - quad_m*l*np.cross(xi_, qd_params.Kxi @ e_xi + qd_params.Kw @ e_w+ (xi_.T @ w_des_) * xidot_ + xi_asym_ @ xi_asym_ @ w_des_dot_, axisa=0, axisb=0).T
+        Force = mu_ - quad_m*l*np.cross(xi_, qd_params[0].Kxi @ e_xi + qd_params[0].Kw @ e_w+ (xi_.T @ w_des_) * xidot_ + xi_asym_ @ xi_asym_ @ w_des_dot_, axisa=0, axisb=0).T
         F = np.transpose(Force) @ Rot_worldtobody @ e3
 
         # Attitude Control        
@@ -672,5 +685,5 @@ class controller:
 
         # Moment
         # Missing the angular acceleration term but in general it is neglectable.
-        M = - qd_params.Kpe @ e_angle - qd_params.Kde @ e_omega + np.cross(ql["qd_omega"],qd_params.I @ ql["qd_omega"], axisa=0, axisb=0).T
+        M = - qd_params[0].Kpe @ e_angle - qd_params[0].Kde @ e_omega + np.cross(ql["qd_omega"],qd_params[0].I @ ql["qd_omega"], axisa=0, axisb=0).T
         return F, M

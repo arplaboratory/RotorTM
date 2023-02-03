@@ -7,4 +7,3 @@ geometry_msgs/Vector3 angular_velocity
 geometry_msgs/Quaternion quaternion 
 float64[3] kR
 float64[3] kOm
-rotor_tm_msgs/AuxCommand aux

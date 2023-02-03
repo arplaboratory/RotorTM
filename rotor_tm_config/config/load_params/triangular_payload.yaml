@@ -1,5 +1,5 @@
 # payload inertia parameters
-mass: 0.25
+mass: 0.278
 inertia: {Ixx: 0.00625019392, Ixy: 0.0, Ixz: 0.0, Iyx: 0.0, Iyy: 0.00625019392, Iyz: 0.0, Izx: 0.0, Izy: 0.0, Izz: 0.01245978846}
 
 # path to payload mesh
