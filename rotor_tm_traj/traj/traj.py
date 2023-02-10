@@ -140,7 +140,7 @@ class traj:
 			self.offset_euler = rot.from_quat(np.array([init_pos[4], init_pos[5], init_pos[6], init_pos[3]])).as_euler('ZYX')
 			self.T = period
 			self.omega_des = 2*np.pi/self.T
-			self.alpha_des = np.pi/40
+			self.alpha_des = np.pi/30
 			self.start = init_pos
 			self.ramp_t = self.omega_des/self.alpha_des
 			self.duration = circle_duration
