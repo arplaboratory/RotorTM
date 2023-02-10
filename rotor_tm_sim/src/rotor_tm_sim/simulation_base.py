@@ -112,8 +112,8 @@ class simulation_base():
       uav_white_noise_cov = np.diag(np.zeros(12))
       #white_noise_cov = np.diag(np.array([1e-4,1e-4,1e-4,1e-4,1e-4,1e-4,1e-4,1e-4,1e-4,1e-4,1e-4,1e-4]))
       #uav_white_noise_cov = np.diag(np.array([1e-4,1e-4,1e-4,1e-4,1e-4,1e-4,1e-4,1e-4,1e-4,1e-4,1e-4,1e-4]))
-      white_noise_cov = np.diag(np.array([1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6]))
-      uav_white_noise_cov = np.diag(np.array([1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6]))
+      #white_noise_cov = np.diag(np.array([1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6]))
+      #uav_white_noise_cov = np.diag(np.array([1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6]))
       #white_noise_cov = np.diag(np.array([5e-6,5e-6,5e-6,5e-6,5e-6,5e-6,5e-6,5e-6,5e-6,5e-6,5e-6,5e-6]))
       #uav_white_noise_cov = np.diag(np.array([5e-6,5e-6,5e-6,5e-6,5e-6,5e-6,5e-6,5e-6,5e-6,5e-6,5e-6,5e-6]))
       rate = rospy.Rate(self.rate)
@@ -225,7 +225,7 @@ class simulation_base():
                       0.0,  0.0,    0.0,            # pl vel    6
                       1.0,  0.0,    0.0,    0.0,    # pl quat   10
                       0.0,  0.0,    0.0,            # pl omega  13
-                      0.0,  0.0,    0.5,            # qd pos    16
+                      0.0,  0.0,    self.pl_params.cable_length,            # qd pos    16
                       0.0,  0.0,    0.0,            # qd vel    19 
                       1.0,  0.0,    0.0,    0.0,    # qd quat   23
                       0.0,  0.0,    0.0])           # qd omega  26
