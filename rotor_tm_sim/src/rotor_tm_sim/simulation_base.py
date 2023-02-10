@@ -7,7 +7,6 @@ from visualization_msgs.msg import MarkerArray, Marker
 from nav_msgs.msg import Odometry, Path
 from geometry_msgs.msg import PoseStamped
 from rotor_tm_msgs.msg import RPMCommand, FMCommand 
-from quadrotor_msgs.msg import FMCommand as QuadFMCommand
 from rotor_tm_utils import utilslib, rosutilslib
 from rotor_tm_utils.vee import vee
 import time
@@ -253,7 +252,6 @@ class simulation_base():
           controller_name = "/controller_" + str(i+1)
           self.robot_command_subscriber.append(rospy.Subscriber(controller_name + '/' + uav_name_with_id + '/rpm_cmd',RPMCommand,self.rpm_command_callback,i,queue_size=1, tcp_nodelay=True))
           self.robot_command_subscriber.append(rospy.Subscriber(controller_name + '/' + uav_name_with_id + '/fm_cmd',FMCommand,self.fm_command_callback,i,queue_size=1, tcp_nodelay=True))
-          self.robot_command_subscriber.append(rospy.Subscriber('/' + uav_name_with_id + '/fm_cmd',QuadFMCommand,self.quad_fm_command_callback,i,queue_size=1, tcp_nodelay=True))
     
       print("The list of uav is", sum(uav_in_team, []))
       # Visualization Init
@@ -1584,29 +1582,6 @@ class simulation_base():
 ##################                  Call backs                  ####################
   def rpm_command_callback(self,rpm_command,uav_id):
       return
-
-  def quad_fm_command_callback(self,fm_command,uav_id):
-    # DESCRIPTION:
-    # call back function for fm_command, get force and moment command from quadrotor controllers
-        if self.pl_params.mechanism_type == 'Rigid Link':
-            self.uav_F[0,0] = fm_command.rlink_thrust.x
-            self.uav_F[1,0] = fm_command.rlink_thrust.y
-            self.uav_F[2,0] = fm_command.rlink_thrust.z
-
-            self.uav_M[0,0] = fm_command.moments.x
-            self.uav_M[1,0] = fm_command.moments.y
-            self.uav_M[2,0] = fm_command.moments.z
-        elif self.pl_params.mechanism_type == 'Cable':
-            if self.pl_params.payload_type == 'Rigid Body':
-                self.uav_F[uav_id] = fm_command.thrust
-                self.uav_M[0,uav_id] = fm_command.moments.x
-                self.uav_M[1,uav_id] = fm_command.moments.y
-                self.uav_M[2,uav_id] = fm_command.moments.z
-            elif self.pl_params.payload_type == 'Point Mass':
-                self.uav_F[0] = fm_command.thrust
-                self.uav_M[0,0] = fm_command.moments.x
-                self.uav_M[1,0] = fm_command.moments.y
-                self.uav_M[2,0] = fm_command.moments.z
 
   def fm_command_callback(self,fm_command,uav_id):
     # DESCRIPTION:
