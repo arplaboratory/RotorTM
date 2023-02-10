@@ -115,7 +115,7 @@ class read_params:
         if params.payload_type == 'Rigid Body':
           # Geometric parameters matrix for cooperative geometric controller
           P = np.vstack((identity_stack_mat,params.rho_vec_asym_mat))
-          params.pseudo_inv_P = np.matmul(P.T, LA.inv(np.matmul(P, P.T)))
+          params.pseudo_inv_P = LA.pinv(P) # np.matmul(P.T, LA.inv(np.matmul(P, P.T)))
           params.P = P
           for robot_idx, robot_name in enumerate(mechanism_params.robot_list):
             quad_params[robot_idx].l = mechanism_params.cable_length[robot_idx] 

@@ -1,11 +1,11 @@
 <launch>
 
     <!-- 4 snapdragon flights with fedex box payload using cable mechanisms -->
-    <arg name="uav_params_path"             default = "$(find rotor_tm_config)/config/uav_params/snapdragonfly.yaml"/>
+    <arg name="uav_params_path"             default = "$(find rotor_tm_config)/config/uav_params/"/>
     <arg name="payload_params_path"         default = "$(find rotor_tm_config)/config/load_params/fedex_box_payload.yaml"/>
-    <arg name="mechanism_params_path"       default = "$(find rotor_tm_config)/config/attach_mechanism/4_robots_cable_mechanism.yaml"/>
+    <arg name="mechanism_params_path"       default = "$(find rotor_tm_config)/config/attach_mechanism/cable/3_robots_triangular_payload_1m_different_robots_dynamics.yaml"/>
     <arg name="payload_control_gain_path"   default = "$(find rotor_tm_config)/config/control_params/triangular_payload_cooperative_cable_gains.yaml"/>
-    <arg name="uav_control_gain_path"       default = "$(find rotor_tm_config)/config/control_params/dragonfly_control_gains.yaml"/>
+    <arg name="uav_control_gain_path"       default = "$(find rotor_tm_config)/config/control_params/"/>
     <arg name="rviz_launch_file_path"       default = "$(find rotor_tm)/launch/rviz.launch"/>
 
     <node pkg="rotor_tm" type="runsim.py" name="sim" output="screen" args="$(arg payload_params_path) $(arg uav_params_path) $(arg mechanism_params_path) $(arg payload_control_gain_path) $(arg uav_control_gain_path)">

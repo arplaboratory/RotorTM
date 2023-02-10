@@ -39,4 +39,4 @@ __pycache__
 *.swp
 
 # Launch files
-rotor_tm_sim/launch/editable_launch.launch
+./rotor_tm_sim/launch/editable_launch.launch
