@@ -111,8 +111,10 @@ class simulation_base():
       uav_white_noise_cov = np.diag(np.zeros(12))
       #white_noise_cov = np.diag(np.array([1e-4,1e-4,1e-4,1e-4,1e-4,1e-4,1e-4,1e-4,1e-4,1e-4,1e-4,1e-4]))
       #uav_white_noise_cov = np.diag(np.array([1e-4,1e-4,1e-4,1e-4,1e-4,1e-4,1e-4,1e-4,1e-4,1e-4,1e-4,1e-4]))
-      # white_noise_cov = np.diag(np.array([1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6]))
-      # uav_white_noise_cov = np.diag(np.array([1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6]))
+      #white_noise_cov = np.diag(np.array([1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6]))
+      #uav_white_noise_cov = np.diag(np.array([1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6]))
+      #white_noise_cov = np.diag(np.array([5e-6,5e-6,5e-6,5e-6,5e-6,5e-6,5e-6,5e-6,5e-6,5e-6,5e-6,5e-6]))
+      #uav_white_noise_cov = np.diag(np.array([5e-6,5e-6,5e-6,5e-6,5e-6,5e-6,5e-6,5e-6,5e-6,5e-6,5e-6,5e-6]))
       rate = rospy.Rate(self.rate)
       t_span = (0,1/self.rate)
       self.worldframe = "simulator"
@@ -142,7 +144,6 @@ class simulation_base():
             for idx in range(self.nquad) : uav_hover_force.extend([0,0,self.uav_params[idx].mass * self.pl_params.grav]) 
             self.uav_F = np.matmul(self.pl_params.pseudo_inv_P, np.array([0,0,self.pl_params.mass * self.pl_params.grav,0,0,0])) + uav_hover_force
             self.uav_F = self.uav_F.reshape(self.nquad, 3)[:,2]
-            print(self.uav_F)
             self.uav_M = np.zeros((3,self.nquad))
 
             self.rho_vec_list = self.pl_params.rho_vec_list
@@ -223,7 +224,7 @@ class simulation_base():
                       0.0,  0.0,    0.0,            # pl vel    6
                       1.0,  0.0,    0.0,    0.0,    # pl quat   10
                       0.0,  0.0,    0.0,            # pl omega  13
-                      0.0,  0.0,    0.5,            # qd pos    16
+                      0.0,  0.0,    self.pl_params.cable_length,            # qd pos    16
                       0.0,  0.0,    0.0,            # qd vel    19 
                       1.0,  0.0,    0.0,    0.0,    # qd quat   23
                       0.0,  0.0,    0.0])           # qd omega  26
@@ -311,9 +312,9 @@ class simulation_base():
                     pl_vel = x[3:6]
                     robot_pos = x[13:16]
                     robot_vel = x[16:19]
-                    cable_norm_vel = np.transpose(pl_pos - robot_pos) @ (pl_vel - robot_vel)
+                    cable_norm_vel = np.transpose(pl_pos - robot_pos) @ (pl_vel - robot_vel)/np.linalg.norm(pl_pos - robot_pos)
                     ## if collision, compute new velocities and assign to state
-                    if cable_norm_vel > 1e-6 and not self.cable_is_slack:
+                    if cable_norm_vel > 1e-3 and not self.cable_is_slack:
                         print("Colliding")
                         v1, v2 = self.ptmass_inelastic_cable_collision(x[0:6], x[13:19], self.pl_params.mass, self.uav_params[0].mass)
                         x[3:6] = v1
@@ -351,25 +352,34 @@ class simulation_base():
             # Third Scenario: Cooperative 
                 else:    
                     ## first, we check for collision
-                    inelastic_collision_flag = self.cooperative_check_inelastic(x)
+                    inelastic_collision_flag, xi = self.cooperative_check_inelastic(x)
                     
                     ## make sure velocities are distributed with no new collisions happening 
                     while np.any(inelastic_collision_flag):
                         print("collision!")
-                        print("The inelastic collision_flag is", inelastic_collision_flag)
                         before_collide_inelastic_collision_flag = inelastic_collision_flag
+                        print("The before inelastic collision_flag is", before_collide_inelastic_collision_flag)
                         x = self.rigidbody_quad_inelastic_cable_collision(x, inelastic_collision_flag)
                         print("collision finished!")
-                        after_collide_inelastic_collision_flag = self.cooperative_check_inelastic(x)
+                        after_collide_inelastic_collision_flag, xi = self.cooperative_check_inelastic(x)
                         print("Checking after collision")
+                        print("The after inelastic collision_flag is", after_collide_inelastic_collision_flag)
                         if np.any((after_collide_inelastic_collision_flag - before_collide_inelastic_collision_flag)>0):
                             inelastic_collision_flag = after_collide_inelastic_collision_flag + before_collide_inelastic_collision_flag
                             for i in range(inelastic_collision_flag.shape[0]):
                                 if inelastic_collision_flag[i] != 0:
                                     inelastic_collision_flag[i] = 1.0
                         else:
+                            print("Seems to be last time of the collision")
+                            attach_point_position = x[0:3].reshape((3,1))+ utilslib.QuatToRot(x[6:10]) @ self.pl_params.rho_vec_list
                             inelastic_collision_flag = after_collide_inelastic_collision_flag
+                            for i in range(self.nquad):
+                                print("The robot ", i+1, " position is ", x[(i+1)*13:(i+1)*13+3])
+                                print("The xi ", i+1, " is ", xi[:,i])
+                                print("The new robot position is, ", attach_point_position[:,i] - self.pl_params.cable_length[i] * xi[:,i])
+                                x[(i+1)*13:(i+1)*13+3] = attach_point_position[:,i] - self.pl_params.cable_length[i] * xi[:,i]
                     
+                    #print("                                              ")
                     ## set up event for ivp solver
                     slack_condition = self.cable_is_slack
                     idx = np.arange(1, self.pl_params.nquad+1)
@@ -419,6 +429,7 @@ class simulation_base():
                             x = x.reshape((x.shape[0],))
                     else:
                         x = sol.y[:,-1]
+                        # print("Getting x here: ", x)
                     
                     self.cable_is_slack = self.isslack_multi(x[0:3].reshape((3,1))+ utilslib.QuatToRot(x[6:10]) @ self.pl_params.rho_vec_list, x[13*np.arange(1, self.nquad+1)+np.array([[0],[1],[2]])],self.pl_params.cable_length)
                     
@@ -494,7 +505,7 @@ class simulation_base():
             for uav_id in range(self.nquad):
                 if self.pl_params.mechanism_type == 'Rigid Link':
                     uav_state = x[13:26]
-                    attach_pos = x[0:3] + payload_rotmat @ (self.pl_params.rho_robot[:,uav_id]+np.array([-0.06,0,0.02]))
+                    attach_pos = x[0:3] + payload_rotmat @ (self.pl_params.rho_robot[:,uav_id]+np.array([0.0,0,0.04]))
                     uav_state[0:3] = attach_pos
                     attach_vel = uav_state[3:6] + np.matmul(payload_rotmat, np.cross(sol.y[:,0][10:13], self.pl_params.rho_robot[:,uav_id]))
                     if not self.cable_is_slack[uav_id]:
@@ -740,9 +751,9 @@ class simulation_base():
     # OUTPUTS:
     # flag                      - a (# of robots) sized ndarray (shape of (3,)) with boolean type elements
     #                             the n-th element describes if the n-th cable is taut
+      flag = (np.linalg.norm(robot_pos - attach_pos, 2, 0) > (cable_length - 1e-3))
       #print("The distance is", np.linalg.norm(robot_pos-attach_pos, 2, 0))
       #print("Taut condition is ", flag)
-      flag = (np.linalg.norm(robot_pos - attach_pos, 2, 0) > (cable_length - 1e-4))
       return flag
 
   def isslack_multi(self, robot_pos, attach_pos, cable_length):
@@ -762,7 +773,7 @@ class simulation_base():
     # OUTPUTS:
     # flag                      - a (# of robots) sized ndarray (shape of (3,)) with boolean type elements
     #                             the n-th element describes if the n-th cable is slack
-      flag = (np.linalg.norm(robot_pos - attach_pos, 2, 0) <= (cable_length - 1e-4))
+      flag = (np.linalg.norm(robot_pos - attach_pos, 2, 0) <= (cable_length - 1e-3))
       return flag
 
   def isslack(self, robot_pos, attach_pos, cable_length):
@@ -782,7 +793,7 @@ class simulation_base():
     # OUTPUTS:
     # flag                      - an ndarray (shape of (1,)) with boolean type elements
     #                             the element describes if the cable is slack
-      if (np.linalg.norm(robot_pos - attach_pos) > (cable_length - 1e-4)):
+      if (np.linalg.norm(robot_pos - attach_pos) > (cable_length - 1e-3)):
         return np.array([0.0])
       else:
         return np.array([1.0])
@@ -1080,12 +1091,18 @@ class simulation_base():
       xi = (attach_pos - robot_pos) / np.linalg.norm(attach_pos - robot_pos, 2, 0)
       
       # check collision condition
+      # print("xi is")
+      # print(xi)
+      # print("relative vel")
+      # print((attach_vel - robot_vel))
+      # print("product is ")
+      # print(xi * (attach_vel - robot_vel))
       positive_attach_robot_vel = (np.sum(xi * (attach_vel - robot_vel), 0) > 1e-3)
       taut_condition = self.istaut(attach_pos, robot_pos, self.pl_params.cable_length)
       collision_condition = np.empty((taut_condition.shape))
       for i in range(taut_condition.shape[0]):
         collision_condition[i] = positive_attach_robot_vel[i] and taut_condition[i]
-      return collision_condition
+      return collision_condition, xi
 
   def rigidbody_quad_inelastic_cable_collision(self, x, collision_idx):
       # DESCRIPTION:
