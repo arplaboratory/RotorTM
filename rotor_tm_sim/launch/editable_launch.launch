@@ -113,18 +113,6 @@
     <arg name="number_of_robots"            default = "6"/>
 -->
 
-
-<!--
-    1 dragonfly with point-mass payload using cable mechanisms
-    <arg name="uav_params_path"             default = "$(find rotor_tm_config)/config/uav_params/"/>
-    <arg name="payload_params_path"         default = "$(find rotor_tm_config)/config/load_params/pointmass_payload.yaml"/>
-    <arg name="mechanism_params_path"       default = "$(find rotor_tm_config)/config/attach_mechanism/cable/1_robot_point_mass_0_5m.yaml"/>
-    <arg name="payload_control_gain_path"   default = "$(find rotor_tm_config)/config/control_params/pointmass_cable_gains.yaml"/>
-    <arg name="uav_control_gain_path"       default = "$(find rotor_tm_config)/config/control_params/"/>
-    <arg name="number_of_robots"            default = "1"/>
--->
-
-
 <!--
     race, snapdragon, hummingbird with triangular payload using rigid link mechanisms
     <arg name="uav_params_path"             default = "$(find rotor_tm_config)/config/uav_params/"/>
