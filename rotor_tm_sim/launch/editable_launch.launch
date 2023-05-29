@@ -13,7 +13,7 @@
 <!--Lists of provided scenarios-->
 
 <!--
-    1 dragonfly with triangular payload using cable mechanisms (0.5 m)
+    1 dragonfly with pointmass payload using cable mechanisms (0.5 m)
     <arg name="uav_params_path"             default = "$(find rotor_tm_config)/config/uav_params/"/>
     <arg name="payload_params_path"         default = "$(find rotor_tm_config)/config/load_params/pointmass_payload.yaml"/>
     <arg name="mechanism_params_path"       default = "$(find rotor_tm_config)/config/attach_mechanism/cable/1_robot_point_mass_0-5m.yaml"/>
