@@ -1,8 +1,11 @@
 #!/bin/bash
 
-# Directory path to run autopep8
-directory_path="/Users/mrunalsarvaiya/Documents/NYU/RotorTM"
+if [[ -z "${ARPL_ROTOR_TM_DIR}" ]]; then  
+    echo "ARPL_ROTOR_TM_DIR not available"
+    echo "Please export it in your ~/.bashrc"
+    exit 1
+else  
+    echo "ARPL_ROTOR_TM_DIR is "${ARPL_ROTOR_TM_DIR}""    
+fi  
 
-# Run autopep8 on all Python files in the directory
-# find "$directory_path" -type f -name "*.py" -exec autopep8 --global-config /asd/asd {} \;
-autopep8 --global-config /Users/mrunalsarvaiya/Documents/NYU/RotorTM/pyproject.toml 
+find $ARPL_ROTOR_TM_DIR -type f -name "*.py" -exec autopep8 --global-config "${ROTOR_TM_WS}pyproject.toml" {} \;
