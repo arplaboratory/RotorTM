@@ -3,6 +3,7 @@
 from importlib.resources import path
 import numpy as np
 
+
 class options:
     def __init__(self):
         self.total_traj_num = None
@@ -20,20 +21,17 @@ class options:
         self.cor_wid = None
         self.nc = None
 
-    def create_default_option(self, pathlength = 5):
+    def create_default_option(self, pathlength=5):
         self.max_diff = 4
         self.max_exponent = 6
-        self.max_vel = 2.0 #3.0  
-        self.max_acc = 5.0 #10.0  
+        self.max_vel = 2.0  # 3.0
+        self.max_acc = 5.0  # 10.0
         self.dim = 3
         self.cor_wid = 0.2
         self.nc = 10
         self.cor_constraint = False
-        self.max_iteration = 300   
-        self.num_coeff = self.max_exponent+1
-        self.total_traj_num = pathlength-1
+        self.max_iteration = 300
+        self.num_coeff = self.max_exponent + 1
+        self.total_traj_num = pathlength - 1
         self.pt_num = pathlength
-        self.traj_num = pathlength-1
-        
-        
-        
+        self.traj_num = pathlength - 1
