@@ -302,16 +302,17 @@ class simulation_base():
             if self.pl_params.id == "Rigid Link":
                 sol = scipy.integrate.solve_ivp(self.rigid_links_cooperative_rigidbody_pl_EOM, t_span, x, method= 'RK45', t_eval=t_span)
                 x = sol.y[:,-1]
+
             else:
-            
-            # Second Scenario: Point Mass
+                # Second Scenario: Point Mass
                 if self.nquad == 1:
-                    
                     ## first check for inelastic collision
                     pl_pos = x[0:3]
                     pl_vel = x[3:6]
                     robot_pos = x[13:16]
                     robot_vel = x[16:19]
+
+                    # TODO where does this equation come from?
                     cable_norm_vel = np.transpose(pl_pos - robot_pos) @ (pl_vel - robot_vel)/np.linalg.norm(pl_pos - robot_pos)
                     ## if collision, compute new velocities and assign to state
                     if cable_norm_vel > 1e-3 and not self.cable_is_slack:
@@ -349,7 +350,7 @@ class simulation_base():
                     ## recheck cable slack condition
                     self.cable_is_slack = self.isslack(x[0:3], x[13:16], self.pl_params.cable_length)
                 
-            # Third Scenario: Cooperative 
+                # Third Scenario: Cooperative 
                 else:    
                     ## first, we check for collision
                     inelastic_collision_flag, xi = self.cooperative_check_inelastic(x)

@@ -68,6 +68,8 @@ class controller:
         # Cable Direction Tracking Control
         mu_des = qd[qn]["mu_des"]
         xi_des = np.divide(-mu_des, np.linalg.norm(mu_des))
+
+        # TODO isn't w_des 0?
         xi_des_dot = np.array([[0.0],[0.0],[0.0]])
         w_des = np.cross(xi_des, xi_des_dot, axisa=0, axisb=0).T
         
@@ -550,14 +552,16 @@ class controller:
         tau = np.transpose(Force) @ Rot @ e3
         
         ## Attitude Control
-        Rot_des = np.zeros((3,3), dtype=float)
+        # TODO This math is done in different places, create helper function
+        # comes from https://mathweb.ucsd.edu/~mleok/pdf/LeLeMc2010_quadrotor.pdf
         Z_body_in_world = Force/np.linalg.norm(Force)
-        Rot_des[:,2:3] = Z_body_in_world
         X_unit = np.array([[np.cos(yaw_des)], [np.sin(yaw_des)], [0]])
         Y_body_in_world = np.cross(Z_body_in_world,X_unit, axisa=0, axisb=0).T
         Y_body_in_world = Y_body_in_world/np.linalg.norm(Y_body_in_world)
-        Rot_des[:,1:2] = Y_body_in_world
         X_body_in_world = np.cross(Y_body_in_world,Z_body_in_world, axisa=0, axisb=0).T
+        Rot_des = np.zeros((3,3), dtype=float)
+        Rot_des[:,2:3] = Z_body_in_world
+        Rot_des[:,1:2] = Y_body_in_world
         Rot_des[:,0:1] = X_body_in_world
         
         # Errors of anlges and angular velocities
@@ -565,6 +569,8 @@ class controller:
         e_angle = vee(e_Rot)/2
         e_omega = omega.reshape((3,1)) - np.transpose(Rot) @ Rot_des @ omega_des.reshape((3, 1))
 
+        # TODO where does thrust_moment_distribution_mat? 
+        # it should be the result of an optimization prob?
         # Net moment
         # Missing the angular acceleration term but in general it is neglectable.
         M = - params.Kpe @ e_angle - params.Kde @ e_omega + np.cross(omega, params.struct_I @ omega, axisa=0, axisb=0).reshape((3,1))
@@ -641,9 +647,6 @@ class controller:
         #Velocity error
         ed = ql["vel_des"]-ql["vel"]
 
-        # Desired acceleration This equation drives the errors of trajectory to zero.
-        acceleration_des = ql["acc_des"] + g*e3 + pl_params.Kp @ ep + pl_params.Kd @ ed
-
         # Desired yaw and yawdot
         yaw_des = ql["qd_yaw_des"] # This can remain for Quad
         yawdot_des = ql["qd_yawdot_des"]
@@ -651,13 +654,19 @@ class controller:
         ## Cable Direction Control
         # Desired cable direction
 
+        # Finding F desired
+        # Desired acceleration This equation drives the errors of trajectory to zero.
+        acceleration_des = ql["acc_des"] + g*e3 + pl_params.Kp @ ep + pl_params.Kd @ ed
         mu_des_ = (quad_m + pl_m) * acceleration_des + quad_m * l * (np.transpose(xidot_) @ xidot_) * xi_
         xi_des_ = -mu_des_ / np.linalg.norm(mu_des_)
+
+        # TODO isnt w_des_ 0?
         xi_des_dot_ = np.zeros((3, 1), dtype=float)
         w_des_ = np.cross(xi_des_, xi_des_dot_, axisa=0, axisb=0).T
         w_des_dot_ = np.zeros((3, 1), dtype=float)
         mu_ = xixiT_ @ mu_des_
 
+        # TODO isnt w_des_dot_ 0?
         e_xi = np.cross(xi_des_, xi_, axisa=0, axisb=0).T
         e_w = w_ + xi_asym_ @ xi_asym_ @ w_des_
         Force = mu_ - quad_m*l*np.cross(xi_, qd_params[0].Kxi @ e_xi + qd_params[0].Kw @ e_w+ (xi_.T @ w_des_) * xidot_ + xi_asym_ @ xi_asym_ @ w_des_dot_, axisa=0, axisb=0).T
@@ -675,6 +684,7 @@ class controller:
         Rot_des[:,0:1] = X_body_in_world
 
         # Errors of anlges and angular velocities
+        # TODO Why are the signs flipped?
         e_Rot = np.transpose(Rot_des) @ Rot_worldtobody - Rot_worldtobody.T @ Rot_des
         e_angle = vee(e_Rot)/2
 
