@@ -10,6 +10,7 @@ from rotor_tm_msgs.msg import PositionCommand
 from nav_msgs.msg import Odometry
 from std_msgs.msg import Header
 from rotor_tm_traj.srv import Circle, Line, CircleWithRotation, StepPose
+from rotor_tm_traj.srv import CircleResponse, LineResponse, CircleWithRotationResponse, StepPoseResponse
 from scipy.spatial.transform import Rotation as rot
 
 
@@ -76,6 +77,11 @@ class traj_node:
 			status_msgs = Header()
 			status_msgs.stamp = rospy.get_rostime()
 			self.cir_traj_status_pub.publish(status_msgs)
+			
+		response = CircleResponse()
+		response.success = True
+		response.message = "Circle Trajectory Generated"
+		return response	
 	
 	def circle_with_rot_body_traj_cb(self, req):
 	# DESCRIPTION
@@ -105,6 +111,10 @@ class traj_node:
 			status_msgs.stamp = rospy.get_rostime()
 			self.cir_traj_status_pub.publish(status_msgs)
 
+		response = CircleWithRotationResponse() 
+		response.success = True
+		response.message = "Circle Trajectory with Rotation Generated"
+		return response	
 
 	def line_traj_cb(self, req):
 	# DESCRIPTION
@@ -138,6 +148,10 @@ class traj_node:
 			status_msgs.stamp = rospy.get_rostime()
 			self.line_traj_status_pub.publish(status_msgs)
 
+		response = LineResponse() 
+		response.success = True
+		response.message = "Line Trajectory with Rotation Generated"
+		return response	
 
 	def min_derivative_line_traj_cb(self, req):
 	# DESCRIPTION
@@ -173,6 +187,11 @@ class traj_node:
 			status_msgs.stamp = rospy.get_rostime()
 			self.min_der_traj_status_pub.publish(status_msgs)
 
+		response = LineResponse() 
+		response.success = True
+		response.message = "Line Trajectory with Rotation Generated"
+		return response	
+
 	def step_input_cb(self, req):
 	# DESCRIPTION
 	# call back function for the step input service "/Stepinput"
@@ -202,6 +221,11 @@ class traj_node:
 			status_msgs = Header()
 			status_msgs.stamp = rospy.get_rostime()
 			self.step_traj_status_pub.publish(status_msgs)
+
+		response = StepPoseResponse() 
+		response.success = True
+		response.message = "Step Pose Called"
+		return response	
 
 	def odom_callback(self, data):
 	# DESCRIPTION
