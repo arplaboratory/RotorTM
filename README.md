@@ -1,6 +1,10 @@
 # RotorTM
 An Aerial Transportation and Manipulation Simulator for Research and Education
 
+paper: https://arxiv.org/abs/2205.05140
+
+video: https://www.youtube.com/watch?v=jzfEVQ3qlPc
+
 ## License
 Please be aware that this code was originally implemented for research purposes and may be subject to changes and any fitness for a particular purpose is disclaimed. To inquire about commercial licenses, please contact Guanrui Li (lguanrui@nyu.edu), Xinyang Liu (liuxy@nyu.edu) and Prof. Giuseppe Loianno (loiannog@nyu.edu).
 ```
@@ -19,14 +23,18 @@ Please be aware that this code was originally implemented for research purposes 
     
 ```
 ## Citation
-If you publish a paper with our simulator, please cite our paper: 
+If you publish a paper with our simulator, please cite our paper published in IEEE Transactions on Robotics: 
 ```
-@article{rotortm2022,
-  doi = {10.48550/ARXIV.2205.05140}, 
-  url = {https://arxiv.org/abs/2205.05140},
-  author = {Li, Guanrui and Liu, Xinyang and Loianno, Giuseppe},
-  title = {RotorTM: A Flexible Simulator for Aerial Transportation and Manipulation}}
-```
+@ARTICLE{rotortm2023,
+  author={Li, Guanrui and Liu, Xinyang and Loianno, Giuseppe},
+  journal={IEEE Transactions on Robotics}, 
+  title={RotorTM: A Flexible Simulator for Aerial Transportation and Manipulation}, 
+  year={2023},
+  volume={},
+  number={},
+  pages={1-20},
+  doi={10.1109/TRO.2023.3336320}}
+ ```
 
 ## Overview
 #### Description
