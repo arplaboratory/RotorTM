@@ -1,6 +1,8 @@
 # RotorTM
 An Aerial Transportation and Manipulation Simulator for Research and Education
+
 paper: https://arxiv.org/abs/2205.05140
+
 video: https://www.youtube.com/watch?v=jzfEVQ3qlPc
 
 ## License
