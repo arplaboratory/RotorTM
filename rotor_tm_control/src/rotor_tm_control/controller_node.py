@@ -1,6 +1,5 @@
 #!/usr/bin/python3
 import sys
-from cv2 import circle
 import rospy
 import numpy as np
 import rospkg
