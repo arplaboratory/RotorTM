@@ -8,7 +8,7 @@ import scipy.integrate
 from scipy.spatial.transform import Rotation as rot_math
 from visualization_msgs.msg import MarkerArray, Marker
 from nav_msgs.msg import Odometry, Path
-from geometry_msgs.msg import PoseStamped, Wrench
+from geometry_msgs.msg import PoseStamped, WrenchStamped, Wrench
 from sensor_msgs.msg import Imu
 from rotor_tm_msgs.msg import RPMCommand, FMCommand
 from quadrotor_msgs.msg import ukf_measurement_update
@@ -255,8 +255,9 @@ class simulation_base():
           controller_name = "/controller_" + str(uav_id+1)
           self.robot_command_subscriber.append(rospy.Subscriber(controller_name + '/' + mav_name + '/rpm_cmd',RPMCommand,self.rpm_command_callback,uav_id,queue_size=1, tcp_nodelay=True))
           self.robot_command_subscriber.append(rospy.Subscriber(controller_name + '/' + mav_name + '/fm_cmd',FMCommand,self.fm_command_callback,uav_id,queue_size=1, tcp_nodelay=True))
-      self.payload_ext_wrench = rospy.Subscriber("/payload/so3_control/ext_wrench", Wrench, self.ext_wrench_callback, queue_size=1, tcp_nodelay=True)
+      self.payload_ext_wrench = rospy.Subscriber("/payload/ext_wrench", WrenchStamped, self.ext_wrench_callback, queue_size=1, tcp_nodelay=True)
       self.payload_ctrl_wrench = rospy.Publisher("/payload/so3_control/payload_sim_net_force", Wrench,  queue_size=1, tcp_nodelay=True)
+
       # Visualization Init
       self.cable_marker_scale = 0.01 * np.ones(3)
       self.cable_marker_color = np.array([1.0,0.5,0.5,0.5])
@@ -278,7 +279,7 @@ class simulation_base():
       try:
         self.hybrid_flag = rospy.get_param("hybrid_switch")
       except:
-        rospy.set_param("hybrid_switch", True)
+        rospy.set_param("hybrid_switch", False)
         self.hybrid_flag = rospy.get_param("hybrid_switch")
 
       if self.hybrid_flag:
@@ -418,9 +419,7 @@ class simulation_base():
                     
             end = time.time()
             
-            
             # Publish payload odometry
-
             payload_odom = Odometry()
             # current_time = rospy.get_rostime()
             payload_odom.header.stamp = current_time
@@ -673,9 +672,9 @@ class simulation_base():
                                                     0.0, 0.0, 0.0, 0.0, 0.0, self.variance]
                     # self.robot_vio[uav_id].publish(uav_vio_odom)
 
-
                     # Publish UAV attach odometry
                     attach_odom = Odometry()
+
                     # current_time = rospy.get_rostime()
                     attach_odom.header.stamp = current_time
                     attach_odom.header.frame_id = self.worldframe 
@@ -711,9 +710,9 @@ class simulation_base():
                     ukf_measure.header.frame_id = self.worldframe 
                     ukf_measure.imu = imu_pub
                     ukf_measure.odom = uav_vio_odom
-                    ukf_measure.wrench.force.x = self.tension_[0, uav_id]
-                    ukf_measure.wrench.force.y = self.tension_[1, uav_id]
-                    ukf_measure.wrench.force.z = self.tension_[2, uav_id]
+                    ukf_measure.wrench.force.x = -self.tension_[0, uav_id]
+                    ukf_measure.wrench.force.y = -self.tension_[1, uav_id]
+                    ukf_measure.wrench.force.z = -self.tension_[2, uav_id]
                     self.UKF_publisher[uav_id].publish(ukf_measure)
 
                 cable_point_list[2*uav_id,:] = uav_state[0:3]
@@ -725,6 +724,7 @@ class simulation_base():
             # Update cable visualization
             cable_marker_msg = rosutilslib.init_marker_msg(Marker(),5,0,self.worldframe,self.cable_marker_scale,self.cable_marker_color)
             system_marker.markers.append(rosutilslib.update_line_msg(cable_marker_msg,cable_point_list,self.nquad + 1))
+
             # Update payload visualization
             system_marker.markers.append(rosutilslib.update_marker_msg(self.payload_marker_msg,x[0:3],x[6:10],self.nquad+2))
             self.system_publisher.publish(system_marker)
@@ -896,6 +896,7 @@ class simulation_base():
                     attach_odom.twist.twist.linear.y = attach_vel[1]
                     attach_odom.twist.twist.linear.z = attach_vel[2]
                     self.attach_publisher[uav_id].publish(attach_odom)
+
                 else:
                     uav_state = x[self.pl_dim_num+self.uav_dim_num*uav_id:self.pl_dim_num+self.uav_dim_num*(uav_id+1)]
                     attach_pos = x[0:3] + np.matmul(payload_rotmat, self.rho_vec_list[:,uav_id])
@@ -1207,10 +1208,10 @@ class simulation_base():
               D = D + Dk
               E = E + Ek
               ML = ML + self.uav_params.mass * xixiT
+
           self.tension_ = tension_vector 
 
       invML = linalg.inv(ML)
-
 
       payload_rot = utilslib.QuatToRot(s[6:10])
       diag_rot = np.zeros((0,0), dtype=float)
@@ -1223,11 +1224,9 @@ class simulation_base():
       pl_net_M = pl_net_M # pl_net_M is in world frame
       mu_ext =  diag_rot @  self.pl_params.pseudo_inv_P @ np.append(self.ext_force, self.ext_torque, axis=0)
       # print("mu_ext is\n", mu_ext)
+
       ## Dynamics of Payload
-
-
-      # print(pl_net_F)
-      sdotLoad = self.rigidbody_payloadEOM_readonly(pl_state,pl_net_F,pl_net_M,invML,C,D,E)
+      sdotLoad = self.rigidbody_payloadEOM_readonly(pl_state, pl_net_F, pl_net_M, invML, C, D, E)
       
       self.pl_accel = sdotLoad[3:6]
       self.pl_ang_accel = sdotLoad[10:13]
@@ -1256,7 +1255,6 @@ class simulation_base():
              M = self.uav_M[:,uav_idx]
              sdotQuad = self.taut_quadEOM_readonly(uav_s,F,M,T, uav_idx)
          sdot = np.concatenate((sdot,sdotQuad))
-        
 
       return sdot
     
@@ -1289,14 +1287,18 @@ class simulation_base():
       qLdot = utilslib.quat_dot(quat,omega) 
 
       # Payload Angular acceleration
-      effective_M = M - np.matmul(C, np.matmul(invML, F)) - np.cross(omega, np.matmul(self.pl_params.I, omega))
+      effective_M = M - np.matmul(C, np.matmul(invML, F + self.ext_force)) - np.cross(omega, np.matmul(self.pl_params.I, omega))
       effective_inertia = self.pl_params.I + np.matmul(C, np.matmul(invML, D)) - E
       omgLdot = np.linalg.solve(effective_inertia,effective_M) + self.pl_params.invI @ self.ext_torque 
       #omgLdot = np.linalg.solve(effective_inertia,effective_M)
 
       # Payload Acceleration
-      accL = np.matmul(invML, F + np.matmul(D, omgLdot)) - np.array([0,0,self.pl_params.grav]) + self.ext_force/self.pl_params.mass
+      accL = np.matmul(invML, F + np.matmul(D, omgLdot) + self.ext_force) - np.array([0,0,self.pl_params.grav]) # + self.ext_force/self.pl_params.mass
+      #print("ext_force is\n", self.ext_force)
+      #print("ext_force caused accel is\n", self.ext_force/self.pl_params.mass)
+      #print("The cable tension caused accele is\n", F + np.matmul(D, omgLdot))
       # accL = np.matmul(invML, F + np.matmul(D, omgLdot)) - np.array([0,0,self.pl_params.grav])
+
       temp = invML @ (F * self.pl_params.mass)
       self.wrench_value.force.x = temp[0]
       self.wrench_value.force.y = temp[1]
@@ -1304,6 +1306,7 @@ class simulation_base():
       self.wrench_value.torque.x = M[0]
       self.wrench_value.torque.y = M[1]
       self.wrench_value.torque.z = M[2]
+
       # Assemble sdot
       sdotLoad = np.zeros(self.pl_dim_num)
       sdotLoad[0:3] = s[3:6] 
@@ -1836,8 +1839,9 @@ class simulation_base():
 ##################                  Call backs                  ####################
   
   def ext_wrench_callback(self, wrench_command):
-      self.ext_force = np.array([wrench_command.force.x, wrench_command.force.y, wrench_command.force.z])
-      self.ext_torque= np.array([wrench_command.torque.x, wrench_command.torque.y, wrench_command.torque.z])
+      self.ext_force = np.array([wrench_command.wrench.force.x, wrench_command.wrench.force.y, wrench_command.wrench.force.z])
+      #self.ext_torque= np.array([wrench_command.wrench.torque.x, wrench_command.wrench.torque.y, wrench_command.wrench.torque.z])
+      self.ext_torque= np.array([0.0,0.0,0.0])
 
   def rpm_command_callback(self,rpm_command,uav_id):
       return
