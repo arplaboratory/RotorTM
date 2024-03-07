@@ -1,0 +1,18 @@
+# Define the type of the connection
+mechanism_type: "Cable" 
+
+# Define the total number of robots
+num_of_robots: 3
+
+# Define where the cable is attached at
+rho: 
+  - {x: -0.1540, y: -0.267, z: 0.01125}
+  - {x: 0.3083,  y: 0.0000, z: 0.01125}
+  - {x: -0.1540, y: 0.267,  z: 0.01125}
+
+# Define the cable length
+cable_length: [1.0,1.0,1.0]
+
+# Define the types of robots attach to the payload
+robot_list: ["snapdragonfly","snapdragonfly","snapdragonfly"]
+

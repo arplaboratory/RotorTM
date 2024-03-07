@@ -1,0 +1,7 @@
+float32 radius
+float32[3] angle_amp
+float32 T
+float32 duration
+---
+bool success
+string message

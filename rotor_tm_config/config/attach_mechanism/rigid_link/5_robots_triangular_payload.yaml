@@ -14,3 +14,7 @@ rho:
 
 # Define the initial yaw of each UAV
 yaw_list: [0.0,0.0,0.0,0.0,0.0]
+
+# Define the types of robots attach to the payload
+robot_list: ["snapdragonfly","snapdragonfly","snapdragonfly","snapdragonfly","snapdragonfly"]
+

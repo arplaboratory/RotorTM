@@ -5,7 +5,6 @@ from geometry_msgs.msg import Point
 def init_marker_msg(marker_msg, marker_type, action, frame_id, scale = [1,1,1], color = [1,0,0,0], mesh_resource=''):
 
     marker_msg.header.stamp = rospy.get_rostime() 
-
     marker_msg.header.frame_id = frame_id
     marker_msg.type = int(marker_type)
     marker_msg.action = int(action)
@@ -23,7 +22,6 @@ def init_marker_msg(marker_msg, marker_type, action, frame_id, scale = [1,1,1], 
 def update_marker_msg(marker_stamped_msg, position, orientation, marker_id = 0):
 
     marker_stamped_msg.header.stamp = rospy.get_rostime() 
-
     marker_stamped_msg.pose.position.x = position[0]
     marker_stamped_msg.pose.position.y = position[1]
     marker_stamped_msg.pose.position.z = position[2]
@@ -31,8 +29,8 @@ def update_marker_msg(marker_stamped_msg, position, orientation, marker_id = 0):
     marker_stamped_msg.pose.orientation.x = orientation[1]
     marker_stamped_msg.pose.orientation.y = orientation[2]
     marker_stamped_msg.pose.orientation.z = orientation[3]
-
     marker_stamped_msg.id = int(marker_id)
+
     return marker_stamped_msg
 
 def update_line_msg(marker_stamped_msg, point_list, marker_id = 0):
