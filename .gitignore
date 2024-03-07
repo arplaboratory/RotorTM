@@ -34,3 +34,9 @@
 # Python
 *.pyc
 __pycache__
+
+# Vim
+*.swp
+
+# Launch files
+./rotor_tm_sim/launch/editable_launch.launch

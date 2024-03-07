@@ -1,8 +1,5 @@
-from ast import Break
-from turtle import left
 import numpy as np
 import numpy.linalg as linalg
-from yaml.error import Mark
 import rospy
 import scipy.integrate
 from scipy.spatial.transform import Rotation as rot_math
@@ -14,8 +11,6 @@ from rotor_tm_msgs.msg import RPMCommand, FMCommand
 from quadrotor_msgs.msg import ukf_measurement_update
 from rotor_tm_utils import utilslib, rosutilslib
 from rotor_tm_utils.vee import vee
-from rotor_tm_utils import utilslib
-from scipy.spatial.transform import Rotation as RotationM
 import time
 import scipy.linalg as LA
 
@@ -115,9 +110,18 @@ class simulation_base():
   def __init__(self,pl_params,uav_params):
       rospy.init_node('simulation')
       self.rate = 100
+      white_noise_cov = np.diag(np.zeros(12))
+      uav_white_noise_cov = np.diag(np.zeros(12))
+      #white_noise_cov = np.diag(np.array([1e-4,1e-4,1e-4,1e-4,1e-4,1e-4,1e-4,1e-4,1e-4,1e-4,1e-4,1e-4]))
+      #uav_white_noise_cov = np.diag(np.array([1e-4,1e-4,1e-4,1e-4,1e-4,1e-4,1e-4,1e-4,1e-4,1e-4,1e-4,1e-4]))
+      #white_noise_cov = np.diag(np.array([1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6]))
+      #uav_white_noise_cov = np.diag(np.array([1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6,1e-6]))
+      #white_noise_cov = np.diag(np.array([5e-6,5e-6,5e-6,5e-6,5e-6,5e-6,5e-6,5e-6,5e-6,5e-6,5e-6,5e-6]))
+      #uav_white_noise_cov = np.diag(np.array([5e-6,5e-6,5e-6,5e-6,5e-6,5e-6,5e-6,5e-6,5e-6,5e-6,5e-6,5e-6]))
       rate = rospy.Rate(self.rate)
       t_span = (0,1/self.rate)
       self.worldframe = "simulator"
+
       ################################## init parameters ################################
       self.pl_params = pl_params
       self.uav_params = uav_params
@@ -145,9 +149,12 @@ class simulation_base():
         # First Scenario: Cooperative  
         if self.pl_params.id == "Cable":
             print("Initalizing Cooperative Scenario")
-            self.uav_F = np.matmul(self.pl_params.pseudo_inv_P, np.array([0,0,self.pl_params.mass * self.pl_params.grav,0,0,0])) + np.kron([1]*self.nquad, [0,0,self.uav_params.mass * self.pl_params.grav]) 
+            uav_hover_force = []
+            for idx in range(self.nquad) : uav_hover_force.extend([0,0,self.uav_params[idx].mass * self.pl_params.grav]) 
+            self.uav_F = np.matmul(self.pl_params.pseudo_inv_P, np.array([0,0,self.pl_params.mass * self.pl_params.grav,0,0,0])) + uav_hover_force
             self.uav_F = self.uav_F.reshape(self.nquad, 3)[:,2]
             self.uav_M = np.zeros((3,self.nquad))
+
             self.rho_vec_list = self.pl_params.rho_vec_list
             self.cable_len_list = np.array(self.pl_params.cable_length)
             x = np.zeros(self.pl_dim_num + self.uav_dim_num * self.nquad)
@@ -205,15 +212,20 @@ class simulation_base():
       else:
         print("Initalizing Ptmass Scenario")
         ## init force to [sum of (quad and payload mass)] * gravity
-        self.uav_F = np.array([(self.pl_params.mass + self.uav_params.mass) * self.uav_params.grav])
+        self.uav_F = np.array([(self.pl_params.mass + self.uav_params[0].mass) * self.uav_params[0].grav])
+
         ## init M to [0; 0; 0]
         self.uav_M = np.zeros((3,self.nquad), dtype=float)
+
         ## init calbe to taut
         self.cable_is_slack = np.zeros(self.nquad)
+
         ## init rho_vec_list = [] (empty)
         self.rho_vec_list = self.pl_params.rho_vec_list
+
         ## init cable_len_list = cable_length (read)
         self.cable_len_list = np.array(self.pl_params.cable_length)
+
         ## init state x as a (26, 1) state vector with inital position hard code to (0, 0, 0.5)
         # x = (26, 1) state init
                                                     # Name      Element Location
@@ -221,7 +233,7 @@ class simulation_base():
                       0.0,  0.0,    0.0,            # pl vel    6
                       1.0,  0.0,    0.0,    0.0,    # pl quat   10
                       0.0,  0.0,    0.0,            # pl omega  13
-                      0.0,  0.0,    0.5,            # qd pos    16
+                      0.0,  0.0,    self.pl_params.cable_length,            # qd pos    16
                       0.0,  0.0,    0.0,            # qd vel    19 
                       1.0,  0.0,    0.0,    0.0,    # qd quat   23
                       0.0,  0.0,    0.0])           # qd omega  26
@@ -229,44 +241,44 @@ class simulation_base():
       # ROS Publisher 
       self.system_publisher = rospy.Publisher('system/marker',MarkerArray,queue_size=10)
       self.payload_odom_publisher = rospy.Publisher('payload/odom',Odometry,queue_size=1, tcp_nodelay=True)
+      self.payload_odom_ground_truth_publisher = rospy.Publisher('payload/odom_ground_truth',Odometry,queue_size=1, tcp_nodelay=True)
       self.payload_path_publisher = rospy.Publisher('payload/path',Path,queue_size=1, tcp_nodelay=True)
       self.robot_vio_publisher = rospy.Publisher('payload/vio', Odometry, queue_size=1, tcp_nodelay=True)
       self.payload_path = Path()
       self.robot_odom_publisher = []
       self.attach_publisher = []
-      self.UKF_publisher = []
-      #self.robot_vio = []
-
-      for i in range(self.nquad):
-          self.robot_odom_publisher.append(rospy.Publisher(self.mav_name + str(i+1) + '/odom',Odometry, queue_size=1, tcp_nodelay=True))
-          self.attach_publisher.append(rospy.Publisher(self.mav_name + str(i+1) + '/attach',Odometry, queue_size=1, tcp_nodelay=True))
-          self.UKF_publisher.append(rospy.Publisher(self.mav_name + str(i+1) + '/ukf_measurement', ukf_measurement_update, queue_size=1, tcp_nodelay=True))
-          #self.robot_vio.append(rospy.Publisher(self.mav_name + str(i+1) + '/vio',Odometry, queue_size=1, tcp_nodelay=True))
-      # add two dummy publishers
-      #for i in range(0,2):
-      #    self.robot_odom_publisher.append(rospy.Publisher('odom_dummy'+str(i+1),Odometry, queue_size=1, tcp_nodelay=True))
-      #    self.attach_publisher.append(rospy.Publisher('att_dummy'+str(i+1),Odometry, queue_size=1, tcp_nodelay=True))
-      #    self.UKF_publisher.append(rospy.Publisher('measure_dummy'+str(i+1), ukf_measurement_update, queue_size=1, tcp_nodelay=True))     
-    
-      # ROS Subscriber 
       self.robot_command_subscriber = []
-      for uav_id in range(self.nquad):
-          mav_name = self.mav_name + str(uav_id+1)
-          controller_name = "/controller_" + str(uav_id+1)
-          self.robot_command_subscriber.append(rospy.Subscriber(controller_name + '/' + mav_name + '/rpm_cmd',RPMCommand,self.rpm_command_callback,uav_id,queue_size=1, tcp_nodelay=True))
-          self.robot_command_subscriber.append(rospy.Subscriber(controller_name + '/' + mav_name + '/fm_cmd',FMCommand,self.fm_command_callback,uav_id,queue_size=1, tcp_nodelay=True))
-      self.payload_ext_wrench = rospy.Subscriber("/payload/so3_control/ext_wrench", Wrench, self.ext_wrench_callback, queue_size=1, tcp_nodelay=True)
-      self.payload_ctrl_wrench = rospy.Publisher("/payload/so3_control/payload_sim_net_force", Wrench,  queue_size=1, tcp_nodelay=True)
+      uav_type = []
+      uav_in_team = []
+      print(pl_params.uav_in_team)
+      for i in range(self.nquad):
+          uav_name = self.uav_params[i].uav_name
+          uav_name_with_id = pl_params.uav_in_team[i]
+
+          # ROS Publisher
+          self.robot_odom_publisher.append(rospy.Publisher(uav_name_with_id + '/odom',Odometry, queue_size=1, tcp_nodelay=True))
+          self.attach_publisher.append(rospy.Publisher(uav_name_with_id + '/attach',Odometry, queue_size=1, tcp_nodelay=True))
+           
+          # ROS Subscriber 
+          controller_name = "/controller_" + str(i+1)
+          self.robot_command_subscriber.append(rospy.Subscriber(controller_name + '/' + uav_name_with_id + '/rpm_cmd',RPMCommand,self.rpm_command_callback,i,queue_size=1, tcp_nodelay=True))
+          self.robot_command_subscriber.append(rospy.Subscriber(controller_name + '/' + uav_name_with_id + '/fm_cmd',FMCommand,self.fm_command_callback,i,queue_size=1, tcp_nodelay=True))
+    
+      print("The list of uav is", sum(uav_in_team, []))
       # Visualization Init
       self.cable_marker_scale = 0.01 * np.ones(3)
       self.cable_marker_color = np.array([1.0,0.5,0.5,0.5])
       self.uav_marker_scale = 0.5 * np.ones(3)
       self.uav_marker_color = np.array([1.0,0.0,0.0,1.0])
-      self.uav_mesh = self.uav_params.mesh_path
+      self.uav_mesh = []
+      for idx in range(self.nquad):
+        self.uav_mesh.append(self.uav_params[idx].mesh_path)
+
       if self.nquad == 1:
         self.payload_marker_scale = np.array([0.1,0.1,0.1])
       else:
         self.payload_marker_scale = np.ones(3)
+
       self.payload_marker_color = np.array([1.0,0.745,0.812,0.941])
       self.payload_mesh = self.pl_params.mesh_path
       if self.nquad == 1:
@@ -280,10 +292,11 @@ class simulation_base():
       except:
         rospy.set_param("hybrid_switch", True)
         self.hybrid_flag = rospy.get_param("hybrid_switch")
+        print("The hybrid flag is ", self.hybrid_flag)
 
       if self.hybrid_flag:
         print("\n############################################################")
-        print("HYBRID DYNAMICS IS TURN ON")
+        print("HYBRID DYNAMICS IS ON")
         print("LOW PERFORMANCE PROCESSOR PROCEDE WITH CAUTION")
         print("############################################################\n")
         while not rospy.is_shutdown():
@@ -310,10 +323,11 @@ class simulation_base():
                     pl_vel = x[3:6]
                     robot_pos = x[13:16]
                     robot_vel = x[16:19]
-                    cable_norm_vel = np.transpose(pl_pos - robot_pos) @ (pl_vel - robot_vel)
+                    cable_norm_vel = np.transpose(pl_pos - robot_pos) @ (pl_vel - robot_vel)/np.linalg.norm(pl_pos - robot_pos)
                     ## if collision, compute new velocities and assign to state
-                    if cable_norm_vel > 1e-6 and not self.cable_is_slack:
-                        v1, v2 = self.ptmass_inelastic_cable_collision(x[0:6], x[13:19], self.pl_params.mass, self.uav_params.mass)
+                    if cable_norm_vel > 1e-3 and not self.cable_is_slack:
+                        print("Colliding")
+                        v1, v2 = self.ptmass_inelastic_cable_collision(x[0:6], x[13:19], self.pl_params.mass, self.uav_params[0].mass)
                         x[3:6] = v1
                         x[16:19] = v2
                     
@@ -327,10 +341,12 @@ class simulation_base():
 
                     ## state integration
                     if self.cable_is_slack:
-                        # print("Cable is slack")
+                        print("Cable is slack")
+                        #print(x)
                         sol = scipy.integrate.solve_ivp(self.hybrid_ptmass_pl_transportationEOM, t_span, x, method= 'RK45', t_eval=t_span, events=ptmassslackToTaut)
                     else:
-                        # print("Cable is taut")
+                        #print("Cable is taut")
+                        #print(x)
                         sol = scipy.integrate.solve_ivp(self.hybrid_ptmass_pl_transportationEOM, t_span, x, method= 'RK45', t_eval=t_span, events=ptmasstautToSlack)
                     
                     ## extract state from solver soltion
@@ -347,23 +363,34 @@ class simulation_base():
             # First Scenario: Cooperative 
                 else:    
                     ## first, we check for collision
-                    inelastic_collision_flag = self.cooperative_check_inelastic(x)
+                    inelastic_collision_flag, xi = self.cooperative_check_inelastic(x)
                     
                     ## make sure velocities are distributed with no new collisions happening 
                     while np.any(inelastic_collision_flag):
-                        # print("collision!")
+                        print("collision!")
                         before_collide_inelastic_collision_flag = inelastic_collision_flag
+                        print("The before inelastic collision_flag is", before_collide_inelastic_collision_flag)
                         x = self.rigidbody_quad_inelastic_cable_collision(x, inelastic_collision_flag)
-                        # print("collision finished!")
-                        after_collide_inelastic_collision_flag = self.cooperative_check_inelastic(x)
+                        print("collision finished!")
+                        after_collide_inelastic_collision_flag, xi = self.cooperative_check_inelastic(x)
+                        print("Checking after collision")
+                        print("The after inelastic collision_flag is", after_collide_inelastic_collision_flag)
                         if np.any((after_collide_inelastic_collision_flag - before_collide_inelastic_collision_flag)>0):
                             inelastic_collision_flag = after_collide_inelastic_collision_flag + before_collide_inelastic_collision_flag
                             for i in range(inelastic_collision_flag.shape[0]):
                                 if inelastic_collision_flag[i] != 0:
                                     inelastic_collision_flag[i] = 1.0
                         else:
+                            print("Seems to be last time of the collision")
+                            attach_point_position = x[0:3].reshape((3,1))+ utilslib.QuatToRot(x[6:10]) @ self.pl_params.rho_vec_list
                             inelastic_collision_flag = after_collide_inelastic_collision_flag
+                            for i in range(self.nquad):
+                                print("The robot ", i+1, " position is ", x[(i+1)*13:(i+1)*13+3])
+                                print("The xi ", i+1, " is ", xi[:,i])
+                                print("The new robot position is, ", attach_point_position[:,i] - self.pl_params.cable_length[i] * xi[:,i])
+                                x[(i+1)*13:(i+1)*13+3] = attach_point_position[:,i] - self.pl_params.cable_length[i] * xi[:,i]
                     
+                    #print("                                              ")
                     ## set up event for ivp solver
                     slack_condition = self.cable_is_slack
                     idx = np.arange(1, self.pl_params.nquad+1)
@@ -397,7 +424,7 @@ class simulation_base():
                         id = id + 1
 
                     ## state integration
-                    sol = scipy.integrate.solve_ivp(self.hybrid_cooperative_rigidbody_pl_transportationEOM, t_span, x, method='RK45', t_eval=t_span, events=GuardEvents)
+                    sol = scipy.integrate.solve_ivp(self.hybrid_cooperative_rigidbody_pl_transportationEOM, t_span, x, method='RK23', t_eval=t_span, events=GuardEvents)
                     
                     ## extract state from solver soltion
                     EventTriggered_bool = sol.status
@@ -413,6 +440,7 @@ class simulation_base():
                             x = x.reshape((x.shape[0],))
                     else:
                         x = sol.y[:,-1]
+                        # print("Getting x here: ", x)
                     
                     self.cable_is_slack = self.isslack_multi(x[0:3].reshape((3,1))+ utilslib.QuatToRot(x[6:10]) @ self.pl_params.rho_vec_list, x[13*np.arange(1, self.nquad+1)+np.array([[0],[1],[2]])],self.pl_params.cable_length)
                     
@@ -433,96 +461,58 @@ class simulation_base():
             payload_rotmat = utilslib.QuatToRot(sol.y[:,0][6:10])
 
             if self.pl_params.mechanism_type == 'Rigid Link':
-                # for rigid link scenario, the payload position is uav position
-                self.load_pos = x[0:3].reshape((3,1)) + payload_rotmat @ self.pl_params.rho_load
-                payload_odom.pose.pose.position.x = self.load_pos[0]
-                payload_odom.pose.pose.position.y = self.load_pos[1]
-                payload_odom.pose.pose.position.z = self.load_pos[2]
-                payload_vio.pose.pose.position.x = self.load_pos[0]
-                payload_vio.pose.pose.position.y = -self.load_pos[1]
-                payload_vio.pose.pose.position.z = -self.load_pos[2]
+                load_pos = x[0:3].reshape((3,1)) + payload_rotmat @ self.pl_params.rho_load
             else:
-                payload_odom.pose.pose.position.x    = x[0]
-                payload_odom.pose.pose.position.y    = x[1]
-                payload_odom.pose.pose.position.z    = x[2]
-                payload_vio.pose.pose.position.x    = x[0]
-                payload_vio.pose.pose.position.y    = -x[1]
-                payload_vio.pose.pose.position.z    = -x[2]
+                load_pos = x[0:3].reshape((3,1))
+
+            white_noise = np.random.multivariate_normal(np.zeros(12),white_noise_cov)
+            deltaR = utilslib.expSO3(white_noise[6:9])
+            payload_rot_with_noise = np.matmul(rot_math.from_quat([x[7],x[8],x[9],x[6]]).as_matrix(), deltaR)
+            payload_quat_with_noise = rot_math.from_matrix(payload_rot_with_noise).as_quat()
+
+            payload_odom.pose.pose.position.x = load_pos[0] + white_noise[0]
+            payload_odom.pose.pose.position.y = load_pos[1] + white_noise[1]
+            payload_odom.pose.pose.position.z = load_pos[2] + white_noise[2]
+            payload_odom.twist.twist.linear.x    = x[3] + white_noise[3]
+            payload_odom.twist.twist.linear.y    = x[4] + white_noise[4]
+            payload_odom.twist.twist.linear.z    = x[5] + white_noise[5]
+            payload_odom.pose.pose.orientation.w = payload_quat_with_noise[3] 
+            payload_odom.pose.pose.orientation.x = payload_quat_with_noise[0]
+            payload_odom.pose.pose.orientation.y = payload_quat_with_noise[1]
+            payload_odom.pose.pose.orientation.z = payload_quat_with_noise[2]
+            payload_odom.twist.twist.angular.x   = x[10] + white_noise[9]
+            payload_odom.twist.twist.angular.y   = x[11] + white_noise[10]
+            payload_odom.twist.twist.angular.z   = x[12] + white_noise[11]
+
+            self.payload_odom_publisher.publish(payload_odom)
+
+            payload_odom.pose.pose.position.x = load_pos[0]
+            payload_odom.pose.pose.position.y = load_pos[1]
+            payload_odom.pose.pose.position.z = load_pos[2]
             payload_odom.twist.twist.linear.x    = x[3]
             payload_odom.twist.twist.linear.y    = x[4]
             payload_odom.twist.twist.linear.z    = x[5]
-            payload_odom.pose.pose.orientation.w = x[6]
+            payload_odom.pose.pose.orientation.w = x[6] 
             payload_odom.pose.pose.orientation.x = x[7]
             payload_odom.pose.pose.orientation.y = x[8]
             payload_odom.pose.pose.orientation.z = x[9]
             payload_odom.twist.twist.angular.x   = x[10]
             payload_odom.twist.twist.angular.y   = x[11]
             payload_odom.twist.twist.angular.z   = x[12]
-            
-            payload_vio.twist.twist.linear.x    = x[3]
-            payload_vio.twist.twist.linear.y    = -x[4]
-            payload_vio.twist.twist.linear.z    = -x[5]
 
-            r0 = RotationM.from_quat(x[6:10])
-            odom_orientation_rmatrix = r0.as_matrix()
-            flipalongx = np.array([[1,0,0],[0,-1,0],[0,0,-1]])
-            vio_oritentation_rmatrix =  odom_orientation_rmatrix @ flipalongx
-            r1 = RotationM.from_matrix(vio_oritentation_rmatrix)
-            odom_oritentaion_quat = r1.as_quat()
-            payload_vio.pose.pose.orientation.w  = odom_oritentaion_quat[3]
-            payload_vio.pose.pose.orientation.x = odom_oritentaion_quat[2]
-            payload_vio.pose.pose.orientation.y = odom_oritentaion_quat[1]
-            payload_vio.pose.pose.orientation.z = odom_oritentaion_quat[0]
+            self.payload_odom_ground_truth_publisher.publish(payload_odom)
 
-            vio_angular_velocity = flipalongx @ x[10:13]
-
-            payload_vio.twist.twist.angular.x = vio_angular_velocity[0]
-            payload_vio.twist.twist.angular.y = vio_angular_velocity[1]
-            payload_vio.twist.twist.angular.z = vio_angular_velocity[2]
-                    
-            payload_vio.pose.covariance = [self.variance, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                            0.0, self.variance, 0.0, 0.0, 0.0, 0.0,
-                                            0.0, 0.0, self.variance, 0.0, 0.0, 0.0,
-                                            0.0, 0.0, 0.0, self.variance, 0.0, 0.0,
-                                            0.0, 0.0, 0.0, 0.0, self.variance, 0.0,
-                                            0.0, 0.0, 0.0, 0.0, 0.0, self.variance]
-            payload_vio.twist.covariance = [self.variance, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                            0.0, self.variance, 0.0, 0.0, 0.0, 0.0,
-                                            0.0, 0.0, self.variance, 0.0, 0.0, 0.0,
-                                            0.0, 0.0, 0.0, self.variance, 0.0, 0.0,
-                                            0.0, 0.0, 0.0, 0.0, self.variance, 0.0,
-                                            0.0, 0.0, 0.0, 0.0, 0.0, self.variance]
-
-            self.payload_odom_publisher.publish(payload_odom)
-            self.robot_vio_publisher.publish(payload_vio)
-            self.payload_ctrl_wrench.publish(self.wrench_value)
             # Publish payload path
             # current_time = rospy.get_rostime()
 
             self.payload_path.header.stamp = current_time
             self.payload_path.header.frame_id = self.worldframe 
-            payload_rotmat = utilslib.QuatToRot(sol.y[:,0][6:10])
 
             pl_pose_stamped = PoseStamped()
             # current_time = rospy.get_rostime()
             pl_pose_stamped.header.stamp = current_time
             pl_pose_stamped.header.frame_id = self.worldframe
-
-            if self.pl_params.mechanism_type == 'Rigid Link':
-                # for rigid link scenario, the payload position is uav position
-                self.load_pos = x[0:3].reshape((3,1)) + payload_rotmat @ self.pl_params.rho_load
-                pl_pose_stamped.pose.position.x = self.load_pos[0]
-                pl_pose_stamped.pose.position.y = self.load_pos[1]
-                pl_pose_stamped.pose.position.z = self.load_pos[2]
-            else:
-                pl_pose_stamped.pose.position.x    = x[0]
-                pl_pose_stamped.pose.position.y    = x[1]
-                pl_pose_stamped.pose.position.z    = x[2]
-
-            pl_pose_stamped.pose.orientation.w = x[6]
-            pl_pose_stamped.pose.orientation.x = x[7]
-            pl_pose_stamped.pose.orientation.y = x[8]
-            pl_pose_stamped.pose.orientation.z = x[9]
+            pl_pose_stamped.pose = payload_odom.pose.pose 
 
             self.payload_path.poses.append(pl_pose_stamped)
             self.payload_path_publisher.publish(self.payload_path)
@@ -544,7 +534,7 @@ class simulation_base():
                 if self.pl_params.mechanism_type == 'Rigid Link':
                     print("I'm in Rigid Link", uav_id)
                     uav_state = x[13:26]
-                    attach_pos = self.load_pos.reshape((3,)) + np.matmul(payload_rotmat, (self.pl_params.rho_robot[:,uav_id]+np.array([0.028,0,0.032])))
+                    attach_pos = x[0:3] + payload_rotmat @ (self.pl_params.rho_robot[:,uav_id]+np.array([0.0,0,0.04]))
                     uav_state[0:3] = attach_pos
                     attach_vel = uav_state[3:6] + np.matmul(payload_rotmat, np.cross(sol.y[:,0][10:13], self.pl_params.rho_robot[:,uav_id]))
                     if not self.cable_is_slack[uav_id]:
@@ -553,39 +543,6 @@ class simulation_base():
                         if uav_attach_distance > self.cable_len_list[uav_id]:
                             xi = uav_attach_vector/uav_attach_distance
                             uav_state[0:3] = attach_pos[0:3] + self.cable_len_list[uav_id] * xi
-                        
-                    # Publish UAV odometry
-                    uav_odom = Odometry()
-                    # current_time = rospy.get_rostime()
-                    uav_odom.header.stamp = current_time
-                    uav_odom.header.frame_id = self.worldframe 
-                    uav_odom.pose.pose.position.x = uav_state[0]
-                    uav_odom.pose.pose.position.y = uav_state[1]
-                    uav_odom.pose.pose.position.z = uav_state[2]
-                    uav_odom.twist.twist.linear.x = uav_state[3]
-                    uav_odom.twist.twist.linear.y = uav_state[4]
-                    uav_odom.twist.twist.linear.z = uav_state[5]
-                    uav_odom.pose.pose.orientation.w = uav_state[6]
-                    uav_odom.pose.pose.orientation.x = uav_state[7]
-                    uav_odom.pose.pose.orientation.y = uav_state[8]
-                    uav_odom.pose.pose.orientation.z = uav_state[9]
-                    uav_odom.twist.twist.angular.x = uav_state[10]
-                    uav_odom.twist.twist.angular.y = uav_state[11]
-                    uav_odom.twist.twist.angular.z = uav_state[12]
-                    self.robot_odom_publisher[uav_id].publish(uav_odom)
-
-                    # Publish UAV attach odometry
-                    attach_odom = Odometry()
-                    # current_time = rospy.get_rostime()
-                    attach_odom.header.stamp = current_time
-                    attach_odom.header.frame_id = self.worldframe 
-                    attach_odom.pose.pose.position.x = attach_pos[0]
-                    attach_odom.pose.pose.position.y = attach_pos[1]
-                    attach_odom.pose.pose.position.z = attach_pos[2]
-                    attach_odom.twist.twist.linear.x = attach_vel[0]
-                    attach_odom.twist.twist.linear.y = attach_vel[1]
-                    attach_odom.twist.twist.linear.z = attach_vel[2]
-                    self.attach_publisher[uav_id].publish(attach_odom)
                 else:
                     # print("I'm in non rigid link", uav_id)
                     uav_state = x[self.pl_dim_num+self.uav_dim_num*uav_id:self.pl_dim_num+self.uav_dim_num*(uav_id+1)]
@@ -597,128 +554,46 @@ class simulation_base():
                         if uav_attach_distance > self.cable_len_list[uav_id]:
                             xi = uav_attach_vector/uav_attach_distance
                             uav_state[0:3] = attach_pos[0:3] + self.cable_len_list[uav_id] * xi
-                    # print("this should be printed and time is: ", current_time.nsecs, "   : |", current_time.secs)
-                    # Publish UAV odometry
-                    uav_odom = Odometry()
-                    # current_time = rospy.get_rostime()
-                    uav_odom.header.stamp = current_time
-                    uav_odom.header.frame_id = self.worldframe 
-                    uav_odom.pose.pose.position.x = uav_state[0]
-                    uav_odom.pose.pose.position.y = uav_state[1]
-                    uav_odom.pose.pose.position.z = uav_state[2]
-                    uav_odom.twist.twist.linear.x = uav_state[3]
-                    uav_odom.twist.twist.linear.y = uav_state[4]
-                    uav_odom.twist.twist.linear.z = uav_state[5]
-                    uav_odom.pose.pose.orientation.w = uav_state[6]
-                    uav_odom.pose.pose.orientation.x = uav_state[7]
-                    uav_odom.pose.pose.orientation.y = uav_state[8]
-                    uav_odom.pose.pose.orientation.z = uav_state[9]
-                    uav_odom.twist.twist.angular.x = uav_state[10]
-                    uav_odom.twist.twist.angular.y = uav_state[11]
-                    uav_odom.twist.twist.angular.z = uav_state[12]
-                    uav_odom.pose.covariance = [self.variance, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                                    0.0, self.variance, 0.0, 0.0, 0.0, 0.0,
-                                                    0.0, 0.0, self.variance, 0.0, 0.0, 0.0,
-                                                    0.0, 0.0, 0.0, self.variance, 0.0, 0.0,
-                                                    0.0, 0.0, 0.0, 0.0, self.variance, 0.0,
-                                                    0.0, 0.0, 0.0, 0.0, 0.0, self.variance]
-                    uav_odom.twist.covariance = [self.variance, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                                    0.0, self.variance, 0.0, 0.0, 0.0, 0.0,
-                                                    0.0, 0.0, self.variance, 0.0, 0.0, 0.0,
-                                                    0.0, 0.0, 0.0, self.variance, 0.0, 0.0,
-                                                    0.0, 0.0, 0.0, 0.0, self.variance, 0.0,
-                                                    0.0, 0.0, 0.0, 0.0, 0.0, self.variance]
-                    self.robot_odom_publisher[uav_id].publish(uav_odom)
+                        
+                white_noise = np.random.multivariate_normal(np.zeros(12),uav_white_noise_cov)
+                deltaR = utilslib.expSO3(white_noise[6:9])
+                uav_rot_with_noise = np.matmul(rot_math.from_quat([uav_state[7],uav_state[8],uav_state[9],uav_state[6]]).as_matrix(), deltaR)
+                uav_quat_with_noise = rot_math.from_matrix(uav_rot_with_noise).as_quat()
 
-                    # Publish UAV vio odometry
-                    uav_vio_odom = Odometry()
-                    # current_time = rospy.get_rostime()
-                    uav_vio_odom.header.stamp = current_time
-                    uav_vio_odom.header.frame_id = self.worldframe 
-                    uav_vio_odom.pose.pose.position.x = uav_state[0]
-                    uav_vio_odom.pose.pose.position.y = -uav_state[1]
-                    uav_vio_odom.pose.pose.position.z = -uav_state[2]
-                    uav_vio_odom.twist.twist.linear.x = uav_state[3]
-                    uav_vio_odom.twist.twist.linear.y = -uav_state[4]
-                    uav_vio_odom.twist.twist.linear.z = -uav_state[5]
-                    r0 = RotationM.from_quat(uav_state[6:10])
-                    odom_orientation_rmatrix = r0.as_matrix()
-                    flipalongx = np.array([[1,0,0],[0,-1,0],[0,0,-1]])
-                    vio_oritentation_rmatrix =  odom_orientation_rmatrix @ flipalongx
-                    r1 = RotationM.from_matrix(vio_oritentation_rmatrix)
-                    odom_oritentaion_quat = r1.as_quat()
+                # Publish UAV odometry
+                uav_odom = Odometry()
+                uav_odom.header.stamp = current_time
+                uav_odom.header.frame_id = self.worldframe 
+                uav_odom.pose.pose.position.x = uav_state[0] + white_noise[0]
+                uav_odom.pose.pose.position.y = uav_state[1] + white_noise[1]
+                uav_odom.pose.pose.position.z = uav_state[2] + white_noise[2]
+                uav_odom.twist.twist.linear.x    = uav_state[3] + white_noise[3]
+                uav_odom.twist.twist.linear.y    = uav_state[4] + white_noise[4]
+                uav_odom.twist.twist.linear.z    = uav_state[5] + white_noise[5]
+                uav_odom.pose.pose.orientation.w = uav_quat_with_noise[3]
+                uav_odom.pose.pose.orientation.x = uav_quat_with_noise[0]
+                uav_odom.pose.pose.orientation.y = uav_quat_with_noise[1]
+                uav_odom.pose.pose.orientation.z = uav_quat_with_noise[2]
+                uav_odom.twist.twist.angular.x   = uav_state[10] + white_noise[9]     
+                uav_odom.twist.twist.angular.y   = uav_state[11] + white_noise[10]    
+                uav_odom.twist.twist.angular.z   = uav_state[12] + white_noise[11]    
+                self.robot_odom_publisher[uav_id].publish(uav_odom)
 
-                    uav_vio_odom.pose.pose.orientation.w = odom_oritentaion_quat[3]
-                    uav_vio_odom.pose.pose.orientation.x = odom_oritentaion_quat[2]
-                    uav_vio_odom.pose.pose.orientation.y = odom_oritentaion_quat[1]
-                    uav_vio_odom.pose.pose.orientation.z = odom_oritentaion_quat[0]
-
-                    vio_angular_velocity = flipalongx @ uav_state[10:13]
-
-                    uav_vio_odom.twist.twist.angular.x = vio_angular_velocity[0]
-                    uav_vio_odom.twist.twist.angular.y = vio_angular_velocity[1]
-                    uav_vio_odom.twist.twist.angular.z = vio_angular_velocity[2]
-                    
-                    uav_vio_odom.pose.covariance = [self.variance, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                                    0.0, self.variance, 0.0, 0.0, 0.0, 0.0,
-                                                    0.0, 0.0, self.variance, 0.0, 0.0, 0.0,
-                                                    0.0, 0.0, 0.0, self.variance, 0.0, 0.0,
-                                                    0.0, 0.0, 0.0, 0.0, self.variance, 0.0,
-                                                    0.0, 0.0, 0.0, 0.0, 0.0, self.variance]
-                    uav_vio_odom.twist.covariance = [self.variance, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                                    0.0, self.variance, 0.0, 0.0, 0.0, 0.0,
-                                                    0.0, 0.0, self.variance, 0.0, 0.0, 0.0,
-                                                    0.0, 0.0, 0.0, self.variance, 0.0, 0.0,
-                                                    0.0, 0.0, 0.0, 0.0, self.variance, 0.0,
-                                                    0.0, 0.0, 0.0, 0.0, 0.0, self.variance]
-                    # self.robot_vio[uav_id].publish(uav_vio_odom)
-
-
-                    # Publish UAV attach odometry
-                    attach_odom = Odometry()
-                    # current_time = rospy.get_rostime()
-                    attach_odom.header.stamp = current_time
-                    attach_odom.header.frame_id = self.worldframe 
-                    attach_odom.pose.pose.position.x = attach_pos[0]
-                    attach_odom.pose.pose.position.y = attach_pos[1]
-                    attach_odom.pose.pose.position.z = attach_pos[2]
-                    attach_odom.twist.twist.linear.x = attach_vel[0]
-                    attach_odom.twist.twist.linear.y = attach_vel[1]
-                    attach_odom.twist.twist.linear.z = attach_vel[2]
-                    self.attach_publisher[uav_id].publish(attach_odom)
-
-                    # Publish UAV imu
-                    ukf_measure = ukf_measurement_update()
-                    imu_pub = Imu()
-                    # current_time = rospy.get_rostime()
-                    imu_pub.header.stamp = current_time
-                    imu_pub.header.frame_id = self.worldframe
-                    imu_pub.orientation.w = odom_oritentaion_quat[3]
-                    imu_pub.orientation.x = odom_oritentaion_quat[2]
-                    imu_pub.orientation.y = odom_oritentaion_quat[1]
-                    imu_pub.orientation.z = odom_oritentaion_quat[0]
-                    imu_pub.angular_velocity.x = uav_state[10]
-                    imu_pub.angular_velocity.y = -uav_state[11]
-                    imu_pub.angular_velocity.z = -uav_state[12]
-                    imu_pub.linear_acceleration.x = self.imu_accel[0, uav_id]
-                    imu_pub.linear_acceleration.y = -self.imu_accel[1, uav_id]
-                    imu_pub.linear_acceleration.z = -self.imu_accel[2, uav_id]
-                    imu_pub.orientation_covariance = [self.imu_variance, 0.0, 0.0, 0.0, self.imu_variance, 0.0, 0.0, 0.0, self.imu_variance]
-                    imu_pub.angular_velocity_covariance = [self.imu_variance, 0.0, 0.0, 0.0, self.imu_variance, 0.0, 0.0, 0.0, self.imu_variance]
-                    imu_pub.linear_acceleration_covariance = [self.imu_variance, 0.0, 0.0, 0.0, self.imu_variance, 0.0, 0.0, 0.0, self.imu_variance]
-                    # current_time = rospy.get_rostime()
-                    ukf_measure.header.stamp = current_time
-                    ukf_measure.header.frame_id = self.worldframe 
-                    ukf_measure.imu = imu_pub
-                    ukf_measure.odom = uav_vio_odom
-                    ukf_measure.wrench.force.x = self.tension_[0, uav_id]
-                    ukf_measure.wrench.force.y = self.tension_[1, uav_id]
-                    ukf_measure.wrench.force.z = self.tension_[2, uav_id]
-                    self.UKF_publisher[uav_id].publish(ukf_measure)
+                # Publish UAV attach odometry
+                attach_odom = Odometry()
+                attach_odom.header.stamp = current_time
+                attach_odom.header.frame_id = self.worldframe 
+                attach_odom.pose.pose.position.x = attach_pos[0]
+                attach_odom.pose.pose.position.y = attach_pos[1]
+                attach_odom.pose.pose.position.z = attach_pos[2]
+                attach_odom.twist.twist.linear.x = attach_vel[0]
+                attach_odom.twist.twist.linear.y = attach_vel[1]
+                attach_odom.twist.twist.linear.z = attach_vel[2]
+                self.attach_publisher[uav_id].publish(attach_odom)
 
                 cable_point_list[2*uav_id,:] = uav_state[0:3]
                 cable_point_list[2*uav_id+1,:] = attach_pos[0:3]
-                uav_marker_msg = rosutilslib.init_marker_msg(Marker(),10,0,self.worldframe,self.uav_marker_scale,self.uav_marker_color,self.uav_mesh)
+                uav_marker_msg = rosutilslib.init_marker_msg(Marker(),10,0,self.worldframe,self.uav_marker_scale,self.uav_marker_color,self.uav_mesh[uav_id])
                 uav_marker = rosutilslib.update_marker_msg(uav_marker_msg,uav_state[0:3],uav_state[6:10],uav_id)
                 system_marker.markers.append(uav_marker)
 
@@ -732,7 +607,7 @@ class simulation_base():
             rate.sleep()    
       elif self.hybrid_flag == False:
         print("\n############################################################")
-        print("HYBRID DYNAMICS IS TURN OFF")
+        print("HYBRID DYNAMICS IS OFF")
         print("############################################################\n")
         while not rospy.is_shutdown():
             start = time.time()
@@ -755,64 +630,46 @@ class simulation_base():
             payload_rotmat = utilslib.QuatToRot(sol.y[:,0][6:10])
 
             if self.pl_params.mechanism_type == 'Rigid Link':
-                self.load_pos = x[0:3].reshape((3,1)) + payload_rotmat @ self.pl_params.rho_load
-                payload_odom.pose.pose.position.x = self.load_pos[0]
-                payload_odom.pose.pose.position.y = self.load_pos[1]
-                payload_odom.pose.pose.position.z = self.load_pos[2]
-                payload_vio.pose.pose.position.x = self.load_pos[0]
-                payload_vio.pose.pose.position.y = -self.load_pos[1]
-                payload_vio.pose.pose.position.z = -self.load_pos[2]
+                load_pos = x[0:3].reshape((3,1)) + payload_rotmat @ self.pl_params.rho_load
             else:
-                payload_odom.pose.pose.position.x    = x[0]
-                payload_odom.pose.pose.position.y    = x[1]
-                payload_odom.pose.pose.position.z    = x[2]
-                payload_vio.pose.pose.position.x    = x[0]
-                payload_vio.pose.pose.position.y    = -x[1]
-                payload_vio.pose.pose.position.z    = -x[2]
+                load_pos = x[0:3].reshape((3,1)) 
+
+            white_noise = np.random.multivariate_normal(np.zeros(12),white_noise_cov)
+            deltaR = utilslib.expSO3(white_noise[6:9])
+            payload_rot_with_noise = np.matmul(rot_math.from_quat([x[7],x[8],x[9],x[6]]).as_matrix(), deltaR)
+            payload_quat_with_noise = rot_math.from_matrix(payload_rot_with_noise).as_quat()
+
+            payload_odom.pose.pose.position.x = load_pos[0] + white_noise[0]
+            payload_odom.pose.pose.position.y = load_pos[1] + white_noise[1]
+            payload_odom.pose.pose.position.z = load_pos[2] + white_noise[2]
+            payload_odom.twist.twist.linear.x    = x[3] + white_noise[3]
+            payload_odom.twist.twist.linear.y    = x[4] + white_noise[4]
+            payload_odom.twist.twist.linear.z    = x[5] + white_noise[5]
+            payload_odom.pose.pose.orientation.w = payload_quat_with_noise[3] 
+            payload_odom.pose.pose.orientation.x = payload_quat_with_noise[0]
+            payload_odom.pose.pose.orientation.y = payload_quat_with_noise[1]
+            payload_odom.pose.pose.orientation.z = payload_quat_with_noise[2]
+            payload_odom.twist.twist.angular.x   = x[10] + white_noise[9]
+            payload_odom.twist.twist.angular.y   = x[11] + white_noise[10]
+            payload_odom.twist.twist.angular.z   = x[12] + white_noise[11]
+
+            self.payload_odom_publisher.publish(payload_odom)
+
+            payload_odom.pose.pose.position.x = load_pos[0]
+            payload_odom.pose.pose.position.y = load_pos[1]
+            payload_odom.pose.pose.position.z = load_pos[2]
             payload_odom.twist.twist.linear.x    = x[3]
             payload_odom.twist.twist.linear.y    = x[4]
             payload_odom.twist.twist.linear.z    = x[5]
-            payload_odom.pose.pose.orientation.w = x[6]
+            payload_odom.pose.pose.orientation.w = x[6] 
             payload_odom.pose.pose.orientation.x = x[7]
             payload_odom.pose.pose.orientation.y = x[8]
             payload_odom.pose.pose.orientation.z = x[9]
             payload_odom.twist.twist.angular.x   = x[10]
             payload_odom.twist.twist.angular.y   = x[11]
             payload_odom.twist.twist.angular.z   = x[12]
-            
-            payload_vio.twist.twist.linear.x    = x[3]
-            payload_vio.twist.twist.linear.y    = -x[4]
-            payload_vio.twist.twist.linear.z    = -x[5]
 
-            r0 = RotationM.from_quat(x[6:10])
-            odom_orientation_rmatrix = r0.as_matrix()
-            flipalongx = np.array([[1,0,0],[0,-1,0],[0,0,-1]])
-            vio_oritentation_rmatrix =  odom_orientation_rmatrix @ flipalongx
-            r1 = RotationM.from_matrix(vio_oritentation_rmatrix)
-            odom_oritentaion_quat = r1.as_quat()
-            payload_vio.pose.pose.orientation.w  = odom_oritentaion_quat[3]
-            payload_vio.pose.pose.orientation.x = odom_oritentaion_quat[2]
-            payload_vio.pose.pose.orientation.y = odom_oritentaion_quat[1]
-            payload_vio.pose.pose.orientation.z = odom_oritentaion_quat[0]
-
-            vio_angular_velocity = flipalongx @ x[10:13]
-
-            payload_vio.twist.twist.angular.x = vio_angular_velocity[0]
-            payload_vio.twist.twist.angular.y = vio_angular_velocity[1]
-            payload_vio.twist.twist.angular.z = vio_angular_velocity[2]
-                    
-            payload_vio.pose.covariance = [self.variance, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                            0.0, self.variance, 0.0, 0.0, 0.0, 0.0,
-                                            0.0, 0.0, self.variance, 0.0, 0.0, 0.0,
-                                            0.0, 0.0, 0.0, self.variance, 0.0, 0.0,
-                                            0.0, 0.0, 0.0, 0.0, self.variance, 0.0,
-                                            0.0, 0.0, 0.0, 0.0, 0.0, self.variance]
-            payload_vio.twist.covariance = [self.variance, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                            0.0, self.variance, 0.0, 0.0, 0.0, 0.0,
-                                            0.0, 0.0, self.variance, 0.0, 0.0, 0.0,
-                                            0.0, 0.0, 0.0, self.variance, 0.0, 0.0,
-                                            0.0, 0.0, 0.0, 0.0, self.variance, 0.0,
-                                            0.0, 0.0, 0.0, 0.0, 0.0, self.variance]
+            self.payload_odom_ground_truth_publisher.publish(payload_odom)
 
             self.payload_odom_publisher.publish(payload_odom)
             self.robot_vio_publisher.publish(payload_vio)
@@ -828,22 +685,7 @@ class simulation_base():
             current_time = rospy.get_rostime()
             pl_pose_stamped.header.stamp = current_time
             pl_pose_stamped.header.frame_id = self.worldframe
-
-            if self.pl_params.mechanism_type == 'Rigid Link':
-                # for rigid link scenario, the payload position is uav position
-                self.load_pos = x[0:3].reshape((3,1)) + payload_rotmat @ self.pl_params.rho_load
-                pl_pose_stamped.pose.position.x = self.load_pos[0]
-                pl_pose_stamped.pose.position.y = self.load_pos[1]
-                pl_pose_stamped.pose.position.z = self.load_pos[2]
-            else:
-                pl_pose_stamped.pose.position.x    = x[0]
-                pl_pose_stamped.pose.position.y    = x[1]
-                pl_pose_stamped.pose.position.z    = x[2]
-
-            pl_pose_stamped.pose.orientation.w = x[6]
-            pl_pose_stamped.pose.orientation.x = x[7]
-            pl_pose_stamped.pose.orientation.y = x[8]
-            pl_pose_stamped.pose.orientation.z = x[9]
+            pl_pose_stamped.pose = payload_odom.pose.pose 
 
             self.payload_path.poses.append(pl_pose_stamped)
             self.payload_path_publisher.publish(self.payload_path)
@@ -854,7 +696,7 @@ class simulation_base():
             for uav_id in range(self.nquad-1, -1, -1):
                 if self.pl_params.mechanism_type == 'Rigid Link':
                     uav_state = x[13:26]
-                    attach_pos = self.load_pos.reshape((3,)) + np.matmul(payload_rotmat, (self.pl_params.rho_robot[:,uav_id]+np.array([0.028,0,0.032])))
+                    attach_pos = x[0:3] + payload_rotmat @ (self.pl_params.rho_robot[:,uav_id]+np.array([-0.06,0,0.02]))
                     uav_state[0:3] = attach_pos
                     attach_vel = uav_state[3:6] + np.matmul(payload_rotmat, np.cross(sol.y[:,0][10:13], self.pl_params.rho_robot[:,uav_id]))
                     if not self.cable_is_slack[uav_id]:
@@ -864,38 +706,6 @@ class simulation_base():
                             xi = uav_attach_vector/uav_attach_distance
                             uav_state[0:3] = attach_pos[0:3] + self.cable_len_list[uav_id] * xi
                         
-                    # Publish UAV odometry
-                    uav_odom = Odometry()
-                    current_time = rospy.get_rostime()
-                    uav_odom.header.stamp = current_time
-                    uav_odom.header.frame_id = self.worldframe 
-                    uav_odom.pose.pose.position.x = uav_state[0]
-                    uav_odom.pose.pose.position.y = uav_state[1]
-                    uav_odom.pose.pose.position.z = uav_state[2]
-                    uav_odom.twist.twist.linear.x = uav_state[3]
-                    uav_odom.twist.twist.linear.y = uav_state[4]
-                    uav_odom.twist.twist.linear.z = uav_state[5]
-                    uav_odom.pose.pose.orientation.w = uav_state[6]
-                    uav_odom.pose.pose.orientation.x = uav_state[7]
-                    uav_odom.pose.pose.orientation.y = uav_state[8]
-                    uav_odom.pose.pose.orientation.z = uav_state[9]
-                    uav_odom.twist.twist.angular.x = uav_state[10]
-                    uav_odom.twist.twist.angular.y = uav_state[11]
-                    uav_odom.twist.twist.angular.z = uav_state[12]
-                    self.robot_odom_publisher[uav_id].publish(uav_odom)
-
-                    # Publish UAV attach odometry
-                    attach_odom = Odometry()
-                    current_time = rospy.get_rostime()
-                    attach_odom.header.stamp = current_time
-                    attach_odom.header.frame_id = self.worldframe 
-                    attach_odom.pose.pose.position.x = attach_pos[0]
-                    attach_odom.pose.pose.position.y = attach_pos[1]
-                    attach_odom.pose.pose.position.z = attach_pos[2]
-                    attach_odom.twist.twist.linear.x = attach_vel[0]
-                    attach_odom.twist.twist.linear.y = attach_vel[1]
-                    attach_odom.twist.twist.linear.z = attach_vel[2]
-                    self.attach_publisher[uav_id].publish(attach_odom)
                 else:
                     uav_state = x[self.pl_dim_num+self.uav_dim_num*uav_id:self.pl_dim_num+self.uav_dim_num*(uav_id+1)]
                     attach_pos = x[0:3] + np.matmul(payload_rotmat, self.rho_vec_list[:,uav_id])
@@ -907,141 +717,57 @@ class simulation_base():
                             xi = uav_attach_vector/uav_attach_distance
                             uav_state[0:3] = attach_pos[0:3] + self.cable_len_list[uav_id] * xi
                         
-                    # Publish UAV odometry
-                    uav_odom = Odometry()
-                    current_time = rospy.get_rostime()
-                    uav_odom.header.stamp = current_time
-                    uav_odom.header.frame_id = self.worldframe 
-                    uav_odom.pose.pose.position.x = uav_state[0]
-                    uav_odom.pose.pose.position.y = uav_state[1]
-                    uav_odom.pose.pose.position.z = uav_state[2]
-                    uav_odom.twist.twist.linear.x = uav_state[3]
-                    uav_odom.twist.twist.linear.y = uav_state[4]
-                    uav_odom.twist.twist.linear.z = uav_state[5]
-                    uav_odom.pose.pose.orientation.w = uav_state[6]
-                    uav_odom.pose.pose.orientation.x = uav_state[7]
-                    uav_odom.pose.pose.orientation.y = uav_state[8]
-                    uav_odom.pose.pose.orientation.z = uav_state[9]
-                    uav_odom.twist.twist.angular.x = uav_state[10]
-                    uav_odom.twist.twist.angular.y = uav_state[11]
-                    uav_odom.twist.twist.angular.z = uav_state[12]
-                    uav_odom.pose.covariance = [self.variance, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                                    0.0, self.variance, 0.0, 0.0, 0.0, 0.0,
-                                                    0.0, 0.0, self.variance, 0.0, 0.0, 0.0,
-                                                    0.0, 0.0, 0.0, self.variance, 0.0, 0.0,
-                                                    0.0, 0.0, 0.0, 0.0, self.variance, 0.0,
-                                                    0.0, 0.0, 0.0, 0.0, 0.0, self.variance]
-                    uav_odom.twist.covariance = [self.variance, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                                    0.0, self.variance, 0.0, 0.0, 0.0, 0.0,
-                                                    0.0, 0.0, self.variance, 0.0, 0.0, 0.0,
-                                                    0.0, 0.0, 0.0, self.variance, 0.0, 0.0,
-                                                    0.0, 0.0, 0.0, 0.0, self.variance, 0.0,
-                                                    0.0, 0.0, 0.0, 0.0, 0.0, self.variance]
-                    self.robot_odom_publisher[uav_id].publish(uav_odom)
+                white_noise = np.random.multivariate_normal(np.zeros(12),uav_white_noise_cov)
+                deltaR = utilslib.expSO3(white_noise[6:9])
+                uav_rot_with_noise = np.matmul(rot_math.from_quat([uav_state[7],uav_state[8],uav_state[9],uav_state[6]]).as_matrix(), deltaR)
+                uav_quat_with_noise = rot_math.from_matrix(uav_rot_with_noise).as_quat()
 
-                    # Publish UAV vio odometry
-                    uav_vio_odom = Odometry()
-                    current_time = rospy.get_rostime()
-                    uav_vio_odom.header.stamp = current_time
-                    uav_vio_odom.header.frame_id = self.worldframe 
-                    uav_vio_odom.pose.pose.position.x = uav_state[0]
-                    uav_vio_odom.pose.pose.position.y = -uav_state[1]
-                    uav_vio_odom.pose.pose.position.z = -uav_state[2]
-                    uav_vio_odom.twist.twist.linear.x = uav_state[3]
-                    uav_vio_odom.twist.twist.linear.y = -uav_state[4]
-                    uav_vio_odom.twist.twist.linear.z = -uav_state[5]
-                    r0 = RotationM.from_quat(uav_state[6:10])
-                    odom_orientation_rmatrix = r0.as_matrix()
-                    flipalongx = np.array([[1,0,0],[0,-1,0],[0,0,-1]])
-                    vio_oritentation_rmatrix =  odom_orientation_rmatrix @ flipalongx
-                    r1 = RotationM.from_matrix(vio_oritentation_rmatrix)
-                    odom_oritentaion_quat = r1.as_quat()
+                # Publish UAV odometry
+                uav_odom = Odometry()
+                uav_odom.header.stamp = current_time
+                uav_odom.header.frame_id = self.worldframe 
+                uav_odom.pose.pose.position.x = uav_state[0] + white_noise[0]
+                uav_odom.pose.pose.position.y = uav_state[1] + white_noise[1]
+                uav_odom.pose.pose.position.z = uav_state[2] + white_noise[2]
+                uav_odom.twist.twist.linear.x    = uav_state[3] + white_noise[3]
+                uav_odom.twist.twist.linear.y    = uav_state[4] + white_noise[4]
+                uav_odom.twist.twist.linear.z    = uav_state[5] + white_noise[5]
+                uav_odom.pose.pose.orientation.w = uav_quat_with_noise[3]
+                uav_odom.pose.pose.orientation.x = uav_quat_with_noise[0]
+                uav_odom.pose.pose.orientation.y = uav_quat_with_noise[1]
+                uav_odom.pose.pose.orientation.z = uav_quat_with_noise[2]
+                uav_odom.twist.twist.angular.x   = uav_state[10] + white_noise[9]     
+                uav_odom.twist.twist.angular.y   = uav_state[11] + white_noise[10]    
+                uav_odom.twist.twist.angular.z   = uav_state[12] + white_noise[11]    
+                self.robot_odom_publisher[uav_id].publish(uav_odom)
 
-                    uav_vio_odom.pose.pose.orientation.w = odom_oritentaion_quat[3]
-                    uav_vio_odom.pose.pose.orientation.x = odom_oritentaion_quat[2]
-                    uav_vio_odom.pose.pose.orientation.y = odom_oritentaion_quat[1]
-                    uav_vio_odom.pose.pose.orientation.z = odom_oritentaion_quat[0]
-
-                    vio_angular_velocity = flipalongx @ uav_state[10:13]
-
-                    uav_vio_odom.twist.twist.angular.x = vio_angular_velocity[0]
-                    uav_vio_odom.twist.twist.angular.y = vio_angular_velocity[1]
-                    uav_vio_odom.twist.twist.angular.z = vio_angular_velocity[2]
-                    
-                    uav_vio_odom.pose.covariance = [self.variance, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                                    0.0, self.variance, 0.0, 0.0, 0.0, 0.0,
-                                                    0.0, 0.0, self.variance, 0.0, 0.0, 0.0,
-                                                    0.0, 0.0, 0.0, self.variance, 0.0, 0.0,
-                                                    0.0, 0.0, 0.0, 0.0, self.variance, 0.0,
-                                                    0.0, 0.0, 0.0, 0.0, 0.0, self.variance]
-                    uav_vio_odom.twist.covariance = [self.variance, 0.0, 0.0, 0.0, 0.0, 0.0,
-                                                    0.0, self.variance, 0.0, 0.0, 0.0, 0.0,
-                                                    0.0, 0.0, self.variance, 0.0, 0.0, 0.0,
-                                                    0.0, 0.0, 0.0, self.variance, 0.0, 0.0,
-                                                    0.0, 0.0, 0.0, 0.0, self.variance, 0.0,
-                                                    0.0, 0.0, 0.0, 0.0, 0.0, self.variance]
-
-
-                    #self.robot_vio[uav_id].publish(uav_vio_odom)
-
-
-                    # Publish UAV attach odometry
-                    attach_odom = Odometry()
-                    current_time = rospy.get_rostime()
-                    attach_odom.header.stamp = current_time
-                    attach_odom.header.frame_id = self.worldframe 
-                    attach_odom.pose.pose.position.x = attach_pos[0]
-                    attach_odom.pose.pose.position.y = attach_pos[1]
-                    attach_odom.pose.pose.position.z = attach_pos[2]
-                    attach_odom.twist.twist.linear.x = attach_vel[0]
-                    attach_odom.twist.twist.linear.y = attach_vel[1]
-                    attach_odom.twist.twist.linear.z = attach_vel[2]
-                    self.attach_publisher[uav_id].publish(attach_odom)
-
-                    # Publish UAV imu
-                    ukf_measure = ukf_measurement_update()
-                    imu_pub = Imu()
-                    current_time = rospy.get_rostime()
-                    imu_pub.header.stamp = current_time
-                    imu_pub.header.frame_id = self.worldframe
-                    imu_pub.orientation.w = odom_oritentaion_quat[3]
-                    imu_pub.orientation.x = odom_oritentaion_quat[2]
-                    imu_pub.orientation.y = odom_oritentaion_quat[1]
-                    imu_pub.orientation.z = odom_oritentaion_quat[0]
-                    imu_pub.angular_velocity.x = uav_state[10]
-                    imu_pub.angular_velocity.y = -uav_state[11]
-                    imu_pub.angular_velocity.z = -uav_state[12]
-                    imu_pub.linear_acceleration.x = self.imu_accel[0, uav_id]
-                    imu_pub.linear_acceleration.y = -self.imu_accel[1, uav_id]
-                    imu_pub.linear_acceleration.z = -self.imu_accel[2, uav_id]
-                    imu_pub.orientation_covariance = [self.imu_variance, 0.0, 0.0, 0.0, self.imu_variance, 0.0, 0.0, 0.0, self.imu_variance]
-                    imu_pub.angular_velocity_covariance = [self.imu_variance, 0.0, 0.0, 0.0, self.imu_variance, 0.0, 0.0, 0.0, self.imu_variance]
-                    imu_pub.linear_acceleration_covariance = [self.imu_variance, 0.0, 0.0, 0.0, self.imu_variance, 0.0, 0.0, 0.0, self.imu_variance]
-                    ukf_measure.header.stamp = current_time
-                    ukf_measure.header.frame_id = self.worldframe 
-                    ukf_measure.imu = imu_pub
-                    ukf_measure.odom = uav_vio_odom
-                    ukf_measure.wrench.force.x = self.tension_[0, uav_id]
-                    ukf_measure.wrench.force.y = self.tension_[1, uav_id]
-                    ukf_measure.wrench.force.z = self.tension_[2, uav_id]
-                    self.UKF_publisher[uav_id].publish(ukf_measure)
+                # Publish UAV attach odometry
+                attach_odom = Odometry()
+                attach_odom.header.stamp = current_time
+                attach_odom.header.frame_id = self.worldframe 
+                attach_odom.pose.pose.position.x = attach_pos[0]
+                attach_odom.pose.pose.position.y = attach_pos[1]
+                attach_odom.pose.pose.position.z = attach_pos[2]
+                attach_odom.twist.twist.linear.x = attach_vel[0]
+                attach_odom.twist.twist.linear.y = attach_vel[1]
+                attach_odom.twist.twist.linear.z = attach_vel[2]
+                self.attach_publisher[uav_id].publish(attach_odom)
 
                 cable_point_list[2*uav_id,:] = uav_state[0:3]
                 cable_point_list[2*uav_id+1,:] = attach_pos[0:3]
-                uav_marker_msg = rosutilslib.init_marker_msg(Marker(),10,0,self.worldframe,self.uav_marker_scale,self.uav_marker_color,self.uav_mesh)
+                uav_marker_msg = rosutilslib.init_marker_msg(Marker(),10,0,self.worldframe,self.uav_marker_scale,self.uav_marker_color,self.uav_mesh[uav_id])
                 uav_marker = rosutilslib.update_marker_msg(uav_marker_msg,uav_state[0:3],uav_state[6:10],uav_id)
                 system_marker.markers.append(uav_marker)
 
             # Update cable visualization
             cable_marker_msg = rosutilslib.init_marker_msg(Marker(),5,0,self.worldframe,self.cable_marker_scale,self.cable_marker_color)
-            system_marker.markers.append(rosutilslib.update_line_msg(cable_marker_msg,cable_point_list,self.nquad + 1))
+            system_marker.markers.append(rosutilslib.update_line_msg(cable_marker_msg,cable_point_list,uav_id + 1))
+
             # Update payload visualization
-            system_marker.markers.append(rosutilslib.update_marker_msg(self.payload_marker_msg,x[0:3],x[6:10],self.nquad+2))
+            system_marker.markers.append(rosutilslib.update_marker_msg(self.payload_marker_msg,load_pos[0:3],x[6:10],uav_id+2))
             self.system_publisher.publish(system_marker)
 
             rate.sleep()
-
-
 
   def istaut(self, robot_pos, attach_pos, cable_length):
     # DESCRIPTION:
@@ -1060,8 +786,9 @@ class simulation_base():
     # OUTPUTS:
     # flag                      - a (# of robots) sized ndarray (shape of (3,)) with boolean type elements
     #                             the n-th element describes if the n-th cable is taut
-      np.linalg.norm(robot_pos-attach_pos, 2, 0)
-      flag = (np.linalg.norm(robot_pos - attach_pos, 2, 0) > (cable_length - 1e-4))
+      flag = (np.linalg.norm(robot_pos - attach_pos, 2, 0) > (cable_length - 1e-3))
+      #print("The distance is", np.linalg.norm(robot_pos-attach_pos, 2, 0))
+      #print("Taut condition is ", flag)
       return flag
 
   def isslack_multi(self, robot_pos, attach_pos, cable_length):
@@ -1081,7 +808,7 @@ class simulation_base():
     # OUTPUTS:
     # flag                      - a (# of robots) sized ndarray (shape of (3,)) with boolean type elements
     #                             the n-th element describes if the n-th cable is slack
-      flag = (np.linalg.norm(robot_pos - attach_pos, 2, 0) <= (cable_length - 1e-4))
+      flag = (np.linalg.norm(robot_pos - attach_pos, 2, 0) <= (cable_length - 1e-3))
       return flag
 
   def isslack(self, robot_pos, attach_pos, cable_length):
@@ -1101,7 +828,7 @@ class simulation_base():
     # OUTPUTS:
     # flag                      - an ndarray (shape of (1,)) with boolean type elements
     #                             the element describes if the cable is slack
-      if (np.linalg.norm(robot_pos - attach_pos) > (cable_length - 1e-4)):
+      if (np.linalg.norm(robot_pos - attach_pos) > (cable_length - 1e-3)):
         return np.array([0.0])
       else:
         return np.array([1.0])
@@ -1160,7 +887,7 @@ class simulation_base():
       qd_xidot = (pl_vel + np.matmul(pl_rot, np.matmul(pl_omg_asym, self.rho_vec_list)).T - qd_vel) / self.cable_len_list[:, np.newaxis]
       cable_omg = np.cross(qd_xi,qd_xidot)
       attach_centrifugal_accel = np.matmul(pl_omg_asym, np.matmul(pl_omg_asym, self.rho_vec_list))
-      self.attach_accel = self.pl_accel + np.array([0,0,self.uav_params.grav]) + \
+      self.attach_accel = self.pl_accel + np.array([0,0,self.pl_params.grav]) + \
                           np.matmul(pl_rot, np.matmul(utilslib.vec2asym(self.pl_ang_accel), self.rho_vec_list)).T + \
                           np.matmul(pl_rot, attach_centrifugal_accel).T
 
@@ -1188,27 +915,28 @@ class simulation_base():
           if not self.cable_is_slack[uav_idx]:
               cable_len = self.cable_len_list[uav_idx]
               # If the cable is taut, calculate these terms
+
               # Force and Moment at attach point
-              attach_qn_force = u_parallel - self.uav_params.mass * cable_len * linalg.norm(cbl_omg)**2 * xi - \
-                                self.uav_params.mass * np.matmul(xixiT, np.matmul(pl_rot, attach_centrifugal_accel[:,uav_idx]))
+              attach_qn_force = u_parallel - self.uav_params[uav_idx].mass * cable_len * linalg.norm(cbl_omg)**2 * xi - \
+                                self.uav_params[uav_idx].mass * np.matmul(xixiT, np.matmul(pl_rot, attach_centrifugal_accel[:,uav_idx]))
               attach_qn_moment = np.matmul(rho_qn_asym, np.matmul(pl_rot.T, attach_qn_force))
-              tension = self.uav_params.mass*cable_len*np.sum(cbl_omg**2) - \
-                        np.matmul(xi, qd_u - self.uav_params.mass * self.attach_accel[uav_idx,:])
+
+              # Tension Force on each cable
+              tension = self.uav_params[uav_idx].mass*cable_len*np.sum(cbl_omg**2) - \
+                        np.matmul(xi, qd_u - self.uav_params[uav_idx].mass * self.attach_accel[uav_idx,:])
               tension_vector[:,uav_idx] = tension * xi
 
-              # Sum Net Force, Moment and other corresponding terms
-              # for the Payload Dynamics
+              # Sum Net Force, Moment and other corresponding terms for the Payload Dynamics
               pl_net_F = pl_net_F + attach_qn_force
               pl_net_M = pl_net_M + attach_qn_moment
-              Ck = self.uav_params.mass * np.matmul(rho_qn_asym, np.matmul(pl_rot.T, xixiT))
+              Ck = self.uav_params[uav_idx].mass * np.matmul(rho_qn_asym, np.matmul(pl_rot.T, xixiT))
               Dk = - np.transpose(Ck)
               Ek = np.matmul(Ck, np.matmul(pl_rot, rho_qn_asym))
               C = C + Ck
               D = D + Dk
               E = E + Ek
-              ML = ML + self.uav_params.mass * xixiT
-          self.tension_ = tension_vector 
-
+              ML = ML + self.uav_params[uav_idx].mass * xixiT
+      
       invML = linalg.inv(ML)
 
 
@@ -1239,7 +967,7 @@ class simulation_base():
          if self.cable_is_slack[uav_idx]:
              F = self.uav_F[uav_idx]
              M = self.uav_M[:,uav_idx]
-             sdotQuad = self.slack_quadEOM_readonly(uav_s,F,M, uav_idx)
+             sdotQuad = self.slack_quadEOM_readonly(uav_s,F,M,uav_idx)
          else:
              #print(tension_vector[:,uav_idx])
              #print(xixiT)
@@ -1254,7 +982,7 @@ class simulation_base():
              #print(test2)
              F = self.uav_F[uav_idx] 
              M = self.uav_M[:,uav_idx]
-             sdotQuad = self.taut_quadEOM_readonly(uav_s,F,M,T, uav_idx)
+             sdotQuad = self.taut_quadEOM_readonly(uav_s,F,M,T,uav_idx)
          sdot = np.concatenate((sdot,sdotQuad))
         
 
@@ -1271,9 +999,9 @@ class simulation_base():
       # F      - 1 x 1, thrust output from controller (only used in simulation)
       # M      - 3 x 1, moments output from controller (only used in simulation)
       # invML  - 3 x 3, inverse of the ML with payload mass as diagnal elements
-      # C      - 
-      # D      - 
-      # E      - 
+      # C      - coeff
+      # D      - coeff
+      # E      - coeff
 
       # IMPORTANT ATTRIBUTE USED
       # params - struct, output from crazyflie() and whatever parameters you want to pass in
@@ -1316,11 +1044,14 @@ class simulation_base():
   def taut_quadEOM_readonly(self, qd, F, M, T, uav_idx): 
       # DESCRIPTION:
       # QUADEOM_READONLY Solve quadrotor equation of motion when the cable is
-      # slack.
+      # taut.
       # quadEOM_readonly calculate the derivative of the state vector
           
       # INPUTS:
-      # params - struct, parameters you want to pass in
+      # qd - struct, quadrotor parameters you want to pass in
+      # F - ndarray, thrust value from controller, in quadrotor frame
+      # M - ndarray, control moment from controller, in quadrotor frame
+      # T - ndarray, tension value from simulation
           
       # OUTPUTS:
       # sdot   - 13 x 1, derivative of state vector s
@@ -1335,13 +1066,13 @@ class simulation_base():
 
       # Acceleration
       #accel = 1 / self.uav_params.mass * (R * np.array([[0],[0],[F]]) + T * xi - np.array([[0],[0],[params.mass * params.grav]]))
-      accel =  (np.matmul(R , np.array([0,0,F])) + T)/self.uav_params.mass - np.array([0,0,self.uav_params.grav])
-      self.imu_accel[:, uav_idx] = accel
+      accel =  (np.matmul(R , np.array([0,0,F])) + T)/self.uav_params[uav_idx].mass - np.array([0,0,self.uav_params[uav_idx].grav])
+      
       # quaternion derivative 
       qdot = utilslib.quat_dot(quat,omega)
 
       # Angular acceleration
-      pqrdot = np.matmul(self.uav_params.invI, M - np.cross(omega,np.matmul(self.uav_params.I, omega)))
+      pqrdot = np.matmul(self.uav_params[uav_idx].invI, M - np.cross(omega,np.matmul(self.uav_params[uav_idx].I, omega)))
 
       # Assemble sdot
       sdot = np.zeros(self.uav_dim_num)
@@ -1367,9 +1098,9 @@ class simulation_base():
       # quadEOM_readonly calculate the derivative of the state vector
       
       # INPUTS:
-      # t      - 1 x 1, time
-      # qd     - struct, quadrotor states and inputs
-      # F      - struct, parameters you want to pass in
+      # qd - struct, quadrotor parameters you want to pass in
+      # F - ndarray, thrust value from controller, in quadrotor frame
+      # M - ndarray, control moment from controller, in quadrotor frame
       
       # OUTPUTS:
       # sdot   - 13 x 1, derivative of state vector s
@@ -1383,13 +1114,12 @@ class simulation_base():
       R = utilslib.QuatToRot(quat)
 
       # Acceleration
-      accel =  np.matmul(R , np.array([0,0,F]))/self.uav_params.mass - np.array([0,0,self.uav_params.grav])
-      self.imu_accel[:, uav_idx] = accel
+      accel =  np.matmul(R , np.array([0,0,F]))/self.uav_params[uav_idx].mass - np.array([0,0,self.uav_params[uav_idx].grav])
       # Angular velocity
       qdot = utilslib.quat_dot(quat,omega)
 
       # Angular acceleration
-      pqrdot = np.matmul(self.uav_params.invI , M - np.cross(omega, np.matmul(self.uav_params.I, omega)))
+      pqrdot = np.matmul(self.uav_params[uav_idx].invI , M - np.cross(omega, np.matmul(self.uav_params[uav_idx].I, omega)))
 
       # Assemble sdot
       sdot = np.zeros(self.uav_dim_num)
@@ -1409,6 +1139,14 @@ class simulation_base():
       return sdot
 
   def cooperative_check_inelastic(self, x):
+      # DESCRIPTION:
+      # cooperative_check_inelastic check if any cables are slack or taut
+      
+      # INPUTS:
+      # x     - ndarray, state of the multi-robot-payload system
+      
+      # OUTPUTS:
+      # collision_condition   - self.nquad x 1 ndarray, True False value as collision condition
       # state assignment
       nquad = self.nquad
       rho_vec_list = self.pl_params.rho_vec_list
@@ -1423,20 +1161,37 @@ class simulation_base():
       xi = (attach_pos - robot_pos) / np.linalg.norm(attach_pos - robot_pos, 2, 0)
       
       # check collision condition
-      positive_attach_robot_vel = (np.sum(xi * (attach_vel - robot_vel), 0) > 1e-6)
+      # print("xi is")
+      # print(xi)
+      # print("relative vel")
+      # print((attach_vel - robot_vel))
+      # print("product is ")
+      # print(xi * (attach_vel - robot_vel))
+      positive_attach_robot_vel = (np.sum(xi * (attach_vel - robot_vel), 0) > 1e-3)
       taut_condition = self.istaut(attach_pos, robot_pos, self.pl_params.cable_length)
       collision_condition = np.empty((taut_condition.shape))
       for i in range(taut_condition.shape[0]):
         collision_condition[i] = positive_attach_robot_vel[i] and taut_condition[i]
-      return collision_condition
+      return collision_condition, xi
 
   def rigidbody_quad_inelastic_cable_collision(self, x, collision_idx):
+      # DESCRIPTION:
+      # rigidbody_quad_inelastic_cable_collision redistribute velocities between quadrotor
+      # and the payload immediately after one or more cables switch from slack to taut condition
+      
+      # INPUTS:
+      # x                   - ndarray, state of the multi-robot-payload system
+      # collision_idx       - ndarray, self.nquad by 1, True False value denotes collision is happen between payload and which quadrotor
+      
+      # OUTPUTS:
+      # collision_condition   - self.nquad x 1 ndarray, True False value as collision condition
       # state assignment
+
       xL = x[0:13].reshape((13, 1))
       xQs = x[13:].reshape((x.shape[0]-13, 1))
       nquad = self.nquad
       ntaut_quad = 0
-      for i in range(np.max(collision_idx.shape)):
+      for i in range(nquad):
           if collision_idx[i] != 0:
               ntaut_quad += 1
       IL = self.pl_params.I
@@ -1444,22 +1199,21 @@ class simulation_base():
       
       rho_vec_idx_bool = np.repeat(collision_idx, 3)
       rho_vec_idx_int = np.zeros(int(np.sum(rho_vec_idx_bool)), dtype=int)
+
       index = 0
-      for j in range(np.max(rho_vec_idx_bool.shape)):
+      for j in range(3*nquad):
           if rho_vec_idx_bool[j] == 1:
               rho_vec_idx_int[index] = j
               index = index + 1
       temp_rho_vec_asym_mat = self.pl_params.rho_vec_asym_mat[:, rho_vec_idx_int]
       rho_vec_asym_mat = temp_rho_vec_asym_mat   
       
-      index = 0
-      collision_idx_int = np.zeros(int(np.sum(collision_idx)), dtype=int)
-      for j in range(np.max(collision_idx.shape)):
+      collision_idx_int = [] 
+      for j in range(nquad):
           if collision_idx[j] == 1:
-              collision_idx_int[index] = j
-              index = index + 1
-      
-      temp_rho_vec_list = self.pl_params.rho_vec_list[:, utilslib.toint(collision_idx_int)]
+              collision_idx_int.append(j) 
+      #temp_rho_vec_list = self.pl_params.rho_vec_list[:, utilslib.toint(collision_idx_int)]
+      temp_rho_vec_list = self.pl_params.rho_vec_list[:, collision_idx_int]
       rho_vec_list = temp_rho_vec_list
 
       pl_rot = utilslib.QuatToRot(xL[6:10])
@@ -1470,8 +1224,10 @@ class simulation_base():
       robot_state = np.zeros((13, nquad))
       for i in range(nquad):
         robot_state[:, i] = xQs[13*i:13*(i+1), 0]
-      robot_pos = robot_state[0:3, utilslib.toint(collision_idx_int)]
-      robot_vel = robot_state[3:6, utilslib.toint(collision_idx_int)]
+      #robot_pos = robot_state[0:3, utilslib.toint(collision_idx_int)]
+      #robot_vel = robot_state[3:6, utilslib.toint(collision_idx_int)]
+      robot_pos = robot_state[0:3, collision_idx_int]
+      robot_vel = robot_state[3:6, collision_idx_int]
       
       # state computation
       xi = (attach_pos - robot_pos) / np.linalg.norm(attach_pos - robot_pos, 2, 0)
@@ -1485,7 +1241,6 @@ class simulation_base():
       temp_hatrho_rotL_xi = np.zeros((hatrho_index.shape), dtype=float)
       for i in range(hatrho_index.shape[1]): # for each col of the index
           temp_hatrho_rotL_xi[:, i] = hatrho_rotL_xi[hatrho_index[:, i], i]
-
       hatrho_rotL_xi = temp_hatrho_rotL_xi
 
       # cal for collision
@@ -1493,7 +1248,11 @@ class simulation_base():
       ML_top = np.hstack((mL * np.eye(3), np.zeros((3, 3))))
       ML_bottom = np.hstack((np.zeros((3, 3)), IL))
       ML = np.vstack((ML_top, ML_bottom))
-      MQ = self.uav_params.mass * np.eye(ntaut_quad)
+      MQ_list = []
+      for collide_uav_idx in collision_idx_int: 
+        MQ_list.append(self.uav_params[collide_uav_idx].mass)
+      #MQ = self.uav_params.mass * np.eye(ntaut_quad)
+      MQ = np.diag(np.array(MQ_list)) 
       M = ML + G1 @ MQ @ G1.T
       right_element = xi @ MQ @ robot_vel_xi_proj.T
       right_element = right_element.reshape((right_element.shape[0],1))
@@ -1525,6 +1284,7 @@ class simulation_base():
 ##################                    PTMASS                    ####################
 ####################################################################################
   def hybrid_ptmass_pl_transportationEOM(self, t, s):
+    # DESCRIPTION:
     # QUADEOM Wrapper function for solving quadrotor equation of motion
     # 	quadEOM takes in time, state vector, and output the derivative of the state vector, the
     # 	actual calcution is done in quadEOM_readonly.
@@ -1570,10 +1330,22 @@ class simulation_base():
           return self.taut_ptmass_payload_quadEOM_readonly(t, plqd, self.uav_F, self.uav_M)
 
   def slack_ptmass_payload_quadEOM_readonly(self, t, plqd, F, M):
-      # Assign params and states
-      mQ  =   self.uav_params.mass
+      # DESCRIPTION:
+      # slack_ptmass_payload_quadEOM_readonly Solve payload equation of motion
+      # calculating the derivative of the state vector when cable is slack
+          
+      # INPUTS:
+      # plqd - struct, quadrotor and payload parameters you want to pass in
+      # F - ndarray, thrust value from controller, in quadrotor frame
+      # M - ndarray, control moment from controller, in quadrotor frame
+      # t - float, time, not used currently
+          
+      # OUTPUTS:
+      # sdot   - 26 x 1, derivative of state vector s
+      # # Assign params and states
+      mQ  =   self.uav_params[0].mass
       e3  =   np.array([[0.0],[0.0],[1.0]])
-      g   =   self.uav_params.grav * e3
+      g   =   self.uav_params[0].grav * e3
       wRb =   plqd["qd_rot"];   # Rotation matrix of the quadrotor
       qd_quat     =   plqd["qd_quat"]
       qd_omega    =   plqd["qd_omega"]
@@ -1596,7 +1368,7 @@ class simulation_base():
                             [r,  q, -p,  0]]) @ qd_quat.reshape((qd_quat.shape[0], 1)) + K_quat * quaterror * qd_quat.reshape((qd_quat.shape[0], 1))
 
       # Solving for Quadrotor Angular Acceleration
-      pqrdot   = self.uav_params.invI @ (M - np.reshape(np.cross(qd_omega, self.uav_params.I @ qd_omega, axisa=0, axisb=0), (3,1)))
+      pqrdot   = self.uav_params[0].invI @ (M - np.reshape(np.cross(qd_omega, self.uav_params[0].I @ qd_omega, axisa=0, axisb=0), (3,1)))
       
       # Assemble sdot
       sdot = np.zeros((26,1), dtype=float)
@@ -1610,21 +1382,34 @@ class simulation_base():
       return sdot
 
   def taut_ptmass_payload_quadEOM_readonly(self, t, plqd, F, M):
+      # DESCRIPTION:
+      # taut_ptmass_payload_quadEOM_readonly Solve payload equation of motion
+      # calculating the derivative of the state vector when cable is taut
+          
+      # INPUTS:
+      # plqd - struct, quadrotor and payload parameters you want to pass in
+      # F - ndarray, thrust value from controller, in quadrotor frame
+      # M - ndarray, control moment from controller, in quadrotor frame
+      # t - float, time, not used currently
+          
+      # OUTPUTS:
+      # sdot   - 26 x 1, derivative of state vector s
       mL = self.pl_params.mass
-      mQ = self.uav_params.mass
+      mQ = self.uav_params[0].mass
       total_mass = mL + mQ
       l = self.pl_params.cable_length
       xi = plqd["xi"]
       xidot = plqd["xidot"]
       xi_omega = np.cross(xi,xidot)
       e3=np.array([[0.0],[0.0],[1.0]])
-      g = self.uav_params.grav * e3
+      g = self.uav_params[0].grav * e3
       wRb=plqd["qd_rot"]    #Rotation matrix of the quadrotor
       qd_quat = plqd["qd_quat"]
       qd_omega = plqd["qd_omega"]
       p = qd_omega[0]
       q = qd_omega[1]
       r = qd_omega[2]
+
       # Obtain tension vector
       quad_force_vector = F * wRb @ e3
       quad_centrifugal_f = mQ * l * (xi_omega.T @ xi_omega)
@@ -1643,7 +1428,8 @@ class simulation_base():
                             [r,  q, -p,  0]]) @ qd_quat.reshape((qd_quat.shape[0], 1)) + K_quat * quaterror * qd_quat.reshape((qd_quat.shape[0], 1))
 
       # Solving for Quadrotor Angular Acceleration
-      pqrdot   = self.uav_params.invI @ (M - np.cross(qd_omega, self.uav_params.I @ qd_omega, axisa=0, axisb=0).T.reshape(3, 1))
+      pqrdot   = self.uav_params[0].invI @ (M - np.cross(qd_omega, self.uav_params[0].I @ qd_omega, axisa=0, axisb=0).T.reshape(3, 1))
+
       # Assemble sdot
       sdot = np.zeros((26,1), dtype=float)
       sdot[0:3] = plqd["vel"].reshape(3, 1)
@@ -1657,7 +1443,20 @@ class simulation_base():
       return sdot
 
   def ptmass_inelastic_cable_collision(self, x1, x2, m1, m2): 
+      # DESCRIPTION:
+      # ptmass_inelastic_cable_collision 
+      # redistribute the velocity between payload and the quadrotor by assuming
       # perfectly inelastic collision of ptmass and the drone along the cable direction
+          
+      # INPUTS:
+      # x1 - float, position of object 1
+      # x2 - float, position of object 2
+      # m1 - float, mass of object 1
+      # m2 - float, mass of object 2
+          
+      # OUTPUTS:
+      # v1, v2   - both float, new velocities for the two object
+      
       obj1_pos = x1[0:3]
       obj1_pos = obj1_pos.reshape((3, 1))
       obj2_pos = x2[0:3]
@@ -1680,23 +1479,37 @@ class simulation_base():
 
       return v1, v2
 
-
 ####################################################################################
 ##################                  Rigidlink                   ####################
 ####################################################################################
   def rigid_links_cooperative_rigidbody_pl_EOM(self, t, s):
-    # original          - 13 x 1, state vector = [xL,   yL,     zL, 
-    #                                             xLd,  yLd,    zLd, 
-    #                                             qw,   qx,     qy,     qz,   
-    #                                             pL,   qL,     rL]
-    # s: take_in/output - 26 x 1, state vector(dot-elementwise) = [ xL,         yL,         zL,     
-    #                                                               xLd,        yLd,        zLd,
-    #                                                               qLw = 0,    qLx = 0,    qLy = 0,    qLz = 0,    
-    #                                                               pL,         qL,         rL,
-    #                                                               xQ = 0,     yQ = 0,     zQ = 0, 
-    #                                                               xQd = 0,    yQd = 0,    zQd = 0,
-    #                                                               qw,         qx,         qy,         qz,     
-    #                                                               pQuad = 0,  qQuad = 0,  rQuad = 0]
+    # DESCRIPTION
+    # QUADEOM Wrapper function for solving quadrotor equation of motion
+    # 	quadEOM takes in time, state vector, and output the derivative of the state vector, the
+    # 	actual calcution is done in quadEOM_readonly.
+    #
+    # INPUTS:
+    # t             - 1 x 1, time
+    # s: take_in    - 26 x 1, state vector(dot-elementwise) = [ xL,         yL,         zL,     
+    #                                                           xLd,        yLd,        zLd,
+    #                                                           qLw = 0,    qLx = 0,    qLy = 0,    qLz = 0,    
+    #                                                           pL,         qL,         rL,
+    #                                                           xQ = 0,     yQ = 0,     zQ = 0, 
+    #                                                           xQd = 0,    yQd = 0,    zQd = 0,
+    #                                                           qw,         qx,         qy,         qz,     
+    #                                                           pQuad = 0,  qQuad = 0,  rQuad = 0]
+    #
+    #                   ,where [xL, yL, zL] is payload postion
+    #                          [xLd, yLd, zLd], is payload linear velocity
+    #                          [qLw, qLx, qLy, qLz], is payload orientation in quaternion
+    #                          [pL, qL, rL], is payload orientation in euler angle
+    #                          [xQ, yQ, zQ] is quadrotor position
+    #                          [xQd, yQd, zQd] is quadrotor velocity
+    #                          [qw, qx, qy, qz] is quadrotor orientation in quaternion
+    #                          [pQuad, qQuad, rQuad] is quadrotor angular velocity in its own frame
+    # OUTPUTS:
+    # sdot          - 26 x 1, derivative of state vector s as mentioned above (some values are forced to 0)
+  
       qd = {}
       # extract payload state_vector
       qd["pos"] = s[0:3]
@@ -1708,8 +1521,17 @@ class simulation_base():
       result = self.rigidbody_structEOM_readonly(t, qd, self.uav_F, self.uav_M)
       return result
   
-  # this is the same as the function in controller.py
   def rigid_links_cooperative_payload_controller_init(self, ql, params):
+    # DESCRIPTION:
+    # rigid_links_cooperative_payload_controller_init() initialize the robot_thrust_moment for rigid link robot system
+    # this function is only called once when initialization happens at __init__(), this is the same as the function in controller.py
+    #
+    # INPUTS:
+    # ql - struct, quadrotor and payload parameters you want to pass in
+    # params - struct, store important simulation parameter
+    #
+    # OUTPUTS:
+    # u          - ndarray, 6*1, controlled force and moment
         if not params.sim_start:
             self.icnt = 0
         self.icnt = self.icnt + 1
@@ -1770,6 +1592,18 @@ class simulation_base():
         return u
 
   def rigidbody_structEOM_readonly(self, t, s, F, M):
+    # DESCRIPTION:
+    # rigidbody_structEOM_readonly() Solve payload equation of motion
+    # calculating the derivative of the state vector
+    #
+    # INPUTS:
+    # s - struct, state of the rigidlink system
+    # F - ndarray, thrust value from controller, in quadrotor frame
+    # M - ndarray, control moment from controller, in quadrotor frame
+    # t - float, time, not used currently
+    #
+    # OUTPUTS:
+    # u          - ndarray, 6*1, controlled force and moment
       # Assign states
       quat = s["quat"]
       qW = quat[0]
@@ -1832,7 +1666,6 @@ class simulation_base():
       sdotLoad = sdotLoad.reshape((26, ))
       return sdotLoad
 
-
 ##################                  Call backs                  ####################
   
   def ext_wrench_callback(self, wrench_command):
@@ -1843,6 +1676,8 @@ class simulation_base():
       return
 
   def fm_command_callback(self,fm_command,uav_id):
+    # DESCRIPTION:
+    # call back function for fm_command, get force and moment command from quadrotor controllers
         if self.pl_params.mechanism_type == 'Rigid Link':
             self.uav_F[0,0] = fm_command.rlink_thrust.x
             self.uav_F[1,0] = fm_command.rlink_thrust.y

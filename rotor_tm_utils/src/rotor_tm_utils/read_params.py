@@ -14,6 +14,7 @@ from rotor_tm_utils.RPYtoRot_ZXY import RPYtoRot_ZXY
 # Class to store various parameters of the UAV and the controller
 @dataclass
 class uav_params_class:
+  uav_name: str # The UAV's name
   mass: float # UAV mass 
   inertia: list # UAV inertia
   arm_length: float # motor arm length 
@@ -21,7 +22,7 @@ class uav_params_class:
   num_props: int # number of propellors
   max_rpm: int # maximum rpm of the rotor 
   min_rpm: int # minimum rpm of the rotor
-  motor_coefficients: float  
+  motor_coefficients: float # The motor coefficients gramf/rpm^2 
   mesh_path: str # UAV mesh file path for visualization 
 
 @dataclass
@@ -29,7 +30,8 @@ class mechanism_params_class:
   mechanism_type: str # attach mechanism type 
   num_of_robots: int # number of robots 
   rho: list # attach place on the payload 
-  cable_length: list
+  robot_list: list # This list of robots 
+  cable_length: list 
   yaw_list: list
 
 @dataclass
@@ -63,11 +65,35 @@ class read_params:
 
   def system_setup(self, payload_params_path = None,quad_params_path = None,mechanism_params_path = None,payload_control_params_path = None,uav_controller_params_path=None): 
     payload_control_gains = self.read_payload_control_gains(payload_control_params_path)
-    uav_control_gains = self.read_uav_control_gains(uav_controller_params_path)
-    quad_params = self.read_uav_params(quad_params_path)
-    payload_params = self.read_payload_params(payload_params_path)
     mechanism_params = self.read_mechanism_params(mechanism_params_path)
-    params = payload_params
+    quad_params = []
+    uav_type = []
+    uav_in_team = []
+    for robot_idx, robot_name in enumerate(mechanism_params.robot_list):
+      quad_ = self.read_uav_params(quad_params_path+robot_name+".yaml")
+      uav_control_gains = self.read_uav_control_gains(uav_controller_params_path+robot_name+"_control_gains.yaml")
+      quad_.Kp = uav_control_gains.Kp
+      quad_.Kd = uav_control_gains.Kd
+      quad_.Kpe = uav_control_gains.Kpe
+      quad_.Kde = uav_control_gains.Kde
+      quad_.Kxi = uav_control_gains.Kxi
+      quad_.Kw = uav_control_gains.Kw
+      quad_params.append(quad_)
+
+      uav_name = quad_.uav_name
+      if uav_name in uav_type: 
+        uav_type_idx = uav_type.index(uav_name)
+        total_num_uav_of_current_type = len(uav_in_team[uav_type_idx])
+        uav_name_with_id = uav_name + str(total_num_uav_of_current_type+1)
+        uav_in_team[uav_type_idx].append(uav_name_with_id)
+      else: 
+        uav_type.append(uav_name)
+        uav_name_with_id = uav_name + str(1)
+        uav_in_team.append([uav_name_with_id])
+
+    #quad_params = self.read_uav_params(quad_params_path+robot_name+".yaml")
+    params = self.read_payload_params(payload_params_path)
+    params.uav_in_team = sum(uav_in_team, [])
 
     params.nquad = mechanism_params.num_of_robots
     params.mechanism_type = mechanism_params.mechanism_type
@@ -76,12 +102,6 @@ class read_params:
     params.Kd = payload_control_gains.Kd
     params.Kpe = payload_control_gains.Kpe
     params.Kde = payload_control_gains.Kde
-    quad_params.Kp = uav_control_gains.Kp
-    quad_params.Kd = uav_control_gains.Kd
-    quad_params.Kpe = uav_control_gains.Kpe
-    quad_params.Kde = uav_control_gains.Kde
-    quad_params.Kxi = uav_control_gains.Kxi
-    quad_params.Kw = uav_control_gains.Kw
     params.rho_vec_asym_mat = np.hstack([utilslib.vec2asym(mechanism_params.rho_vec_list[:,k]) for k in range(0,params.nquad)])
     identity_stack_mat = np.hstack([np.eye(3) for k in range(0,params.nquad)])
 
@@ -90,13 +110,15 @@ class read_params:
         params.id = "Cable"
         ## This section sets up the essential controller parameters for cable suspended payload
         ## store cable length in both payload and uav params
-        quad_params.l = mechanism_params.cable_length[0] 
+        #quad_params.l = mechanism_params.cable_length[0] 
         params.cable_length = mechanism_params.cable_length
         if params.payload_type == 'Rigid Body':
           # Geometric parameters matrix for cooperative geometric controller
           P = np.vstack((identity_stack_mat,params.rho_vec_asym_mat))
-          params.pseudo_inv_P = np.matmul(P.T, LA.inv(np.matmul(P, P.T)))
+          params.pseudo_inv_P = LA.pinv(P) # np.matmul(P.T, LA.inv(np.matmul(P, P.T)))
           params.P = P
+          for robot_idx, robot_name in enumerate(mechanism_params.robot_list):
+            quad_params[robot_idx].l = mechanism_params.cable_length[robot_idx] 
     else:
         if params.mechanism_type == 'Rigid Link':
           params.id = "Rigid Link"
@@ -107,22 +129,24 @@ class read_params:
           params.struct_I = params.I
           params.struct_mass = params.mass
           rho_c = np.zeros((1,3), dtype=float)
-          for k in np.arange(1,params.nquad+1):
-              params.struct_mass = params.struct_mass + quad_params.mass
-              rho_c = rho_c + quad_params.mass * mechanism_params.rho_vec_list[:,k-1].T
+          total_quad_mass = 0.0
+          for uav_idx in range(params.nquad):
+              params.struct_mass = params.struct_mass + quad_params[uav_idx].mass
+              rho_c = rho_c + quad_params[uav_idx].mass * mechanism_params.rho_vec_list[:,uav_idx].T
+              total_quad_mass += quad_params[uav_idx].mass
 
-          rho_c = rho_c / (quad_params.mass * params.nquad + params.mass)
+          rho_c = rho_c / (total_quad_mass + params.mass)
           rho_c = rho_c.T
  
           params.struct_I = params.struct_I + params.mass * np.array([[rho_c[1, 0]**2,0,0],[0,rho_c[0, 0]**2,0],[0,0,rho_c[0, 0]**2+rho_c[1, 0]**2]])
 
           ## Calculate the geometric constraints of the structure
           A = np.zeros((4,0), dtype=float)
-          for k in np.arange(1,params.nquad+1).reshape(-1):
-              rho = mechanism_params.rho_vec_list[:, k-1] - rho_c.T
+          for k in range(params.nquad):
+              rho = mechanism_params.rho_vec_list[:, k] - rho_c.T
               rho = rho.T
-              R = np.transpose(RPYtoRot_ZXY(0,0,mechanism_params.yaw_list[k-1]))
-              params.struct_I = params.struct_I + R @ quad_params.I @ R.T + quad_params.mass * np.array([[rho[1,0]**2,0,0],[0,rho[0,0]**2,0],[0,0,rho[0,0]**2+rho[1,0]**2]])
+              R = np.transpose(RPYtoRot_ZXY(0,0,mechanism_params.yaw_list[k]))
+              params.struct_I = params.struct_I + R @ quad_params[k].I @ R.T + quad_params[k].mass * np.array([[rho[1,0]**2,0,0],[0,rho[0,0]**2,0],[0,0,rho[0,0]**2+rho[1,0]**2]])
               A = np.hstack((A, np.vstack((np.array([1,0,0,0]), np.hstack((np.array([[rho[1,0]],[rho[0,0]],[0.0]]), R))))))
           params.rho_load = -rho_c
           params.rho_robot = mechanism_params.rho_vec_list - rho_c
@@ -217,7 +241,7 @@ class read_params:
       rho_vec_list = []
       for i in range(0,params.num_of_robots):
           rho_vec_list.append(np.array([params.rho[i]['x'],params.rho[i]['y'],params.rho[i]['z']]))
-       
+
       params.rho_vec_list = np.array(rho_vec_list).T
       return params
 
@@ -231,8 +255,8 @@ class read_params:
     params.invI = LA.inv(params.I)
     params.grav = 9.81
     params.maxangle = params.max_angle * np.pi/180
-    params.maxF = params.num_props * params.motor_coefficients * params.max_rpm**2 * 1e-3 * params.grav
-    params.minF = params.num_props * params.motor_coefficients * params.min_rpm**2 * 1e-3 * params.grav
+    params.maxF = params.num_props * params.motor_coefficients * params.max_rpm**2 
+    params.minF = params.num_props * params.motor_coefficients * params.min_rpm**2
     self.uav_params = params
     return params
 
