@@ -5,11 +5,14 @@ import scipy.integrate
 from scipy.spatial.transform import Rotation as rot_math
 from visualization_msgs.msg import MarkerArray, Marker
 from nav_msgs.msg import Odometry, Path
-from geometry_msgs.msg import PoseStamped
-from rotor_tm_msgs.msg import RPMCommand, FMCommand 
+from geometry_msgs.msg import PoseStamped, Wrench
+from sensor_msgs.msg import Imu
+from rotor_tm_msgs.msg import RPMCommand, FMCommand
+from quadrotor_msgs.msg import ukf_measurement_update
 from rotor_tm_utils import utilslib, rosutilslib
 from rotor_tm_utils.vee import vee
 import time
+import scipy.linalg as LA
 
 def ptmassslackToTaut(t, x):
     # DESCRIPTION:
@@ -128,7 +131,13 @@ class simulation_base():
       self.mav_name = 'dragonfly'
       self.sim_start = False
       self.last_odom_time_received = 0.0
-
+      self.ext_force = np.array([0.0,0.0,0.0])
+      self.ext_torque = np.array([0.0,0.0,0.0])
+      self.imu_accel = np.zeros((3, self.nquad), dtype=float)
+      self.variance = 0.01**3   # variance for odom
+      self.imu_variance = 0.01**2 # variance for imu
+      self.wrench_value = Wrench()
+      self.tension_ = np.zeros((3, self.nquad), dtype=float)
       # Three scenario:
       #                 1. Cooperative
       #                 2. Point mass
@@ -234,6 +243,7 @@ class simulation_base():
       self.payload_odom_publisher = rospy.Publisher('payload/odom',Odometry,queue_size=1, tcp_nodelay=True)
       self.payload_odom_ground_truth_publisher = rospy.Publisher('payload/odom_ground_truth',Odometry,queue_size=1, tcp_nodelay=True)
       self.payload_path_publisher = rospy.Publisher('payload/path',Path,queue_size=1, tcp_nodelay=True)
+      self.robot_vio_publisher = rospy.Publisher('payload/vio', Odometry, queue_size=1, tcp_nodelay=True)
       self.payload_path = Path()
       self.robot_odom_publisher = []
       self.attach_publisher = []
@@ -290,6 +300,7 @@ class simulation_base():
         print("LOW PERFORMANCE PROCESSOR PROCEDE WITH CAUTION")
         print("############################################################\n")
         while not rospy.is_shutdown():
+            current_time = rospy.get_rostime()
             start = time.time()
             # Three scenario:
             #                 1. Cooperative
@@ -349,7 +360,7 @@ class simulation_base():
                     ## recheck cable slack condition
                     self.cable_is_slack = self.isslack(x[0:3], x[13:16], self.pl_params.cable_length)
                 
-            # Third Scenario: Cooperative 
+            # First Scenario: Cooperative 
                 else:    
                     ## first, we check for collision
                     inelastic_collision_flag, xi = self.cooperative_check_inelastic(x)
@@ -437,10 +448,16 @@ class simulation_base():
             
             
             # Publish payload odometry
-            current_time = rospy.get_rostime()
+
             payload_odom = Odometry()
+            # current_time = rospy.get_rostime()
             payload_odom.header.stamp = current_time
-            payload_odom.header.frame_id = self.worldframe 
+            payload_odom.header.frame_id = self.worldframe
+            
+            payload_vio = Odometry()        
+            # current_time = rospy.get_rostime()  
+            payload_vio.header.stamp = current_time
+            payload_vio.header.frame_id = self.worldframe 
             payload_rotmat = utilslib.QuatToRot(sol.y[:,0][6:10])
 
             if self.pl_params.mechanism_type == 'Rigid Link':
@@ -486,12 +503,13 @@ class simulation_base():
             self.payload_odom_ground_truth_publisher.publish(payload_odom)
 
             # Publish payload path
-            current_time = rospy.get_rostime()
+            # current_time = rospy.get_rostime()
 
             self.payload_path.header.stamp = current_time
             self.payload_path.header.frame_id = self.worldframe 
 
             pl_pose_stamped = PoseStamped()
+            # current_time = rospy.get_rostime()
             pl_pose_stamped.header.stamp = current_time
             pl_pose_stamped.header.frame_id = self.worldframe
             pl_pose_stamped.pose = payload_odom.pose.pose 
@@ -502,8 +520,19 @@ class simulation_base():
             system_marker = MarkerArray()
             cable_point_list = np.zeros((2*self.nquad,3))
 
-            for uav_id in range(self.nquad):
+            #uav_odom = Odometry()
+            #attach_odom = Odometry()
+            #ukf_measure = ukf_measurement_update()
+            #self.UKF_publisher[self.nquad+1].publish(ukf_measure)
+            #self.robot_odom_publisher[self.nquad+1].publish(uav_odom)
+            #self.attach_publisher[self.nquad+1].publish(attach_odom)
+            #self.UKF_publisher[self.nquad].publish(ukf_measure)
+            #self.robot_odom_publisher[self.nquad].publish(uav_odom)
+            #self.attach_publisher[self.nquad].publish(attach_odom)
+
+            for uav_id in range(self.nquad-1, -1, -1):
                 if self.pl_params.mechanism_type == 'Rigid Link':
+                    print("I'm in Rigid Link", uav_id)
                     uav_state = x[13:26]
                     attach_pos = x[0:3] + payload_rotmat @ (self.pl_params.rho_robot[:,uav_id]+np.array([0.0,0,0.04]))
                     uav_state[0:3] = attach_pos
@@ -514,8 +543,8 @@ class simulation_base():
                         if uav_attach_distance > self.cable_len_list[uav_id]:
                             xi = uav_attach_vector/uav_attach_distance
                             uav_state[0:3] = attach_pos[0:3] + self.cable_len_list[uav_id] * xi
-
                 else:
+                    # print("I'm in non rigid link", uav_id)
                     uav_state = x[self.pl_dim_num+self.uav_dim_num*uav_id:self.pl_dim_num+self.uav_dim_num*(uav_id+1)]
                     attach_pos = x[0:3] + np.matmul(payload_rotmat, self.rho_vec_list[:,uav_id])
                     attach_vel = x[3:6] + np.matmul(payload_rotmat, np.cross(sol.y[:,0][10:13], self.rho_vec_list[:,uav_id]))
@@ -570,9 +599,9 @@ class simulation_base():
 
             # Update cable visualization
             cable_marker_msg = rosutilslib.init_marker_msg(Marker(),5,0,self.worldframe,self.cable_marker_scale,self.cable_marker_color)
-            system_marker.markers.append(rosutilslib.update_line_msg(cable_marker_msg,cable_point_list,uav_id + 1))
+            system_marker.markers.append(rosutilslib.update_line_msg(cable_marker_msg,cable_point_list,self.nquad + 1))
             # Update payload visualization
-            system_marker.markers.append(rosutilslib.update_marker_msg(self.payload_marker_msg,x[0:3],x[6:10],uav_id+2))
+            system_marker.markers.append(rosutilslib.update_marker_msg(self.payload_marker_msg,x[0:3],x[6:10],self.nquad+2))
             self.system_publisher.publish(system_marker)
 
             rate.sleep()    
@@ -595,6 +624,7 @@ class simulation_base():
             # Publish payload odometry
             current_time = rospy.get_rostime()
             payload_odom = Odometry()
+            payload_vio = Odometry()   
             payload_odom.header.stamp = current_time
             payload_odom.header.frame_id = self.worldframe 
             payload_rotmat = utilslib.QuatToRot(sol.y[:,0][6:10])
@@ -641,6 +671,9 @@ class simulation_base():
 
             self.payload_odom_ground_truth_publisher.publish(payload_odom)
 
+            self.payload_odom_publisher.publish(payload_odom)
+            self.robot_vio_publisher.publish(payload_vio)
+            self.payload_ctrl_wrench.publish(self.wrench_value)
             # Publish payload path
             current_time = rospy.get_rostime()
 
@@ -649,6 +682,7 @@ class simulation_base():
             payload_rotmat = utilslib.QuatToRot(sol.y[:,0][6:10])
 
             pl_pose_stamped = PoseStamped()
+            current_time = rospy.get_rostime()
             pl_pose_stamped.header.stamp = current_time
             pl_pose_stamped.header.frame_id = self.worldframe
             pl_pose_stamped.pose = payload_odom.pose.pose 
@@ -658,7 +692,8 @@ class simulation_base():
 
             system_marker = MarkerArray()
             cable_point_list = np.zeros((2*self.nquad,3))
-            for uav_id in range(self.nquad):
+            
+            for uav_id in range(self.nquad-1, -1, -1):
                 if self.pl_params.mechanism_type == 'Rigid Link':
                     uav_state = x[13:26]
                     attach_pos = x[0:3] + payload_rotmat @ (self.pl_params.rho_robot[:,uav_id]+np.array([-0.06,0,0.02]))
@@ -904,7 +939,22 @@ class simulation_base():
       
       invML = linalg.inv(ML)
 
+
+      payload_rot = utilslib.QuatToRot(s[6:10])
+      diag_rot = np.zeros((0,0), dtype=float)
+      for i in range(1, self.nquad+1):
+          diag_rot = LA.block_diag(diag_rot, payload_rot)
+      
+      #pl_ctrl_F = pl_net_F
+      #pl_ctrl_M = pl_net_M
+      pl_net_F = pl_net_F # pl_net_F is in world frame
+      pl_net_M = pl_net_M # pl_net_M is in world frame
+      mu_ext =  diag_rot @  self.pl_params.pseudo_inv_P @ np.append(self.ext_force, self.ext_torque, axis=0)
+      # print("mu_ext is\n", mu_ext)
       ## Dynamics of Payload
+
+
+      # print(pl_net_F)
       sdotLoad = self.rigidbody_payloadEOM_readonly(pl_state,pl_net_F,pl_net_M,invML,C,D,E)
       
       self.pl_accel = sdotLoad[3:6]
@@ -919,11 +969,23 @@ class simulation_base():
              M = self.uav_M[:,uav_idx]
              sdotQuad = self.slack_quadEOM_readonly(uav_s,F,M,uav_idx)
          else:
+             #print(tension_vector[:,uav_idx])
+             #print(xixiT)
+             #T = tension_vector[:,uav_idx] - np.matmul(xixiT, mu_ext[uav_idx*self.nquad:(uav_idx+1)*self.nquad])
              T = tension_vector[:,uav_idx]
-             F = self.uav_F[uav_idx]
+             
+             #test = mu_ext[uav_idx*self.nquad:(uav_idx+1)*self.nquad]
+             #print(test.shape)
+             #print(test)
+             #test2 = self.uav_F[uav_idx]
+             #print(test2.shape)
+             #print(test2)
+             F = self.uav_F[uav_idx] 
              M = self.uav_M[:,uav_idx]
              sdotQuad = self.taut_quadEOM_readonly(uav_s,F,M,T,uav_idx)
          sdot = np.concatenate((sdot,sdotQuad))
+        
+
       return sdot
     
   def rigidbody_payloadEOM_readonly(self, s, F, M, invML, C, D, E): 
@@ -957,11 +1019,19 @@ class simulation_base():
       # Payload Angular acceleration
       effective_M = M - np.matmul(C, np.matmul(invML, F)) - np.cross(omega, np.matmul(self.pl_params.I, omega))
       effective_inertia = self.pl_params.I + np.matmul(C, np.matmul(invML, D)) - E
-      omgLdot = np.linalg.solve(effective_inertia,effective_M)
+      omgLdot = np.linalg.solve(effective_inertia,effective_M) + self.pl_params.invI @ self.ext_torque 
+      #omgLdot = np.linalg.solve(effective_inertia,effective_M)
 
       # Payload Acceleration
-      accL = np.matmul(invML, F + np.matmul(D, omgLdot)) - np.array([0,0,self.pl_params.grav])
-
+      accL = np.matmul(invML, F + np.matmul(D, omgLdot)) - np.array([0,0,self.pl_params.grav]) + self.ext_force/self.pl_params.mass
+      # accL = np.matmul(invML, F + np.matmul(D, omgLdot)) - np.array([0,0,self.pl_params.grav])
+      temp = invML @ (F * self.pl_params.mass)
+      self.wrench_value.force.x = temp[0]
+      self.wrench_value.force.y = temp[1]
+      self.wrench_value.force.z = temp[2]
+      self.wrench_value.torque.x = M[0]
+      self.wrench_value.torque.y = M[1]
+      self.wrench_value.torque.z = M[2]
       # Assemble sdot
       sdotLoad = np.zeros(self.pl_dim_num)
       sdotLoad[0:3] = s[3:6] 
@@ -1597,6 +1667,11 @@ class simulation_base():
       return sdotLoad
 
 ##################                  Call backs                  ####################
+  
+  def ext_wrench_callback(self, wrench_command):
+      self.ext_force = np.array([wrench_command.force.x, wrench_command.force.y, wrench_command.force.z])
+      self.ext_torque= np.array([wrench_command.torque.x, wrench_command.torque.y, wrench_command.torque.z])
+
   def rpm_command_callback(self,rpm_command,uav_id):
       return
 

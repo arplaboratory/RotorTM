@@ -9,7 +9,7 @@ from std_msgs.msg import Bool
 from nav_msgs.msg import Odometry 
 from rotor_tm_msgs.msg import PositionCommand,RPMCommand,FMCommand
 from rotor_tm_msgs.msg import CenPL_Command
-from geometry_msgs.msg import Vector3
+from geometry_msgs.msg import Vector3, Wrench
 
 from rotor_tm_utils import read_params
 from rotor_tm_utils import utilslib 
@@ -103,6 +103,7 @@ class controller_node:
             FM_message_name = '/' + uav_name + "/fm_cmd"
             des_odom_name = '/' + uav_name + "/des_odom"
             self.cen_pl_cmd_pub = rospy.Publisher(node_name + "/payload/cen_pl_cmd", CenPL_Command, queue_size = 10)
+            self.cen_pl_wrench_pub = rospy.Publisher(node_name + "/payload/cen_wrench_cmd", Wrench, queue_size = 10)
             self.FM_pub.append(rospy.Publisher(node_name +  FM_message_name, FMCommand, queue_size=1, tcp_nodelay=True))
             self.status_pub = rospy.Publisher(node_name + "/heartbeat", Bool, queue_size = 10)
 
@@ -444,6 +445,10 @@ class controller_node:
                     cen_pl_command.mu.append(mu_command)
                     cen_pl_command.estimated_acc.append(acc_command)
 
+                cen_pl_command.pos_cmd.quaternion.x = self.pl["quat"][1,0]
+                cen_pl_command.pos_cmd.quaternion.y = self.pl["quat"][2,0]
+                cen_pl_command.pos_cmd.quaternion.z = self.pl["quat"][3,0]
+                cen_pl_command.pos_cmd.quaternion.w = self.pl["quat"][0,0]
                 self.cen_pl_cmd_pub.publish(cen_pl_command)
             elif self.pl_params.payload_type == 'Point Mass':
                 plqd = self.assembly_plqd()

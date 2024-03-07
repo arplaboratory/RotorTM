@@ -245,7 +245,16 @@ class controller:
         for i in range(1, nquad+1):
             diag_rot = LA.block_diag(diag_rot, Rot)
 
+        pl_F = F
+        pl_M = M
+
         mu = diag_rot @ pl_params.pseudo_inv_P @ np.append(Rot.T @ F, M, axis=0)
+        
+        #print("force:")
+        #print("   x: " + str(np.around(mu[2,0], 10)))
+        #print("   y: " + str(np.around(mu[5,0], 10)))
+        #print("   z: " + str(np.around(mu[8,0], 10)))
+        #print("---")
         for i in range(1, nquad+1):
             if (0>mu[3*i-1, 0]):
                 mu[3*i-1, 0] = 0 
@@ -283,8 +292,12 @@ class controller:
         #    qd_rot_des[qn] = Rot_des_qn 
     
         #return qd_F, qd_M
+<<<<<<< HEAD
 
         return mu, att_acc_c, qd_F, qd_M, qd_quat_des, qd_rot_des
+=======
+        return mu, att_acc_c, qd_F, qd_M, qd_quat_des, qd_rot_des, pl_F, pl_M
+>>>>>>> 2517ef75853df6f53083a7aa94b9eabf9d23e9b9
 
     # untested
     def cooperative_payload_controller(self, ql, params):
