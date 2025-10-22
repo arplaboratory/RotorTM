@@ -29,10 +29,11 @@ If you publish a paper with our simulator, please cite our paper published in IE
   author={Li, Guanrui and Liu, Xinyang and Loianno, Giuseppe},
   journal={IEEE Transactions on Robotics}, 
   title={RotorTM: A Flexible Simulator for Aerial Transportation and Manipulation}, 
-  year={2023},
-  volume={},
+  year={2024},
+  volume={40},
   number={},
-  pages={1-20},
+  pages={831-850},
+  keywords={Payloads;Robots;Transportation;Mathematical models;Collision avoidance;Quadrotors;Numerical models;Aerial robotics;aerial systems and applications;aerial transportation and manipulation;micro aerial vehicles (MAVs);simulation},
   doi={10.1109/TRO.2023.3336320}}
  ```
 
